@@ -17,7 +17,7 @@ provider "azurerm" {
 # Create a resource group with standard tags
 # All resources within this group should inherit these tags
 resource "azurerm_resource_group" "cfi_test" {
-  name     = "rg-cfi-test-${random_id.suffix.hex}"
+  name     = "rg-cfi-${var.target_id}-${random_id.suffix.hex}"
   location = var.azure_location
 
   tags = {
@@ -25,13 +25,14 @@ resource "azurerm_resource_group" "cfi_test" {
     ManagedBy        = "Terraform"
     Project          = "CCC-CFI-Compliance"
     AutoCleanup      = "true"
+    CFITargetID      = var.target_id
     GitHubWorkflow   = "CFI-Build"
     GitHubRunID      = var.github_run_id
     GitHubRepository = var.github_repository
   }
 }
 
-# Random suffix to avoid naming conflicts
+# Random suffix to avoid naming conflicts between parallel runs
 resource "random_id" "suffix" {
   byte_length = 4
 }
@@ -41,6 +42,12 @@ variable "azure_location" {
   description = "Azure location"
   type        = string
   default     = "eastus"
+}
+
+variable "target_id" {
+  description = "CFI Target ID (e.g., azure-storage-account)"
+  type        = string
+  default     = "local-test"
 }
 
 variable "github_run_id" {

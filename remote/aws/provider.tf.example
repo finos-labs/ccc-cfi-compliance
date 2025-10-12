@@ -20,6 +20,7 @@ provider "aws" {
       ManagedBy        = "Terraform"
       Project          = "CCC-CFI-Compliance"
       AutoCleanup      = "true"
+      CFITargetID      = var.target_id
       GitHubWorkflow   = "CFI-Build"
       # Optional: Add GitHub Action metadata for traceability
       GitHubRunID      = var.github_run_id
@@ -28,11 +29,17 @@ provider "aws" {
   }
 }
 
-# Variables for optional GitHub metadata
+# Variables for CFI testing and GitHub metadata
 variable "aws_region" {
   description = "AWS region"
   type        = string
   default     = "us-east-1"
+}
+
+variable "target_id" {
+  description = "CFI Target ID (e.g., aws-s3-bucket)"
+  type        = string
+  default     = "local-test"
 }
 
 variable "github_run_id" {

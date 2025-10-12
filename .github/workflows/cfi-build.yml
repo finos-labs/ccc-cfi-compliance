@@ -59,6 +59,7 @@ jobs:
       TARGET_SERVICE: ${{ matrix.target.service }}
       # Terraform variables
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_target_id: ${{ matrix.target.id }}
       TF_VAR_github_run_id: ${{ github.run_id }}
       TF_VAR_github_run_number: ${{ github.run_number }}
       TF_VAR_github_actor: ${{ github.actor }}
@@ -230,6 +231,13 @@ jobs:
       - name: Setup provider configuration with tagging
         run: |
           echo "📝 Copying provider configuration for $TARGET_PROVIDER..."
+
+          # GCP requires lowercase labels - sanitize target_id
+          if [ "$TARGET_PROVIDER" = "gcp" ]; then
+            export TF_VAR_target_id_sanitized=$(echo "$TARGET_ID" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            export TF_VAR_github_run_id_sanitized=$(echo "${{ github.run_id }}" | tr '[:upper:]' '[:lower:]')
+            echo "📝 Sanitized for GCP: target_id=$TF_VAR_target_id_sanitized"
+          fi
 
           # Copy the appropriate provider.tf.example to the target directory
           if [ -f "remote/$TARGET_PROVIDER/provider.tf.example" ]; then
