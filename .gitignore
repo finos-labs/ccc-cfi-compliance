@@ -75,3 +75,8 @@ dist/
 
 # Development temp folder
 tmp
+
+
+cucumber-report.html
+report.json
+coverage.out

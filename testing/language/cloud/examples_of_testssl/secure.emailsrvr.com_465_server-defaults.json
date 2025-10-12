@@ -1,0 +1,245 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh -S --jsonfile-pretty=secure.emailsrvr.com_465_server-defaults.json secure.emailsrvr.com:465",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760037260",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "secure.emailsrvr.com",
+                    "ip"              : "173.203.187.10",
+                    "port"            : "465",
+                    "rDNS"            : "secure.emailsrvr.com",
+                    "service"         : "SMTP, thus skipping HTTP specific checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+                            {
+                                "id"           : "TLS_extensions",
+                                "severity"     : "INFO",
+                                "finding"      : "'EC point formats/#11' 'heartbeat/#15' 'session ticket/#35' 'renegotiation info/#65281'"
+                           },{
+                                "id"           : "TLS_session_ticket",
+                                "severity"     : "INFO",
+                                "finding"      : "valid for 7200 seconds only (<daily)"
+                           },{
+                                "id"           : "SSL_sessionID_support",
+                                "severity"     : "INFO",
+                                "finding"      : "yes"
+                           },{
+                                "id"           : "sessionresumption_ticket",
+                                "severity"     : "INFO",
+                                "finding"      : "not supported"
+                           },{
+                                "id"           : "sessionresumption_ID",
+                                "severity"     : "INFO",
+                                "finding"      : "not supported"
+                           },{
+                                "id"           : "early_data",
+                                "severity"     : "INFO",
+                                "finding"      : "No TLS 1.3 offered"
+                           },{
+                                "id"           : "TLS_timestamp",
+                                "severity"     : "INFO",
+                                "finding"      : "off by 0 seconds from your localtime"
+                           },{
+                                "id"           : "cert_compression",
+                                "severity"     : "INFO",
+                                "finding"      : "N/A"
+                           },{
+                                "id"           : "clientAuth",
+                                "severity"     : "INFO",
+                                "finding"      : "none"
+                           },{
+                                "id"           : "cert_numbers",
+                                "severity"     : "INFO",
+                                "finding"      : "1"
+                           },{
+                                "id"           : "cert_signatureAlgorithm",
+                                "severity"     : "OK",
+                                "finding"      : "SHA256 with RSA"
+                           },{
+                                "id"           : "cert_keySize",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA 2048 bits (exponent is 65537)"
+                           },{
+                                "id"           : "cert_keyUsage",
+                                "severity"     : "INFO",
+                                "finding"      : "Digital Signature, Key Encipherment"
+                           },{
+                                "id"           : "cert_extKeyUsage",
+                                "severity"     : "INFO",
+                                "finding"      : "TLS Web Server Authentication, TLS Web Client Authentication"
+                           },{
+                                "id"           : "cert_serialNumber",
+                                "severity"     : "INFO",
+                                "finding"      : "0600D8AE4601EE5A6DAAB8A04A58EF0E"
+                           },{
+                                "id"           : "cert_serialNumberLen",
+                                "severity"     : "INFO",
+                                "finding"      : "16"
+                           },{
+                                "id"           : "cert_fingerprintSHA1",
+                                "severity"     : "INFO",
+                                "finding"      : "1E0140DFA6D760844E66D56568E43F5DC43A5B21"
+                           },{
+                                "id"           : "cert_fingerprintSHA256",
+                                "severity"     : "INFO",
+                                "finding"      : "154AEED447162B9DB46757A4C30DDC209149D5E8390A7D5A5B2CAC8C728DC258"
+                           },{
+                                "id"           : "cert",
+                                "severity"     : "INFO",
+                                "finding"      : "-----BEGIN CERTIFICATE-----\n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\n-----END CERTIFICATE-----"
+                           },{
+                                "id"           : "cert_commonName",
+                                "severity"     : "OK",
+                                "finding"      : "secure.emailsrvr.com"
+                           },{
+                                "id"           : "cert_commonName_wo_SNI",
+                                "severity"     : "INFO",
+                                "finding"      : "secure.emailsrvr.com"
+                           },{
+                                "id"           : "cert_subjectAltName",
+                                "severity"     : "INFO",
+                                "finding"      : "secure.emailsrvr.com"
+                           },{
+                                "id"           : "cert_trust",
+                                "severity"     : "OK",
+                                "finding"      : "Ok via SAN and CN (same w/o SNI)"
+                           },{
+                                "id"           : "cert_chain_of_trust",
+                                "severity"     : "OK",
+                                "finding"      : "passed."
+                           },{
+                                "id"           : "cert_certificatePolicies_EV",
+                                "severity"     : "INFO",
+                                "finding"      : "no"
+                           },{
+                                "id"           : "cert_expirationStatus",
+                                "severity"     : "OK",
+                                "finding"      : "148 >= 60 days"
+                           },{
+                                "id"           : "cert_notBefore",
+                                "severity"     : "INFO",
+                                "finding"      : "2025-02-17 00:00"
+                           },{
+                                "id"           : "cert_notAfter",
+                                "severity"     : "OK",
+                                "finding"      : "2026-03-06 23:59"
+                           },{
+                                "id"           : "cert_extlifeSpan",
+                                "severity"     : "OK",
+                                "finding"      : "certificate has no extended life time according to browser forum"
+                           },{
+                                "id"           : "cert_eTLS",
+                                "severity"     : "INFO",
+                                "finding"      : "not present"
+                           },{
+                                "id"           : "cert_crlDistributionPoints",
+                                "severity"     : "INFO",
+                                "finding"      : "http://cdp.rapidssl.com/RapidSSLTLSRSACAG1.crl"
+                           },{
+                                "id"           : "cert_ocspURL",
+                                "severity"     : "INFO",
+                                "finding"      : "http://status.rapidssl.com"
+                           },{
+                                "id"           : "OCSP_stapling",
+                                "severity"     : "LOW",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cert_mustStapleExtension",
+                                "severity"     : "INFO",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "DNS_CAArecord",
+                                "severity"     : "LOW",
+                                "finding"      : "--"
+                           },{
+                                "id"           : "certificate_transparency",
+                                "severity"     : "OK",
+                                "finding"      : "yes (certificate extension)"
+                           },{
+                                "id"           : "certs_countServer",
+                                "severity"     : "INFO",
+                                "finding"      : "2"
+                           },{
+                                "id"           : "certs_list_ordering_problem",
+                                "severity"     : "INFO",
+                                "finding"      : "no"
+                           },{
+                                "id"           : "cert_caIssuers",
+                                "severity"     : "INFO",
+                                "finding"      : "RapidSSL TLS RSA CA G1 (DigiCert Inc from US)"
+                           },{
+                                "id"           : "intermediate_cert <#1>",
+                                "severity"     : "INFO",
+                                "finding"      : "-----BEGIN CERTIFICATE-----\nMIIEszCCA5ugAwIBAgIQCyWUIs7ZgSoVoE6ZUooO+jANBgkqhkiG9w0BAQsFADBhMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cuZGlnaWNlcnQuY29tMSAwHgYDVQQDExdEaWdpQ2VydCBHbG9iYWwgUm9vdCBHMjAeFw0xNzExMDIxMjI0MzNaFw0yNzExMDIxMjI0MzNaMGAxCzAJBgNVBAYTAlVTMRUwEwYDVQQKEwxEaWdpQ2VydCBJbmMxGTAXBgNVBAsTEHd3dy5kaWdpY2VydC5jb20xHzAdBgNVBAMTFlJhcGlkU1NMIFRMUyBSU0EgQ0EgRzEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC/uVklRBI1FuJdUEkFCuDL/I3aJQiaZ6aibRHjap/ap9zy1aYNrphe7YcaNwMoPsZvXDR+hNJOo9gbgOYVTPq8gXc84I75YKOHiVA4NrJJQZ6p2sJQyqx60HkEIjzIN+1LQLfXTlpuznToOa1hyTD0yyitFyOYwURM+/CI8FNFMpBhw22hpeAQkOOLmsqT5QZJYeik7qlvn8gfD+XdDnk3kkuuu0eG+vuyrSGr5uX5LRhFWlv1zFQDch/EKmd163m6z/ycx/qLa9zyvILc7cQpb+k7TLra9WE17YPSn9ANjG+ECo9PDW3N9lwhKQCNvw1gGoguyCQu7HE7BnW8eSSFAgMBAAGjggFmMIIBYjAdBgNVHQ4EFgQUDNtsgkkPSmcKuBTuesRIUojrVjgwHwYDVR0jBBgwFoAUTiJUIBiV5uNu5g/6+rkS7QYXjzkwDgYDVR0PAQH/BAQDAgGGMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEAMDQGCCsGAQUFBwEBBCgwJjAkBggrBgEFBQcwAYYYaHR0cDovL29jc3AuZGlnaWNlcnQuY29tMEIGA1UdHwQ7MDkwN6A1oDOGMWh0dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydEdsb2JhbFJvb3RHMi5jcmwwYwYDVR0gBFwwWjA3BglghkgBhv1sAQEwKjAoBggrBgEFBQcCARYcaHR0cHM6Ly93d3cuZGlnaWNlcnQuY29tL0NQUzALBglghkgBhv1sAQIwCAYGZ4EMAQIBMAgGBmeBDAECAjANBgkqhkiG9w0BAQsFAAOCAQEAGUSlOb4K3WtmSlbmE50UYBHXM0SKXPqHMzk6XQUpCheF/4qU8aOhajsyRQFDV1ih/uPIg7YHRtFiCTq4G+zb43X1T77nJgSOI9pq/TqCwtukZ7u9VLL3JAq3Wdy2moKLvvC8tVmRzkAe0xQCkRKIjbBG80MSyDX/R4uYgj6ZiNT/Zg6GI6RofgqgpDdssLc0XIRQEotxIZcKzP3pGJ9FCbMHmMLLyuBd+uCWvVcF2ogYAawufChS/PT61D9rqzPRS5I2uqa3tmIT44JhJgWhBnFMb7AGQkvNq9KNS9dd3GWc17H/dXa1enoxzWjE0hBdFjxPhUb0W3wi8o34/m8Fxw==\n-----END CERTIFICATE-----"
+                           },{
+                                "id"           : "intermediate_cert_fingerprintSHA256 <#1>",
+                                "severity"     : "INFO",
+                                "finding"      : "4422E963EE53CD58CC9F85CD40BF5FFEC0095FDF1A154535661C1C06BCADC69B"
+                           },{
+                                "id"           : "intermediate_cert_notBefore <#1>",
+                                "severity"     : "INFO",
+                                "finding"      : "2017-11-02 12:24"
+                           },{
+                                "id"           : "intermediate_cert_notAfter <#1>",
+                                "severity"     : "OK",
+                                "finding"      : "2027-11-02 12:24"
+                           },{
+                                "id"           : "intermediate_cert_expiration <#1>",
+                                "severity"     : "OK",
+                                "finding"      : "ok > 40 days"
+                           },{
+                                "id"           : "intermediate_cert_chain <#1>",
+                                "severity"     : "INFO",
+                                "finding"      : "RapidSSL TLS RSA CA G1 <-- DigiCert Global Root G2"
+                           },{
+                                "id"           : "intermediate_cert_badOCSP",
+                                "severity"     : "OK",
+                                "finding"      : "intermediate certificate(s) is/are ok"
+                           }
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 12
+}

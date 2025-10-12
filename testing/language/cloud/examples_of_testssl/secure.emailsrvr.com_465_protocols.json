@@ -1,0 +1,93 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh -p --jsonfile-pretty=secure.emailsrvr.com_465_protocols.json secure.emailsrvr.com:465",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760037236",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "secure.emailsrvr.com",
+                    "ip"              : "173.203.187.10",
+                    "port"            : "465",
+                    "rDNS"            : "secure.emailsrvr.com",
+                    "service"         : "SMTP, thus skipping HTTP specific checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+                            {
+                                "id"           : "SSLv2",
+                                "severity"     : "OK",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "SSLv3",
+                                "severity"     : "OK",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "TLS1",
+                                "severity"     : "LOW",
+                                "finding"      : "offered (deprecated)"
+                           },{
+                                "id"           : "TLS1_1",
+                                "severity"     : "LOW",
+                                "finding"      : "offered (deprecated)"
+                           },{
+                                "id"           : "TLS1_2",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "TLS1_3",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered + downgraded to weaker protocol"
+                           },{
+                                "id"           : "NPN",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "ALPN",
+                                "severity"     : "INFO",
+                                "finding"      : "not offered"
+                           }
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 13
+}

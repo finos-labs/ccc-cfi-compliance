@@ -1,0 +1,292 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh -f --jsonfile-pretty=robmoff.at_443_forward-secrecy.json robmoff.at:443",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760035200",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.108.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-108-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+                            {
+                                "id"           : "FS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "FS_ciphers",
+                                "severity"     : "INFO",
+                                "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA ECDHE-RSA-CHACHA20-POLY1305 TLS_AES_128_GCM_SHA256 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-AES128-SHA256 ECDHE-RSA-AES128-SHA"
+                           },{
+                                "id"           : "FS_KEMs",
+                                "severity"     : "OK",
+                                "finding"      : "X25519MLKEM768"
+                           },{
+                                "id"           : "FS_ECDHE_curves",
+                                "severity"     : "OK",
+                                "finding"      : "prime256v1 secp384r1 X25519"
+                           },{
+                                "id"           : "FS_TLS12_sig_algs",
+                                "severity"     : "LOW",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA+SHA256 RSA-PSS-RSAE+SHA384 RSA+SHA384 RSA-PSS-RSAE+SHA512 RSA+SHA512 RSA+SHA1"
+                           },{
+                                "id"           : "FS_TLS13_sig_algs",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512"
+                           }
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.111.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-111-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+                            {
+                                "id"           : "FS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "FS_ciphers",
+                                "severity"     : "INFO",
+                                "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA ECDHE-RSA-CHACHA20-POLY1305 TLS_AES_128_GCM_SHA256 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-AES128-SHA256 ECDHE-RSA-AES128-SHA"
+                           },{
+                                "id"           : "FS_KEMs",
+                                "severity"     : "OK",
+                                "finding"      : "X25519MLKEM768"
+                           },{
+                                "id"           : "FS_ECDHE_curves",
+                                "severity"     : "OK",
+                                "finding"      : "prime256v1 secp384r1 X25519"
+                           },{
+                                "id"           : "FS_TLS12_sig_algs",
+                                "severity"     : "LOW",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA+SHA256 RSA-PSS-RSAE+SHA384 RSA+SHA384 RSA-PSS-RSAE+SHA512 RSA+SHA512 RSA+SHA1"
+                           },{
+                                "id"           : "FS_TLS13_sig_algs",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512"
+                           }
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.109.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-109-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+                            {
+                                "id"           : "FS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "FS_ciphers",
+                                "severity"     : "INFO",
+                                "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA ECDHE-RSA-CHACHA20-POLY1305 TLS_AES_128_GCM_SHA256 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-AES128-SHA256 ECDHE-RSA-AES128-SHA"
+                           },{
+                                "id"           : "FS_KEMs",
+                                "severity"     : "OK",
+                                "finding"      : "X25519MLKEM768"
+                           },{
+                                "id"           : "FS_ECDHE_curves",
+                                "severity"     : "OK",
+                                "finding"      : "prime256v1 secp384r1 X25519"
+                           },{
+                                "id"           : "FS_TLS12_sig_algs",
+                                "severity"     : "LOW",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA+SHA256 RSA-PSS-RSAE+SHA384 RSA+SHA384 RSA-PSS-RSAE+SHA512 RSA+SHA512 RSA+SHA1"
+                           },{
+                                "id"           : "FS_TLS13_sig_algs",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512"
+                           }
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.110.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-110-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+                            {
+                                "id"           : "FS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "FS_ciphers",
+                                "severity"     : "INFO",
+                                "finding"      : "TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 ECDHE-RSA-AES256-GCM-SHA384 ECDHE-RSA-AES256-SHA ECDHE-RSA-CHACHA20-POLY1305 TLS_AES_128_GCM_SHA256 ECDHE-RSA-AES128-GCM-SHA256 ECDHE-RSA-AES128-SHA256 ECDHE-RSA-AES128-SHA"
+                           },{
+                                "id"           : "FS_KEMs",
+                                "severity"     : "OK",
+                                "finding"      : "X25519MLKEM768"
+                           },{
+                                "id"           : "FS_ECDHE_curves",
+                                "severity"     : "OK",
+                                "finding"      : "prime256v1 secp384r1 X25519"
+                           },{
+                                "id"           : "FS_TLS12_sig_algs",
+                                "severity"     : "LOW",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA+SHA256 RSA-PSS-RSAE+SHA384 RSA+SHA384 RSA-PSS-RSAE+SHA512 RSA+SHA512 RSA+SHA1"
+                           },{
+                                "id"           : "FS_TLS13_sig_algs",
+                                "severity"     : "INFO",
+                                "finding"      : "RSA-PSS-RSAE+SHA256 RSA-PSS-RSAE+SHA384 RSA-PSS-RSAE+SHA512"
+                           }
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 46
+}

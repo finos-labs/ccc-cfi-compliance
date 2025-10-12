@@ -1,0 +1,184 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh -U --jsonfile-pretty=secure.emailsrvr.com_465_vulnerable.json secure.emailsrvr.com:465",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760037308",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "secure.emailsrvr.com",
+                    "ip"              : "173.203.187.10",
+                    "port"            : "465",
+                    "rDNS"            : "secure.emailsrvr.com",
+                    "service"         : "SMTP, thus skipping HTTP specific checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+                            {
+                                "id"           : "heartbleed",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2014-0160",
+                                "cwe"          : "CWE-119",
+                                "finding"      : "not vulnerable , timed out"
+                           },{
+                                "id"           : "CCS",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2014-0224",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable"
+                           },{
+                                "id"           : "ticketbleed",
+                                "severity"     : "INFO",
+                                "cve"          : "CVE-2016-9244",
+                                "cwe"          : "CWE-200",
+                                "finding"      : "not applicable, not HTTP"
+                           },{
+                                "id"           : "opossum",
+                                "severity"     : "INFO",
+                                "cve"          : "CVE-2025-49812",
+                                "cwe"          : "CWE-287",
+                                "finding"      : "not yet implemented"
+                           },{
+                                "id"           : "ROBOT",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2017-17382 CVE-2017-17427 CVE-2017-17428 CVE-2017-13098 CVE-2017-1000385 CVE-2017-13099 CVE-2016-6883 CVE-2012-5081 CVE-2017-6168",
+                                "cwe"          : "CWE-203",
+                                "finding"      : "not vulnerable"
+                           },{
+                                "id"           : "secure_renego",
+                                "severity"     : "OK",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "supported"
+                           },{
+                                "id"           : "secure_client_renego",
+                                "severity"     : "MEDIUM",
+                                "cve"          : "CVE-2011-1473",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "VULNERABLE, potential DoS threat"
+                           },{
+                                "id"           : "CRIME_TLS",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2012-4929",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable (not using HTTP anyway)"
+                           },{
+                                "id"           : "POODLE_SSL",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2014-3566",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable"
+                           },{
+                                "id"           : "fallback_SCSV",
+                                "severity"     : "OK",
+                                "finding"      : "supported"
+                           },{
+                                "id"           : "SWEET32",
+                                "severity"     : "LOW",
+                                "cve"          : "CVE-2016-2183 CVE-2016-6329",
+                                "cwe"          : "CWE-327",
+                                "finding"      : "uses 64 bit block ciphers"
+                           },{
+                                "id"           : "FREAK",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2015-0204",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable"
+                           },{
+                                "id"           : "DROWN",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2016-0800 CVE-2016-0703",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable on this host and port"
+                           },{
+                                "id"           : "DROWN_hint",
+                                "severity"     : "INFO",
+                                "cve"          : "CVE-2016-0800 CVE-2016-0703",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "Make sure you don't use this certificate elsewhere with SSLv2 enabled services, see https://search.censys.io/search?resource=hosts&virtual_hosts=INCLUDE&q=154AEED447162B9DB46757A4C30DDC209149D5E8390A7D5A5B2CAC8C728DC258"
+                           },{
+                                "id"           : "LOGJAM-common_primes",
+                                "severity"     : "INFO",
+                                "cve"          : "CVE-2015-4000",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "Postfix"
+                           },{
+                                "id"           : "LOGJAM",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2015-4000",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable, no DH EXPORT ciphers,"
+                           },{
+                                "id"           : "BEAST_CBC_TLS1",
+                                "severity"     : "MEDIUM",
+                                "cve"          : "CVE-2011-3389",
+                                "cwe"          : "CWE-20",
+                                "finding"      : "ECDHE-RSA-AES256-SHA DHE-RSA-AES256-SHA DHE-RSA-CAMELLIA256-SHA AES256-SHA CAMELLIA256-SHA ECDHE-RSA-AES128-SHA DHE-RSA-AES128-SHA DHE-RSA-CAMELLIA128-SHA AES128-SHA CAMELLIA128-SHA DHE-RSA-SEED-SHA SEED-SHA ECDHE-RSA-DES-CBC3-SHA EDH-RSA-DES-CBC3-SHA DES-CBC3-SHA"
+                           },{
+                                "id"           : "BEAST",
+                                "severity"     : "LOW",
+                                "cve"          : "CVE-2011-3389",
+                                "cwe"          : "CWE-20",
+                                "finding"      : "VULNERABLE -- but also supports higher protocols  TLSv1.1 TLSv1.2 (likely mitigated)"
+                           },{
+                                "id"           : "LUCKY13",
+                                "severity"     : "LOW",
+                                "cve"          : "CVE-2013-0169",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "potentially vulnerable, uses TLS CBC ciphers"
+                           },{
+                                "id"           : "winshock",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2014-6321",
+                                "cwe"          : "CWE-94",
+                                "finding"      : "not vulnerable"
+                           },{
+                                "id"           : "RC4",
+                                "severity"     : "OK",
+                                "cve"          : "CVE-2013-2566 CVE-2015-2808",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "not vulnerable"
+                           }
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 54
+}

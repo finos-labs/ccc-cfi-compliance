@@ -44,6 +44,7 @@ jobs:
     needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
+      max-parallel: 1
       matrix:
         target: ${{ fromJson(needs.prepare-matrix.outputs.matrix).target }}
       fail-fast: false
@@ -56,7 +57,14 @@ jobs:
       TARGET_PATH: ${{ matrix.target.path }}
       TARGET_PROVIDER: ${{ matrix.target.provider }}
       TARGET_SERVICE: ${{ matrix.target.service }}
+      # Terraform variables
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_github_run_id: ${{ github.run_id }}
+      TF_VAR_github_run_number: ${{ github.run_number }}
+      TF_VAR_github_actor: ${{ github.actor }}
+      TF_VAR_github_repository: ${{ github.repository }}
+      TF_VAR_github_workflow: ${{ github.workflow }}
+      TF_VAR_github_sha: ${{ github.sha }}
 
     steps:
       - name: Checkout repo
@@ -68,7 +76,7 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
           aws-region: ${{ env.AWS_REGION }}
-            
+
       - name: Configure Azure Credentials (OIDC)
         if: matrix.target.provider == 'azure'
         uses: azure/login@v1
@@ -88,6 +96,154 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
+
+      - name: Install aws-nuke
+        if: matrix.target.provider == 'aws'
+        run: |
+          wget -q https://github.com/rebuy-de/aws-nuke/releases/download/v2.25.0/aws-nuke-v2.25.0-linux-amd64.tar.gz
+          tar -xzf aws-nuke-v2.25.0-linux-amd64.tar.gz
+          sudo mv aws-nuke-v2.25.0-linux-amd64 /usr/local/bin/aws-nuke
+          sudo chmod +x /usr/local/bin/aws-nuke
+
+      - name: Cleanup AWS resources from previous runs
+        if: matrix.target.provider == 'aws'
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning up AWS resources from previous runs using aws-nuke..."
+
+          # Create aws-nuke config with generic tag-based filtering
+          cat > nuke-config.yml << EOF
+          regions:
+            - ${{ env.AWS_REGION }}
+            - global
+
+          account-blocklist:
+            - "999999999999" # Prevent accidental deletion in wrong account
+
+          accounts:
+            "${{ secrets.AWS_ACCOUNT_ID }}":
+              # Global filter: only delete resources with Environment=cfi-test tag
+              resource-types:
+                # Use __global__ to apply filter to ALL resource types
+                excludes:
+                  - IAMUser  # Don't delete IAM users for safety
+                  - IAMGroup # Don't delete IAM groups for safety
+                  - S3Object # Don't delete individual objects (will delete buckets)
+              
+              filters:
+                # Generic tag-based filter for all taggable resources
+                __global__:
+                  - property: tag:Environment
+                    value: "cfi-test"
+                
+                # Name-based filters for resources that don't support tags
+                S3Bucket:
+                  - type: glob
+                    value: "*terraform-*"
+                  - type: glob
+                    value: "*cfi-test*"
+                
+                IAMRole:
+                  - type: glob
+                    value: "terraform-*"
+                  - type: glob
+                    value: "*cfi-test*"
+                
+                CloudFormationStack:
+                  - type: glob
+                    value: "terraform-*"
+                  - type: glob
+                    value: "*cfi-test*"
+                
+                CloudWatchLogsLogGroup:
+                  - type: glob
+                    value: "*terraform*"
+                  - type: glob
+                    value: "*cfi-test*"
+          EOF
+
+          # Run aws-nuke in dry-run mode first to see what would be deleted
+          echo "📋 Dry-run to see what would be deleted:"
+          aws-nuke -c nuke-config.yml --profile default || true
+
+          # Actually delete resources (with force flag)
+          echo "💥 Deleting resources:"
+          aws-nuke -c nuke-config.yml --profile default --no-dry-run --force || true
+
+          echo "✅ AWS cleanup completed"
+
+      - name: Cleanup Azure resources from previous runs
+        if: matrix.target.provider == 'azure'
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning up Azure resources from previous runs..."
+
+          # Delete resource groups with cfi-test or terraform prefix
+          for rg in $(az group list --query "[?contains(name, 'cfi-test') || contains(name, 'terraform-')].name" -o tsv); do
+            echo "Deleting resource group: $rg"
+            az group delete --name $rg --yes --no-wait || true
+          done
+
+          echo "✅ Azure cleanup completed"
+
+      - name: Cleanup GCP resources from previous runs
+        if: matrix.target.provider == 'gcp'
+        continue-on-error: true
+        run: |
+          echo "🧹 Cleaning up GCP resources from previous runs..."
+
+          PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          LABEL_FILTER="labels.environment=cfi-test"
+          NAME_FILTER="name:cfi-test OR name:terraform-"
+
+          # Generic cleanup function
+          cleanup() {
+            local cmd=$1
+            echo "Running: $cmd"
+            eval "$cmd" || true
+          }
+
+          # Compute resources (by label)
+          cleanup "gcloud compute instances list --filter='$LABEL_FILTER' --format='value(name,zone)' | while read name zone; do gcloud compute instances delete \$name --zone=\$zone --quiet; done"
+          cleanup "gcloud compute disks list --filter='$LABEL_FILTER' --format='value(name,zone)' | while read name zone; do gcloud compute disks delete \$name --zone=\$zone --quiet; done"
+
+          # Storage (by name pattern - GCS buckets don't support labels well)
+          cleanup "gcloud storage buckets list --filter='$NAME_FILTER' --format='value(name)' | while read bucket; do gcloud storage rm --recursive gs://\$bucket || true; gcloud storage buckets delete gs://\$bucket || true; done"
+
+          # Networking (by name pattern - often don't have labels)
+          cleanup "gcloud compute networks list --filter='$NAME_FILTER' --format='value(name)' | while read name; do gcloud compute networks delete \$name --quiet; done"
+
+          # Serverless (by label)
+          cleanup "gcloud functions list --filter='$LABEL_FILTER' --format='value(name,region)' | while read name region; do gcloud functions delete \$name --region=\$region --quiet; done"
+          cleanup "gcloud run services list --filter='metadata.labels.environment=cfi-test' --format='value(metadata.name,metadata.namespace)' | while read name region; do gcloud run services delete \$name --region=\$region --quiet; done"
+
+          # Databases (by label)  
+          cleanup "gcloud sql instances list --filter='settings.userLabels.environment=cfi-test' --format='value(name)' | while read name; do gcloud sql instances delete \$name --quiet; done"
+          cleanup "bq ls --filter='$LABEL_FILTER' --format=json | jq -r '.[].id' | while read dataset; do bq rm -r -f -d \$dataset; done"
+
+          # Messaging (by label)
+          cleanup "gcloud pubsub topics list --filter='$LABEL_FILTER' --format='value(name)' | while read topic; do gcloud pubsub topics delete \$topic --quiet; done"
+          cleanup "gcloud pubsub subscriptions list --filter='$LABEL_FILTER' --format='value(name)' | while read sub; do gcloud pubsub subscriptions delete \$sub --quiet; done"
+
+          echo "✅ GCP cleanup completed"
+
+      - name: Setup provider configuration with tagging
+        run: |
+          echo "📝 Copying provider configuration for $TARGET_PROVIDER..."
+
+          # Copy the appropriate provider.tf.example to the target directory
+          if [ -f "remote/$TARGET_PROVIDER/provider.tf.example" ]; then
+            cp "remote/$TARGET_PROVIDER/provider.tf.example" "$TARGET_PATH/provider.tf"
+            echo "✅ Copied remote/$TARGET_PROVIDER/provider.tf.example to $TARGET_PATH/provider.tf"
+          else
+            echo "⚠️  No provider.tf.example found for $TARGET_PROVIDER"
+          fi
+
+          # Show what was copied
+          if [ -f "$TARGET_PATH/provider.tf" ]; then
+            echo "Provider configuration:"
+            cat "$TARGET_PATH/provider.tf"
+          fi
 
       - name: Cache Python Poetry virtualenv
         uses: actions/cache@v4

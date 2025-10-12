@@ -1,0 +1,49 @@
+# AWS Provider with default tags
+# All resources created will automatically inherit these tags
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  # Default tags applied to ALL AWS resources automatically
+  default_tags {
+    tags = {
+      Environment      = "cfi-test"
+      ManagedBy        = "Terraform"
+      Project          = "CCC-CFI-Compliance"
+      AutoCleanup      = "true"
+      GitHubWorkflow   = "CFI-Build"
+      # Optional: Add GitHub Action metadata for traceability
+      GitHubRunID      = var.github_run_id
+      GitHubRepository = var.github_repository
+    }
+  }
+}
+
+# Variables for optional GitHub metadata
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "github_run_id" {
+  description = "GitHub Actions run ID"
+  type        = string
+  default     = "local"
+}
+
+variable "github_repository" {
+  description = "GitHub repository"
+  type        = string
+  default     = "local"
+}
+

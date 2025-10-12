@@ -1,0 +1,169 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh --each-cipher --jsonfile-pretty=secure.emailsrvr.com_465_each-cipher.json secure.emailsrvr.com:465",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760037143",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "secure.emailsrvr.com",
+                    "ip"              : "173.203.187.10",
+                    "port"            : "465",
+                    "rDNS"            : "secure.emailsrvr.com",
+                    "service"         : "SMTP, thus skipping HTTP specific checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher_xc030",
+                                "severity"     : "INFO",
+                                "finding"      : "xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 256   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_xc028",
+                                "severity"     : "INFO",
+                                "finding"      : "xc028   ECDHE-RSA-AES256-SHA384           ECDH 256   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384"
+                           },{
+                                "id"           : "cipher_xc014",
+                                "severity"     : "INFO",
+                                "finding"      : "xc014   ECDHE-RSA-AES256-SHA              ECDH 256   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9f",
+                                "severity"     : "INFO",
+                                "finding"      : "x9f     DHE-RSA-AES256-GCM-SHA384         DH 2048    AESGCM      256      TLS_DHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x6b",
+                                "severity"     : "INFO",
+                                "finding"      : "x6b     DHE-RSA-AES256-SHA256             DH 2048    AES         256      TLS_DHE_RSA_WITH_AES_256_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_x39",
+                                "severity"     : "INFO",
+                                "finding"      : "x39     DHE-RSA-AES256-SHA                DH 2048    AES         256      TLS_DHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x88",
+                                "severity"     : "INFO",
+                                "finding"      : "x88     DHE-RSA-CAMELLIA256-SHA           DH 2048    Camellia    256      TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9d",
+                                "severity"     : "INFO",
+                                "finding"      : "x9d     AES256-GCM-SHA384                 RSA        AESGCM      256      TLS_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x3d",
+                                "severity"     : "INFO",
+                                "finding"      : "x3d     AES256-SHA256                     RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_x35",
+                                "severity"     : "INFO",
+                                "finding"      : "x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x84",
+                                "severity"     : "INFO",
+                                "finding"      : "x84     CAMELLIA256-SHA                   RSA        Camellia    256      TLS_RSA_WITH_CAMELLIA_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xc02f",
+                                "severity"     : "INFO",
+                                "finding"      : "xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 256   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc027",
+                                "severity"     : "INFO",
+                                "finding"      : "xc027   ECDHE-RSA-AES128-SHA256           ECDH 256   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_xc013",
+                                "severity"     : "INFO",
+                                "finding"      : "xc013   ECDHE-RSA-AES128-SHA              ECDH 256   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9e",
+                                "severity"     : "INFO",
+                                "finding"      : "x9e     DHE-RSA-AES128-GCM-SHA256         DH 2048    AESGCM      128      TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x67",
+                                "severity"     : "INFO",
+                                "finding"      : "x67     DHE-RSA-AES128-SHA256             DH 2048    AES         128      TLS_DHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_x33",
+                                "severity"     : "INFO",
+                                "finding"      : "x33     DHE-RSA-AES128-SHA                DH 2048    AES         128      TLS_DHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9a",
+                                "severity"     : "INFO",
+                                "finding"      : "x9a     DHE-RSA-SEED-SHA                  DH 2048    SEED        128      TLS_DHE_RSA_WITH_SEED_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x45",
+                                "severity"     : "INFO",
+                                "finding"      : "x45     DHE-RSA-CAMELLIA128-SHA           DH 2048    Camellia    128      TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9c",
+                                "severity"     : "INFO",
+                                "finding"      : "x9c     AES128-GCM-SHA256                 RSA        AESGCM      128      TLS_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x3c",
+                                "severity"     : "INFO",
+                                "finding"      : "x3c     AES128-SHA256                     RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_x2f",
+                                "severity"     : "INFO",
+                                "finding"      : "x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x96",
+                                "severity"     : "INFO",
+                                "finding"      : "x96     SEED-SHA                          RSA        SEED        128      TLS_RSA_WITH_SEED_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x41",
+                                "severity"     : "INFO",
+                                "finding"      : "x41     CAMELLIA128-SHA                   RSA        Camellia    128      TLS_RSA_WITH_CAMELLIA_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xc012",
+                                "severity"     : "INFO",
+                                "finding"      : "xc012   ECDHE-RSA-DES-CBC3-SHA            ECDH 256   3DES        168      TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x16",
+                                "severity"     : "INFO",
+                                "finding"      : "x16     EDH-RSA-DES-CBC3-SHA              DH 2048    3DES        168      TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x0a",
+                                "severity"     : "INFO",
+                                "finding"      : "x0a     DES-CBC3-SHA                      RSA        3DES        168      TLS_RSA_WITH_3DES_EDE_CBC_SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 25
+}

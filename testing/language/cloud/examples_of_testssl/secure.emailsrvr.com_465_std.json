@@ -1,0 +1,99 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh --std --jsonfile-pretty=secure.emailsrvr.com_465_std.json secure.emailsrvr.com:465",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760037202",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "secure.emailsrvr.com",
+                    "ip"              : "173.203.187.10",
+                    "port"            : "465",
+                    "rDNS"            : "secure.emailsrvr.com",
+                    "service"         : "SMTP, thus skipping HTTP specific checks",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+                            {
+                                "id"           : "cipherlist_NULL",
+                                "severity"     : "OK",
+                                "cwe"          : "CWE-327",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cipherlist_aNULL",
+                                "severity"     : "OK",
+                                "cwe"          : "CWE-327",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cipherlist_EXPORT",
+                                "severity"     : "OK",
+                                "cwe"          : "CWE-327",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cipherlist_LOW",
+                                "severity"     : "OK",
+                                "cwe"          : "CWE-327",
+                                "finding"      : "not offered"
+                           },{
+                                "id"           : "cipherlist_3DES_IDEA",
+                                "severity"     : "MEDIUM",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "cipherlist_OBSOLETED",
+                                "severity"     : "LOW",
+                                "cwe"          : "CWE-310",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "cipherlist_STRONG_NOFS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           },{
+                                "id"           : "cipherlist_STRONG_FS",
+                                "severity"     : "OK",
+                                "finding"      : "offered"
+                           }
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 11
+}

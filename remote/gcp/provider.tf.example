@@ -1,0 +1,58 @@
+# GCP Provider with default labels
+# Note: GCP uses "labels" instead of "tags"
+
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.gcp_region
+
+  # Default labels applied to ALL GCP resources that support labels
+  default_labels = {
+    environment      = "cfi-test"
+    managed_by       = "terraform"
+    project          = "ccc-cfi-compliance"
+    auto_cleanup     = "true"
+    github_workflow  = "cfi-build"
+    github_run_id    = var.github_run_id_sanitized
+  }
+}
+
+# Variables
+variable "project_id" {
+  description = "GCP project ID"
+  type        = string
+}
+
+variable "gcp_region" {
+  description = "GCP region"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "github_run_id" {
+  description = "GitHub Actions run ID"
+  type        = string
+  default     = "local"
+}
+
+# GCP labels must be lowercase and can only contain lowercase letters, numbers, hyphens, and underscores
+variable "github_run_id_sanitized" {
+  description = "Sanitized GitHub run ID for GCP labels"
+  type        = string
+  default     = "local"
+}
+
+# Note: GCP label requirements:
+# - Keys and values must be lowercase
+# - Only letters, numbers, hyphens, and underscores allowed
+# - Maximum 63 characters per key/value
+# - No spaces allowed (use hyphens or underscores instead)
+

@@ -1,0 +1,388 @@
+{
+          "clientProblem1" : [
+                            {
+                                "id"           : "engine_problem",
+                                "severity"     : "WARN",
+                                "finding"      : "No engine or GOST support via engine with your /opt/homebrew/bin/openssl"
+                           }
+          ],
+          "Invocation"  : "testssl.sh --each-cipher --jsonfile-pretty=robmoff.at_443_each-cipher.json robmoff.at:443",
+          "at"          : "Mac:/opt/homebrew/bin/openssl",
+          "version"     : "3.3dev 1e0cef3",
+          "openssl"     : "OpenSSL 3.5.2 from Tue Aug 5 12:09:26 2025",
+          "startTime"   : "1760035102",
+          "scanResult"  : [
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.108.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-108-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher_x1302",
+                                "severity"     : "INFO",
+                                "finding"      : "x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x1303",
+                                "severity"     : "INFO",
+                                "finding"      : "x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_xc030",
+                                "severity"     : "INFO",
+                                "finding"      : "xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_xc014",
+                                "severity"     : "INFO",
+                                "finding"      : "xc014   ECDHE-RSA-AES256-SHA              ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xcca8",
+                                "severity"     : "INFO",
+                                "finding"      : "xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_x35",
+                                "severity"     : "INFO",
+                                "finding"      : "x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x1301",
+                                "severity"     : "INFO",
+                                "finding"      : "x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc02f",
+                                "severity"     : "INFO",
+                                "finding"      : "xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc027",
+                                "severity"     : "INFO",
+                                "finding"      : "xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_xc013",
+                                "severity"     : "INFO",
+                                "finding"      : "xc013   ECDHE-RSA-AES128-SHA              ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9c",
+                                "severity"     : "INFO",
+                                "finding"      : "x9c     AES128-GCM-SHA256                 RSA        AESGCM      128      TLS_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x2f",
+                                "severity"     : "INFO",
+                                "finding"      : "x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.111.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-111-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher_x1302",
+                                "severity"     : "INFO",
+                                "finding"      : "x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x1303",
+                                "severity"     : "INFO",
+                                "finding"      : "x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_xc030",
+                                "severity"     : "INFO",
+                                "finding"      : "xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_xc014",
+                                "severity"     : "INFO",
+                                "finding"      : "xc014   ECDHE-RSA-AES256-SHA              ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xcca8",
+                                "severity"     : "INFO",
+                                "finding"      : "xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_x35",
+                                "severity"     : "INFO",
+                                "finding"      : "x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x1301",
+                                "severity"     : "INFO",
+                                "finding"      : "x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc02f",
+                                "severity"     : "INFO",
+                                "finding"      : "xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc027",
+                                "severity"     : "INFO",
+                                "finding"      : "xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_xc013",
+                                "severity"     : "INFO",
+                                "finding"      : "xc013   ECDHE-RSA-AES128-SHA              ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9c",
+                                "severity"     : "INFO",
+                                "finding"      : "x9c     AES128-GCM-SHA256                 RSA        AESGCM      128      TLS_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x2f",
+                                "severity"     : "INFO",
+                                "finding"      : "x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.109.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-109-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher_x1302",
+                                "severity"     : "INFO",
+                                "finding"      : "x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x1303",
+                                "severity"     : "INFO",
+                                "finding"      : "x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_xc030",
+                                "severity"     : "INFO",
+                                "finding"      : "xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_xc014",
+                                "severity"     : "INFO",
+                                "finding"      : "xc014   ECDHE-RSA-AES256-SHA              ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xcca8",
+                                "severity"     : "INFO",
+                                "finding"      : "xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_x35",
+                                "severity"     : "INFO",
+                                "finding"      : "x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x1301",
+                                "severity"     : "INFO",
+                                "finding"      : "x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc02f",
+                                "severity"     : "INFO",
+                                "finding"      : "xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc027",
+                                "severity"     : "INFO",
+                                "finding"      : "xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_xc013",
+                                "severity"     : "INFO",
+                                "finding"      : "xc013   ECDHE-RSA-AES128-SHA              ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9c",
+                                "severity"     : "INFO",
+                                "finding"      : "x9c     AES128-GCM-SHA256                 RSA        AESGCM      128      TLS_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x2f",
+                                "severity"     : "INFO",
+                                "finding"      : "x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ,
+          {
+                    "targetHost"      : "robmoff.at",
+                    "ip"              : "185.199.110.153",
+                    "port"            : "443",
+                    "rDNS"            : "cdn-185-199-110-153.github.com",
+                    "service"         : "HTTP",
+                    "pretest"           : [
+                            {
+                                "id"           : "pre_128cipher",
+                                "severity"     : "INFO",
+                                "finding"      : "No 128 cipher limit bug"
+                           }
+                    ],
+                    "protocols"         : [
+
+                    ],
+                    "grease"            : [
+
+                    ],
+                    "ciphers"           : [
+
+                    ],
+                    "serverPreferences" : [
+
+                    ],
+                    "fs"                : [
+
+                    ],
+                    "serverDefaults"    : [
+
+                    ],
+                    "vulnerabilities"   : [
+
+                    ],
+                    "cipherTests"       : [
+                            {
+                                "id"           : "cipher_x1302",
+                                "severity"     : "INFO",
+                                "finding"      : "x1302   TLS_AES_256_GCM_SHA384            ECDH/MLKEM AESGCM      256      TLS_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_x1303",
+                                "severity"     : "INFO",
+                                "finding"      : "x1303   TLS_CHACHA20_POLY1305_SHA256      ECDH/MLKEM ChaCha20    256      TLS_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_xc030",
+                                "severity"     : "INFO",
+                                "finding"      : "xc030   ECDHE-RSA-AES256-GCM-SHA384       ECDH 253   AESGCM      256      TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+                           },{
+                                "id"           : "cipher_xc014",
+                                "severity"     : "INFO",
+                                "finding"      : "xc014   ECDHE-RSA-AES256-SHA              ECDH 253   AES         256      TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_xcca8",
+                                "severity"     : "INFO",
+                                "finding"      : "xcca8   ECDHE-RSA-CHACHA20-POLY1305       ECDH 253   ChaCha20    256      TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+                           },{
+                                "id"           : "cipher_x35",
+                                "severity"     : "INFO",
+                                "finding"      : "x35     AES256-SHA                        RSA        AES         256      TLS_RSA_WITH_AES_256_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x1301",
+                                "severity"     : "INFO",
+                                "finding"      : "x1301   TLS_AES_128_GCM_SHA256            ECDH/MLKEM AESGCM      128      TLS_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc02f",
+                                "severity"     : "INFO",
+                                "finding"      : "xc02f   ECDHE-RSA-AES128-GCM-SHA256       ECDH 253   AESGCM      128      TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_xc027",
+                                "severity"     : "INFO",
+                                "finding"      : "xc027   ECDHE-RSA-AES128-SHA256           ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+                           },{
+                                "id"           : "cipher_xc013",
+                                "severity"     : "INFO",
+                                "finding"      : "xc013   ECDHE-RSA-AES128-SHA              ECDH 253   AES         128      TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"
+                           },{
+                                "id"           : "cipher_x9c",
+                                "severity"     : "INFO",
+                                "finding"      : "x9c     AES128-GCM-SHA256                 RSA        AESGCM      128      TLS_RSA_WITH_AES_128_GCM_SHA256"
+                           },{
+                                "id"           : "cipher_x2f",
+                                "severity"     : "INFO",
+                                "finding"      : "x2f     AES128-SHA                        RSA        AES         128      TLS_RSA_WITH_AES_128_CBC_SHA"
+                           }
+                    ],
+                    "browserSimulations": [
+
+                    ],
+                    "rating"            : [
+
+                    ]
+          }
+          ],
+                    "scanTime"  : 36
+}
