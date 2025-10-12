@@ -1,14 +1,6 @@
 # GCP Provider with default labels
 # Note: GCP uses "labels" instead of "tags"
-
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 5.0"
-    }
-  }
-}
+# Version constraint is intentionally omitted - let the module specify its required version
 
 provider "google" {
   project = var.project_id

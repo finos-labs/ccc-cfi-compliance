@@ -1,14 +1,6 @@
 # Azure Provider with default tags
 # Tags can be set at provider level or resource group level
-
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 3.0"
-    }
-  }
-}
+# Note: Version constraint is intentionally omitted - let the module specify its required version
 
 provider "azurerm" {
   features {}

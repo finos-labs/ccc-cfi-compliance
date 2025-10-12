@@ -163,13 +163,20 @@ jobs:
                     value: "*cfi-test*"
           EOF
 
+          # Verify AWS credentials are working
+          echo "🔐 Verifying AWS credentials..."
+          aws sts get-caller-identity || {
+            echo "❌ AWS credentials not configured properly"
+            exit 1
+          }
+
           # Run aws-nuke in dry-run mode first to see what would be deleted
           echo "📋 Dry-run to see what would be deleted:"
-          aws-nuke -c nuke-config.yml --profile default || true
+          aws-nuke -c nuke-config.yml --no-dry-run=false || true
 
           # Actually delete resources (with force flag)
           echo "💥 Deleting resources:"
-          aws-nuke -c nuke-config.yml --profile default --no-dry-run --force || true
+          aws-nuke -c nuke-config.yml --no-dry-run --force || true
 
           echo "✅ AWS cleanup completed"
 

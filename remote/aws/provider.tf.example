@@ -1,14 +1,6 @@
 # AWS Provider with default tags
 # All resources created will automatically inherit these tags
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
+# Note: Version constraint is intentionally omitted - let the module specify its required version
 
 provider "aws" {
   region = var.aws_region
