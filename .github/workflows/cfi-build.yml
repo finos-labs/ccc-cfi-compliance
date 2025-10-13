@@ -127,6 +127,14 @@ jobs:
           sudo mv aws-nuke-v2.25.0-linux-amd64 /usr/local/bin/aws-nuke
           sudo chmod +x /usr/local/bin/aws-nuke
 
+      - name: Install gcp-nuke
+        if: matrix.target.provider == 'gcp'
+        run: |
+          wget -q https://github.com/ekristen/gcp-nuke/releases/latest/download/gcp-nuke-linux-amd64.tar.gz
+          tar -xzf gcp-nuke-linux-amd64.tar.gz
+          sudo mv gcp-nuke /usr/local/bin/gcp-nuke
+          sudo chmod +x /usr/local/bin/gcp-nuke
+
       - name: Cleanup AWS resources from previous runs
         if: matrix.target.provider == 'aws'
         continue-on-error: true
@@ -211,40 +219,69 @@ jobs:
         if: matrix.target.provider == 'gcp'
         continue-on-error: true
         run: |
-          echo "🧹 Cleaning up GCP resources from previous runs..."
+          echo "🧹 Cleaning up GCP resources from previous runs using gcp-nuke..."
 
           PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
-          LABEL_FILTER="labels.environment=cfi-test"
-          NAME_FILTER="name:cfi-test OR name:terraform-"
 
-          # Generic cleanup function
-          cleanup() {
-            local cmd=$1
-            echo "Running: $cmd"
-            eval "$cmd" || true
+          # Query all GCP regions dynamically
+          echo "🌍 Querying available GCP regions..."
+          REGIONS=( $(gcloud compute regions list --format='value(name)') )
+          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
+
+          # Create gcp-nuke config to delete resources except those with CCC_INFRA_DONT_DELETE label
+          cat > gcp-nuke-config.yml << EOF
+          regions:
+            - global
+          EOF
+
+          # Add each region to the config
+          for region in "${REGIONS[@]}"; do
+            echo "  - $region" >> gcp-nuke-config.yml
+          done
+
+          cat >> gcp-nuke-config.yml << EOF
+
+          project-blocklist:
+            - "non-existent-project-12345" # Prevent accidental deletion in wrong project
+
+          accounts:
+            "$PROJECT_ID":
+              # Exclude critical resource types for safety
+              resource-types:
+                excludes:
+                  - IAMServiceAccount          # Don't delete service accounts
+                  - IAMRole                    # Don't delete IAM roles
+                  - IAMBinding                 # Don't delete IAM bindings
+                  - IAMWorkloadIdentityPool    # Don't delete workload identity pools
+                  - IAMWorkloadIdentityPoolProvider  # Don't delete OIDC providers
+              
+              filters:
+                # Protect resources with CCC_INFRA_DONT_DELETE label
+                __global__:
+                  - property: labels.CCC_INFRA_DONT_DELETE
+                    type: absent
+                    invert: true
+          EOF
+
+          # Save a copy of the nuke config for reference
+          mkdir -p output
+          cp gcp-nuke-config.yml output/gcp-nuke-config.yml
+          echo "💾 Saved gcp-nuke config to output/gcp-nuke-config.yml"
+
+          # Verify GCP credentials are working
+          echo "🔐 Verifying GCP credentials..."
+          gcloud auth list || {
+            echo "❌ GCP credentials not configured properly"
+            exit 1
           }
 
-          # Compute resources (by label)
-          cleanup "gcloud compute instances list --filter='$LABEL_FILTER' --format='value(name,zone)' | while read name zone; do gcloud compute instances delete \$name --zone=\$zone --quiet; done"
-          cleanup "gcloud compute disks list --filter='$LABEL_FILTER' --format='value(name,zone)' | while read name zone; do gcloud compute disks delete \$name --zone=\$zone --quiet; done"
+          # Run gcp-nuke in dry-run mode first to see what would be deleted
+          echo "📋 Dry-run to see what would be deleted:"
+          gcp-nuke nuke -c gcp-nuke-config.yml || true
 
-          # Storage (by name pattern - GCS buckets don't support labels well)
-          cleanup "gcloud storage buckets list --filter='$NAME_FILTER' --format='value(name)' | while read bucket; do gcloud storage rm --recursive gs://\$bucket || true; gcloud storage buckets delete gs://\$bucket || true; done"
-
-          # Networking (by name pattern - often don't have labels)
-          cleanup "gcloud compute networks list --filter='$NAME_FILTER' --format='value(name)' | while read name; do gcloud compute networks delete \$name --quiet; done"
-
-          # Serverless (by label)
-          cleanup "gcloud functions list --filter='$LABEL_FILTER' --format='value(name,region)' | while read name region; do gcloud functions delete \$name --region=\$region --quiet; done"
-          cleanup "gcloud run services list --filter='metadata.labels.environment=cfi-test' --format='value(metadata.name,metadata.namespace)' | while read name region; do gcloud run services delete \$name --region=\$region --quiet; done"
-
-          # Databases (by label)  
-          cleanup "gcloud sql instances list --filter='settings.userLabels.environment=cfi-test' --format='value(name)' | while read name; do gcloud sql instances delete \$name --quiet; done"
-          cleanup "bq ls --filter='$LABEL_FILTER' --format=json | jq -r '.[].id' | while read dataset; do bq rm -r -f -d \$dataset; done"
-
-          # Messaging (by label)
-          cleanup "gcloud pubsub topics list --filter='$LABEL_FILTER' --format='value(name)' | while read topic; do gcloud pubsub topics delete \$topic --quiet; done"
-          cleanup "gcloud pubsub subscriptions list --filter='$LABEL_FILTER' --format='value(name)' | while read sub; do gcloud pubsub subscriptions delete \$sub --quiet; done"
+          # Actually delete resources (with force flag)
+          echo "💥 Deleting resources:"
+          gcp-nuke nuke -c gcp-nuke-config.yml --no-dry-run || true
 
           echo "✅ GCP cleanup completed"
 
