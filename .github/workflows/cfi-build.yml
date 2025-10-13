@@ -122,9 +122,9 @@ jobs:
       - name: Install aws-nuke
         if: matrix.target.provider == 'aws'
         run: |
-          wget -q https://github.com/rebuy-de/aws-nuke/releases/download/v2.25.0/aws-nuke-v2.25.0-linux-amd64.tar.gz
-          tar -xzf aws-nuke-v2.25.0-linux-amd64.tar.gz
-          sudo mv aws-nuke-v2.25.0-linux-amd64 /usr/local/bin/aws-nuke
+          wget -q https://github.com/ekristen/aws-nuke/releases/download/v3.29.3/aws-nuke-v3.29.3-linux-amd64.tar.gz
+          tar -xzf aws-nuke-v3.29.3-linux-amd64.tar.gz
+          sudo mv aws-nuke /usr/local/bin/aws-nuke
           sudo chmod +x /usr/local/bin/aws-nuke
 
       - name: Install gcp-nuke
@@ -148,35 +148,37 @@ jobs:
 
           # Create aws-nuke config to delete everything EXCEPT resources tagged with CCC_INFRA_DONT_DELETE
           cat > nuke-config.yml << EOF
+          blocklist:
+            - "999999999999" # Prevent accidental deletion in wrong account
+
           regions:
           EOF
 
-          # Add each region to the config (excluding 'global')
+          # Add each region to the config
           for region in "${REGIONS[@]}"; do
             echo "  - $region" >> nuke-config.yml
           done
 
           cat >> nuke-config.yml << EOF
 
-          account-blocklist:
-            - "999999999999" # Prevent accidental deletion in wrong account
-
           accounts:
             "${{ secrets.AWS_ACCOUNT_ID }}":
-              # Exclude critical resource types for safety
+              presets:
+                - "terraform"
+              
               resource-types:
                 excludes:
                   - IAMUser  # Don't delete IAM users for safety
                   - IAMGroup # Don't delete IAM groups for safety
-                  - IAMRole  # Don't delete IAM roles for safety (except filtered below)
+                  - IAMRole  # Don't delete IAM roles for safety
                   - S3Object # Don't delete individual objects (will delete buckets)
+                  - IAMOIDCProvider  # Don't delete OIDC providers
               
               filters:
                 # Protect resources with CCC_INFRA_DONT_DELETE tag
                 __global__:
                   - property: tag:CCC_INFRA_DONT_DELETE
-                    type: absent
-                    invert: true
+                    value: "true"
           EOF
 
           # Save a copy of the nuke config for reference
@@ -193,11 +195,11 @@ jobs:
 
           # Run aws-nuke in dry-run mode first to see what would be deleted
           echo "📋 Dry-run to see what would be deleted:"
-          aws-nuke -c nuke-config.yml --no-dry-run=false --no-alias-check || true
+          aws-nuke run -c nuke-config.yml || true
 
           # Actually delete resources (with force flag)
           echo "💥 Deleting resources:"
-          aws-nuke -c nuke-config.yml --no-dry-run --force --no-alias-check || true
+          aws-nuke run -c nuke-config.yml --no-dry-run --force || true
 
           echo "✅ AWS cleanup completed"
 
