@@ -383,8 +383,8 @@ jobs:
           
           # Copy combined OCSF results from compliance tests
           cd "$GITHUB_WORKSPACE/testing"
-          if [ -f "testing/runner/output/combined.ocsf.json" ]; then
-            cp "testing/runner/output/combined.ocsf.json" "../output/${TARGET_ID}-combined.ocsf.json"
+          if [ -f "runner/output/combined.ocsf.json" ]; then
+            cp "runner/output/combined.ocsf.json" "../output/${TARGET_ID}-combined.ocsf.json"
             echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
           else
             echo "⚠️  No combined OCSF file found for $TARGET_ID"
