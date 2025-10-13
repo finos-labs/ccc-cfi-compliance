@@ -171,6 +171,11 @@ jobs:
                     invert: true
           EOF
 
+          # Save a copy of the nuke config for reference
+          mkdir -p output
+          cp nuke-config.yml output/nuke-config.yml
+          echo "💾 Saved nuke config to output/nuke-config.yml"
+
           # Verify AWS credentials are working
           echo "🔐 Verifying AWS credentials..."
           aws sts get-caller-identity || {
@@ -351,15 +356,15 @@ jobs:
         if: always() && steps.terraform-apply.outcome == 'success'
         run: |
           # Create output directory
-          mkdir -p output
+          mkdir -p ${{ env.OUTPUT_DIR }}
           
           # Copy Prowler OCSF results
           cd "$GITHUB_WORKSPACE/prowler"
           
-          if ls output/*.ocsf.json 1> /dev/null 2>&1; then
-            latest_file=$(ls -t output/*.ocsf.json | head -n 1)
+          if ls runner/output/*.ocsf.json 1> /dev/null 2>&1; then
+            latest_file=$(ls -t runner/output/*.ocsf.json | head -n 1)
             if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
-              cp "$latest_file" "../output/${TARGET_ID}.ocsf.json"
+              cp "$latest_file" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}.ocsf.json"
               echo "✅ Successfully captured Prowler OCSF output for $TARGET_ID"
             else
               echo "⚠️  No valid Prowler OCSF file found for $TARGET_ID"
@@ -371,7 +376,7 @@ jobs:
           # Copy combined OCSF results from compliance tests
           cd "$GITHUB_WORKSPACE/testing"
           if [ -f "runner/output/combined.ocsf.json" ]; then
-            cp "runner/output/combined.ocsf.json" "../output/${TARGET_ID}-combined.ocsf.json"
+            cp "runner/output/combined.ocsf.json" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}-combined.ocsf.json"
             echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
           else
             echo "⚠️  No combined OCSF file found for $TARGET_ID"
