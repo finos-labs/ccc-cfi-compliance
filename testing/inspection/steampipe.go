@@ -3,7 +3,10 @@ package inspection
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"os"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
@@ -35,7 +38,17 @@ func GetAccessiblePorts(ctx context.Context, provider string) ([]TestParams, err
 	}
 	defer rows.Close()
 
-	return parsePortResults(rows, provider)
+	ports, err := parsePortResults(rows, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	// Output ports as CSV to stdout
+	if err := outputTestParamsCSV(ports, "Accessible Ports"); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to output ports CSV: %v\n", err)
+	}
+
+	return ports, nil
 }
 
 // GetServices queries Steampipe for cloud services based on provider
@@ -65,7 +78,17 @@ func GetServices(ctx context.Context, provider string) ([]TestParams, error) {
 	}
 	defer rows.Close()
 
-	return parseServiceResults(rows, provider)
+	services, err := parseServiceResults(rows, provider)
+	if err != nil {
+		return nil, err
+	}
+
+	// Output services as CSV to stdout
+	if err := outputTestParamsCSV(services, "Services"); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to output services CSV: %v\n", err)
+	}
+
+	return services, nil
 }
 
 // connectSteampipe establishes a connection to the Steampipe PostgreSQL database
@@ -353,4 +376,58 @@ func parseServiceResults(rows *sql.Rows, provider string) ([]TestParams, error) 
 	}
 
 	return services, nil
+}
+
+// outputTestParamsCSV writes TestParams to stdout in CSV format
+func outputTestParamsCSV(params []TestParams, title string) error {
+	if len(params) == 0 {
+		fmt.Printf("\n# %s: (none found)\n\n", title)
+		return nil
+	}
+
+	fmt.Printf("\n# %s (%d items):\n", title, len(params))
+
+	writer := csv.NewWriter(os.Stdout)
+	defer writer.Flush()
+
+	// Write header
+	header := []string{
+		"Provider",
+		"UID",
+		"ResourceName",
+		"ServiceType",
+		"ProviderServiceType",
+		"CatalogType",
+		"HostName",
+		"PortNumber",
+		"Protocol",
+		"Region",
+		"Labels",
+	}
+	if err := writer.Write(header); err != nil {
+		return fmt.Errorf("failed to write CSV header: %w", err)
+	}
+
+	// Write data rows
+	for _, p := range params {
+		row := []string{
+			p.Provider,
+			p.UID,
+			p.ResourceName,
+			p.ServiceType,
+			p.ProviderServiceType,
+			p.CatalogType,
+			p.HostName,
+			p.PortNumber,
+			p.Protocol,
+			p.Region,
+			strings.Join(p.Labels, ";"),
+		}
+		if err := writer.Write(row); err != nil {
+			return fmt.Errorf("failed to write CSV row: %w", err)
+		}
+	}
+
+	fmt.Println() // Add blank line after CSV
+	return nil
 }

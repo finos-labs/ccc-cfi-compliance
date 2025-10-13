@@ -133,55 +133,42 @@ jobs:
         run: |
           echo "🧹 Cleaning up AWS resources from previous runs using aws-nuke..."
 
-          # Create aws-nuke config with generic tag-based filtering
+          # Query all AWS regions dynamically
+          echo "🌍 Querying available AWS regions..."
+          REGIONS=( $(aws ec2 describe-regions --query 'Regions[].RegionName' --output text) )
+          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
+
+          # Create aws-nuke config to delete everything EXCEPT resources tagged with CCC_INFRA_DONT_DELETE
           cat > nuke-config.yml << EOF
           regions:
-            - ${{ env.AWS_REGION }}
-            - global
+          EOF
+
+          # Add each region to the config (excluding 'global')
+          for region in "${REGIONS[@]}"; do
+            echo "  - $region" >> nuke-config.yml
+          done
+
+          cat >> nuke-config.yml << EOF
 
           account-blocklist:
             - "999999999999" # Prevent accidental deletion in wrong account
 
           accounts:
             "${{ secrets.AWS_ACCOUNT_ID }}":
-              # Global filter: only delete resources with Environment=cfi-test tag
+              # Exclude critical resource types for safety
               resource-types:
-                # Use __global__ to apply filter to ALL resource types
                 excludes:
                   - IAMUser  # Don't delete IAM users for safety
                   - IAMGroup # Don't delete IAM groups for safety
+                  - IAMRole  # Don't delete IAM roles for safety (except filtered below)
                   - S3Object # Don't delete individual objects (will delete buckets)
               
               filters:
-                # Generic tag-based filter for all taggable resources
+                # Protect resources with CCC_INFRA_DONT_DELETE tag
                 __global__:
-                  - property: tag:Environment
-                    value: "cfi-test"
-                
-                # Name-based filters for resources that don't support tags
-                S3Bucket:
-                  - type: glob
-                    value: "*terraform-*"
-                  - type: glob
-                    value: "*cfi-test*"
-                
-                IAMRole:
-                  - type: glob
-                    value: "terraform-*"
-                  - type: glob
-                    value: "*cfi-test*"
-                
-                CloudFormationStack:
-                  - type: glob
-                    value: "terraform-*"
-                  - type: glob
-                    value: "*cfi-test*"
-                
-                CloudWatchLogsLogGroup:
-                  - type: glob
-                    value: "*terraform*"
-                  - type: glob
-                    value: "*cfi-test*"
+                  - property: tag:CCC_INFRA_DONT_DELETE
+                    type: absent
+                    invert: true
           EOF
 
           # Verify AWS credentials are working
@@ -356,7 +343,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/testing"
           
           chmod +x run-compliance-tests.sh
-          ./run-compliance-tests.sh --provider "$TARGET_PROVIDER" --output "$OUTPUT_DIR"
+          ./run-compliance-tests.sh --provider "$TARGET_PROVIDER" --output "output"
 
           echo "✅ Compliance tests completed for $TARGET_ID"
 
