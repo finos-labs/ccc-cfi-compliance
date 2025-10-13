@@ -1,0 +1,26 @@
+provider_service_type,catalog_type,description
+storage.googleapis.com/Bucket,CCC.ObjStor,Google Cloud Storage
+sqladmin.googleapis.com/Instance,CCC.RDMS,Cloud SQL
+compute.googleapis.com/Instance,CCC.VM,Compute Engine
+cloudfunctions.googleapis.com/CloudFunction,CCC.Serverless,Cloud Functions
+run.googleapis.com/Service,CCC.Serverless,Cloud Run
+batch.googleapis.com/Job,CCC.Batch,Cloud Batch
+pubsub.googleapis.com/Topic,CCC.Message,Cloud Pub/Sub
+pubsub.googleapis.com/Subscription,CCC.Message,Cloud Pub/Sub Subscription
+cloudkms.googleapis.com/CryptoKey,CCC.KeyMgmt,Cloud Key Management Service
+secretmanager.googleapis.com/Secret,CCC.Secrets,Secret Manager
+firestore.googleapis.com/Database,CCC.Vector,Cloud Firestore
+bigtable.googleapis.com/Instance,CCC.Vector,Cloud Bigtable
+bigquery.googleapis.com/Dataset,CCC.Warehouse,BigQuery
+artifactregistry.googleapis.com/Repository,CCC.ContReg,Artifact Registry
+container.googleapis.com/Registry,CCC.ContReg,Container Registry
+cloudbuild.googleapis.com/Build,CCC.Build,Cloud Build
+iam.googleapis.com/ServiceAccount,CCC.IAM,Service Accounts
+logging.googleapis.com/LogBucket,CCC.Logging,Cloud Logging
+monitoring.googleapis.com/MetricDescriptor,CCC.Monitoring,Cloud Monitoring
+compute.googleapis.com/Network,CCC.VPC,Virtual Private Cloud
+compute.googleapis.com/Firewall,CCC.VPC,VPC Firewall Rules
+compute.googleapis.com/ForwardingRule,CCC.LB,Cloud Load Balancing
+aiplatform.googleapis.com/Model,CCC.GenAI,Vertex AI
+notebooks.googleapis.com/Instance,CCC.MLDE,Vertex AI Workbench
+

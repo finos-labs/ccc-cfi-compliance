@@ -2,7 +2,10 @@ package cloud
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -32,11 +35,15 @@ func (suite *TestSuite) setupWithParams(params reporters.TestParams) {
 	// This ensures step registrations remain valid
 	suite.Props = make(map[string]interface{})
 
-	// Setup pre-configured variables for @PerPort tests
-	suite.Props["portNumber"] = params.PortNumber
-	suite.Props["hostName"] = params.HostName
-	suite.Props["protocol"] = params.Protocol
-	suite.Props["serviceType"] = params.ServiceType
+	// Use reflection to automatically populate all fields from TestParams
+	v := reflect.ValueOf(params)
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+		suite.Props[field.Name] = value.Interface()
+	}
 }
 
 // InitializeScenarioWithParams initializes the scenario context with custom parameters
@@ -69,12 +76,23 @@ func buildTagFilter(protocol string) string {
 	return strings.Join(append(tags, exclusions...), " && ")
 }
 
+// Global formatter factory that will be updated with params before each test
+var portFormatterFactory *reporters.FormatterFactory
+
+func init() {
+	// Initialize factory once and register formatters globally
+	portFormatterFactory = reporters.NewFormatterFactory(reporters.TestParams{})
+	godog.Format("html-port", "HTML report for port tests", portFormatterFactory.GetHTMLFormatterFunc())
+	godog.Format("ocsf-port", "OCSF report for port tests", portFormatterFactory.GetOCSFFormatterFunc())
+}
+
 // RunPortTests runs godog tests for a specific port configuration
 func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, reportPath string) {
 	suite := NewTestSuite()
 
 	// Create output directory if it doesn't exist
-	if err := os.MkdirAll("output", 0755); err != nil {
+	outputDir := filepath.Dir(reportPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		t.Fatalf("Failed to create output directory: %v", err)
 	}
 
@@ -82,12 +100,8 @@ func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, repor
 	htmlReportPath := reportPath + ".html"
 	ocsfReportPath := reportPath + ".ocsf.json"
 
-	// Create formatter factory with test parameters
-	factory := reporters.NewFormatterFactory(params)
-
-	// Register formatters
-	godog.Format("html", "HTML report", factory.GetHTMLFormatterFunc())
-	godog.Format("ocsf", "OCSF report", factory.GetOCSFFormatterFunc())
+	// Update factory with current test parameters before running
+	portFormatterFactory.UpdateParams(params)
 
 	// Build tag filter based on protocol
 	tagFilter := buildTagFilter(params.Protocol)
@@ -97,10 +111,10 @@ func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, repor
 	reportTitle := "Port Test Report: " + params.HostName + ":" + params.PortNumber + " (" + params.Protocol + ")"
 
 	opts := godog.Options{
-		Format:   "html:" + htmlReportPath + ",ocsf:" + ocsfReportPath,
+		Format:   fmt.Sprintf("html-port:%s,ocsf-port:%s", htmlReportPath, ocsfReportPath),
 		Paths:    []string{featuresPath},
 		Tags:     tagFilter,
-		TestingT: t,
+		TestingT: nil, // Don't use TestingT to allow proper file output
 	}
 
 	status := godog.TestSuite{
@@ -111,13 +125,12 @@ func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, repor
 		Options: &opts,
 	}.Run()
 
-	t.Logf("HTML report generated: %s", htmlReportPath)
-
+	// Map godog status to testing behavior
 	if status == 2 {
 		t.SkipNow()
 	}
 
 	if status != 0 {
-		t.Fatalf("zero status code expected, %d received", status)
+		t.FailNow()
 	}
 }

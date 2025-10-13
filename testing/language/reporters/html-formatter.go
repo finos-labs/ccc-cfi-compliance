@@ -319,9 +319,6 @@ func (f *HTMLFormatter) generateHTML() string {
 			field := t.Field(i)
 			value := v.Field(i)
 
-			// Format the field name (add spaces between camel case)
-			fieldName := addSpacesToCamelCase(field.Name)
-
 			// Format the value based on its type
 			var valueStr string
 			switch value.Kind() {
@@ -342,7 +339,7 @@ func (f *HTMLFormatter) generateHTML() string {
 
 			// Only add non-empty values
 			if valueStr != "" {
-				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", fieldName, valueStr))
+				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
 			}
 		}
 

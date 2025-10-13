@@ -363,6 +363,15 @@ func (pw *PropsWorld) iCallObjectWithMethod(field, fnName string) error {
 		return nil
 	}
 
+	// Add panic recovery for better error messages
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("Error calling %s.%s(): %v", field, fnName, r)
+			fmt.Printf("\n❌ %s\n", errMsg)
+			pw.Props["result"] = fmt.Errorf("%s", errMsg)
+		}
+	}()
+
 	results := method.Call([]reflect.Value{})
 	if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
@@ -382,6 +391,15 @@ func (pw *PropsWorld) ICallObjectWithMethodWithParameter(field, fnName, param st
 		pw.Props["result"] = fmt.Errorf("method %s not found", fnName)
 		return nil
 	}
+
+	// Add panic recovery for better error messages
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("Error calling %s.%s(%v): %v", field, fnName, param, r)
+			fmt.Printf("\n❌ %s\n", errMsg)
+			pw.Props["result"] = fmt.Errorf("%s", errMsg)
+		}
+	}()
 
 	results := method.Call([]reflect.Value{reflect.ValueOf(paramVal)})
 	if len(results) > 0 {
@@ -404,10 +422,20 @@ func (pw *PropsWorld) iCallObjectWithMethodWithTwoParameters(field, fnName, para
 		return nil
 	}
 
+	// Add panic recovery for better error messages
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("Error calling %s.%s(%v, %v): %v", field, fnName, param1, param2, r)
+			fmt.Printf("\n❌ %s\n", errMsg)
+			pw.Props["result"] = fmt.Errorf("%s", errMsg)
+		}
+	}()
+
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(param1Val),
 		reflect.ValueOf(param2Val),
 	})
+
 	if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
 	}
@@ -421,6 +449,12 @@ func (pw *PropsWorld) iCallObjectWithMethodWithThreeParameters(field, fnName, pa
 	param2Val := pw.HandleResolve(param2)
 	param3Val := pw.HandleResolve(param3)
 
+	// Debug output
+	fmt.Printf("\n🔍 Calling %s.%s() with:\n", field, fnName)
+	fmt.Printf("   param1 (%s) = %v (type: %T)\n", param1, param1Val, param1Val)
+	fmt.Printf("   param2 (%s) = %v (type: %T)\n", param2, param2Val, param2Val)
+	fmt.Printf("   param3 (%s) = %v (type: %T)\n", param3, param3Val, param3Val)
+
 	objValue := reflect.ValueOf(obj)
 	method := objValue.MethodByName(fnName)
 
@@ -428,6 +462,15 @@ func (pw *PropsWorld) iCallObjectWithMethodWithThreeParameters(field, fnName, pa
 		pw.Props["result"] = fmt.Errorf("method %s not found", fnName)
 		return nil
 	}
+
+	// Add panic recovery for better error messages
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg := fmt.Sprintf("Error calling %s.%s(%v, %v, %v): %v", field, fnName, param1, param2, param3, r)
+			fmt.Printf("\n❌ %s\n", errMsg)
+			pw.Props["result"] = fmt.Errorf("%s", errMsg)
+		}
+	}()
 
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(param1Val),

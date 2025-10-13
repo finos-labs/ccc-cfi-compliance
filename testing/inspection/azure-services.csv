@@ -1,0 +1,24 @@
+provider_service_type,catalog_type,description
+Microsoft.Storage/storageAccounts,CCC.ObjStor,Azure Blob Storage
+Microsoft.DBforPostgreSQL/flexibleServers,CCC.RDMS,Azure Database for PostgreSQL
+Microsoft.DBforMySQL/flexibleServers,CCC.RDMS,Azure Database for MySQL
+Microsoft.Sql/servers,CCC.RDMS,Azure SQL Database
+Microsoft.Compute/virtualMachines,CCC.VM,Azure Virtual Machines
+Microsoft.Web/sites,CCC.Serverless,Azure App Service
+Microsoft.ContainerInstance/containerGroups,CCC.Serverless,Azure Container Instances
+Microsoft.Batch/batchAccounts,CCC.Batch,Azure Batch
+Microsoft.ServiceBus/namespaces,CCC.Message,Azure Service Bus
+Microsoft.EventHub/namespaces,CCC.Message,Azure Event Hubs
+Microsoft.KeyVault/vaults,CCC.KeyMgmt,Azure Key Vault
+Microsoft.DocumentDB/databaseAccounts,CCC.Vector,Azure Cosmos DB
+Microsoft.Synapse/workspaces,CCC.Warehouse,Azure Synapse Analytics
+Microsoft.ContainerRegistry/registries,CCC.ContReg,Azure Container Registry
+Microsoft.ManagedIdentity/userAssignedIdentities,CCC.IAM,Azure Managed Identity
+Microsoft.OperationalInsights/workspaces,CCC.Logging,Azure Log Analytics
+Microsoft.Insights/components,CCC.Monitoring,Azure Application Insights
+Microsoft.Network/virtualNetworks,CCC.VPC,Azure Virtual Network
+Microsoft.Network/networkSecurityGroups,CCC.VPC,Azure Network Security Group
+Microsoft.Network/loadBalancers,CCC.LB,Azure Load Balancer
+Microsoft.CognitiveServices/accounts,CCC.GenAI,Azure OpenAI Service
+Microsoft.MachineLearningServices/workspaces,CCC.MLDE,Azure Machine Learning
+

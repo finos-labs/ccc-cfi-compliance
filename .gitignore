@@ -77,6 +77,8 @@ dist/
 tmp
 
 
+**/output/*.html
+**/output/*.ocsf.json
 cucumber-report.html
 report.json
 coverage.out

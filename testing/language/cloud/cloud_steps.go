@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/cucumber/godog"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 )
 
@@ -112,6 +113,9 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// SSL Support reports
 	ctx.Step(`^"([^"]*)" contains details of SSL Support type "([^"]*)" for "([^"]*)" on port "([^"]*)"$`, cw.getSSLSupportReport)
 	ctx.Step(`^"([^"]*)" contains details of SSL Support type "([^"]*)" for "([^"]*)" on port "([^"]*)" with STARTTLS$`, cw.getSSLSupportReportWithSTARTTLS)
+
+	// Cloud API steps
+	ctx.Step(`^a cloud api for "([^"]*)" in "([^"]*)"$`, cw.aCloudAPIForProviderIn)
 }
 
 // opensslClientRequest creates an OpenSSL s_client connection with optional TLS version
@@ -348,4 +352,36 @@ func (cw *CloudWorld) getSSLSupportReport(reportName, testType, hostName, port s
 // getSSLSupportReportWithSTARTTLS runs testssl.sh with STARTTLS support
 func (cw *CloudWorld) getSSLSupportReportWithSTARTTLS(reportName, testType, hostName, port string) error {
 	return cw.runTestSSL(reportName, testType, hostName, port, true)
+}
+
+// aCloudAPIForProviderIn initializes a cloud API factory for the specified provider
+// Example: Given a cloud api for "aws" in "myAPI"
+func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string) error {
+	// Resolve the provider name (in case it's a variable reference)
+	providerResolved := cw.HandleResolve(providerName)
+	providerStr := fmt.Sprintf("%v", providerResolved)
+
+	// Convert provider string to CloudProvider type
+	var provider factory.CloudProvider
+	switch providerStr {
+	case "aws":
+		provider = factory.ProviderAWS
+	case "azure":
+		provider = factory.ProviderAzure
+	case "gcp":
+		provider = factory.ProviderGCP
+	default:
+		return fmt.Errorf("unsupported cloud provider: %s (must be aws, azure, or gcp)", providerStr)
+	}
+
+	// Create the factory
+	f, err := factory.NewFactory(provider)
+	if err != nil {
+		return fmt.Errorf("failed to create factory for provider %s: %w", providerStr, err)
+	}
+
+	// Store the factory in Props with the given API name
+	cw.Props[apiName] = f
+
+	return nil
 }

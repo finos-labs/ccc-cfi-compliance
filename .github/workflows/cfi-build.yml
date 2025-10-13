@@ -98,6 +98,27 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Steampipe
+        run: |
+          echo "📦 Installing Steampipe..."
+          sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
+          steampipe --version
+          
+          echo "📦 Installing Steampipe plugins..."
+          steampipe plugin install aws
+          steampipe plugin install azure
+          steampipe plugin install gcp
+          
+          echo "🚀 Starting Steampipe service..."
+          steampipe service start
+          
+          echo "✅ Steampipe installed and configured successfully"
+
       - name: Install aws-nuke
         if: matrix.target.provider == 'aws'
         run: |
@@ -277,93 +298,112 @@ jobs:
           pipx install poetry
           poetry install
 
-      - name: Deploy and scan module
+      - name: Terraform Apply
+        id: terraform-apply
         run: |
           set -euo pipefail
 
-          echo "🚀 Processing module: $TARGET_NAME (id: $TARGET_ID)"
+          echo "🚀 Deploying module: $TARGET_NAME (id: $TARGET_ID)"
           echo "📁 Path: $TARGET_PATH"
           echo "☁️  Provider: $TARGET_PROVIDER"
           echo "🔧 Service: $TARGET_SERVICE"
 
           mkdir -p "$OUTPUT_DIR"
 
-          (
-              # Trap to ensure destroy always runs
-              cleanup() {
-                  echo "🧨 Running final destroy for $TARGET_ID (even if script failed)..."
-                  cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+          
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            terraform init
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            terraform init -upgrade
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            export TF_VAR_project_id="${{ secrets.GCP_PROJECT_ID }}"
+            terraform init
+            terraform apply -auto-approve -input=false
+          fi
 
-                  if [ "$TARGET_PROVIDER" = "aws" ]; then
-                    terraform destroy -auto-approve  -input=false || true
-                  elif [ "$TARGET_PROVIDER" = "azure" ]; then
-                    terraform destroy -auto-approve -input=false || true
-                  elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-                    terraform destroy -auto-approve -input=false || true
-                  fi
-              }
-              trap cleanup EXIT
+          echo "✅ Terraform apply completed successfully for $TARGET_ID"
 
-              echo "🔧 Applying module $TARGET_ID..."
-              prowler_success=0
+      - name: Run Prowler Scan
+        id: prowler-scan
+        if: success() && steps.terraform-apply.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
 
-              cd "$GITHUB_WORKSPACE/$TARGET_PATH"
-              if [ "$TARGET_PROVIDER" = "aws" ]; then
-                terraform init
-                terraform apply -auto-approve -input=false
-                
-                echo "🔍 Running Prowler scan for $TARGET_ID..."
-                cd "$GITHUB_WORKSPACE/prowler"
-                set +e  # Temporarily disable exit on error for Prowler
-                poetry run python prowler-cli.py aws
-                prowler_success=$?
-                set -e  # Re-enable exit on error
-                
-              elif [ "$TARGET_PROVIDER" = "azure" ]; then
-                export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-                terraform init -upgrade
-                terraform apply -auto-approve -input=false
-                
-                echo "🔍 Running Prowler scan for $TARGET_ID..."
-                cd "$GITHUB_WORKSPACE/prowler"
-                set +e  # Temporarily disable exit on error for Prowler
-                poetry run python prowler-cli.py azure --az-cli-auth
-                prowler_success=$?
-                set -e  # Re-enable exit on error
-                
-              elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-                export TF_VAR_project_id="${{ secrets.GCP_PROJECT_ID }}"
+          echo "🔍 Running Prowler scan for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler"
 
-                terraform init
-                terraform apply -auto-approve  -input=false
-                
-                echo "🔍 Running Prowler scan for $TARGET_ID..."
-                cd "$GITHUB_WORKSPACE/prowler"
-                set +e  # Temporarily disable exit on error for Prowler
-                poetry run python prowler-cli.py gcp
-                prowler_success=$?
-                set -e  # Re-enable exit on error
-              fi
-              
-              if [ "$prowler_success" = 0 ]; then
-                echo "✅ Prowler scan completed successfully for $TARGET_ID"
-              else
-                echo "⚠️  Prowler scan failed for $TARGET_ID (exit code: $prowler_success) but continuing workflow"
-              fi
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            poetry run python prowler-cli.py aws
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            poetry run python prowler-cli.py azure --az-cli-auth
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            poetry run python prowler-cli.py gcp
+          fi
 
-              if ls output/*.ocsf.json 1> /dev/null 2>&1; then
-                latest_file=$(ls -t output/*.ocsf.json | head -n 1)
-                if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
-                  cp "$latest_file" "../$OUTPUT_DIR/${TARGET_ID}_ocsf.json"
-                  echo "✅ Successfully captured OCSF output for $TARGET_ID"
-                else
-                  echo "⚠️  No valid OCSF file found for $TARGET_ID"
-                fi
-              else
-                echo "⚠️  No OCSF output files found for $TARGET_ID"
-              fi
-              
-          )
+          echo "✅ Prowler scan completed successfully for $TARGET_ID"
+
+      - name: Run Compliance Tests
+        id: compliance-tests
+        if: success() && steps.terraform-apply.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "🧪 Running compliance tests for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/testing"
+          
+          chmod +x run-compliance-tests.sh
+          ./run-compliance-tests.sh --provider "$TARGET_PROVIDER" --output "$OUTPUT_DIR"
+
+          echo "✅ Compliance tests completed for $TARGET_ID"
+
+      - name: Copy OCSF Results
+        if: always() && steps.terraform-apply.outcome == 'success'
+        run: |
+          # Copy Prowler OCSF results
+          cd "$GITHUB_WORKSPACE/prowler"
+          
+          if ls output/*.ocsf.json 1> /dev/null 2>&1; then
+            latest_file=$(ls -t output/*.ocsf.json | head -n 1)
+            if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
+              cp "$latest_file" "../$OUTPUT_DIR/${TARGET_ID}.ocsf.json"
+              echo "✅ Successfully captured Prowler OCSF output for $TARGET_ID"
+            else
+              echo "⚠️  No valid Prowler OCSF file found for $TARGET_ID"
+            fi
+          else
+            echo "⚠️  No Prowler OCSF output files found for $TARGET_ID"
+          fi
+          
+          # Copy combined OCSF results from compliance tests
+          cd "$GITHUB_WORKSPACE/testing"
+          if [ -f "$OUTPUT_DIR/combined.ocsf.json" ]; then
+            cp "$OUTPUT_DIR/combined.ocsf.json" "../$OUTPUT_DIR/${TARGET_ID}-combined.ocsf.json"
+            echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
+          else
+            echo "⚠️  No combined OCSF file found for $TARGET_ID"
+          fi
+
+      - name: Terraform Destroy
+        if: always() && steps.terraform-apply.outcome == 'success'
+        run: |
+          echo "🧨 Running terraform destroy for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            terraform destroy -auto-approve -input=false || true
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            terraform destroy -auto-approve -input=false || true
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            terraform destroy -auto-approve -input=false || true
+          fi
+
+          echo "✅ Terraform destroy completed for $TARGET_ID"
 
       - name: Upload module results
         uses: actions/upload-artifact@v4
@@ -372,3 +412,4 @@ jobs:
           path: |
             ${{ env.OUTPUT_DIR }}
             config/${{ matrix.target.id }}.json
+

@@ -1,0 +1,32 @@
+provider_service_type,catalog_type,description
+s3,CCC.ObjStor,Amazon Simple Storage Service
+rds,CCC.RDMS,Amazon Relational Database Service
+ec2,CCC.VM,Amazon Elastic Compute Cloud
+lambda,CCC.Serverless,AWS Lambda Serverless Functions
+batch,CCC.Batch,AWS Batch Processing
+sqs,CCC.Message,Amazon Simple Queue Service
+sns,CCC.Message,Amazon Simple Notification Service
+kinesis,CCC.Message,Amazon Kinesis Data Streams
+kms,CCC.KeyMgmt,AWS Key Management Service
+secretsmanager,CCC.Secrets,AWS Secrets Manager
+ssm,CCC.Secrets,AWS Systems Manager Parameter Store
+dynamodb,CCC.Vector,Amazon DynamoDB
+redshift,CCC.Warehouse,Amazon Redshift Data Warehouse
+ecr,CCC.ContReg,Amazon Elastic Container Registry
+codebuild,CCC.Build,AWS CodeBuild
+iam,CCC.IAM,AWS Identity and Access Management
+cloudtrail,CCC.AuditLog,AWS CloudTrail
+cloudwatch,CCC.Logging,Amazon CloudWatch Logs
+monitoring,CCC.Monitoring,Amazon CloudWatch Monitoring
+vpc,CCC.VPC,Amazon Virtual Private Cloud
+elb,CCC.LB,Elastic Load Balancing (Classic)
+elbv2,CCC.LB,Elastic Load Balancing v2 (ALB/NLB)
+elasticloadbalancing,CCC.LB,Elastic Load Balancing
+bedrock,CCC.GenAI,Amazon Bedrock
+sagemaker,CCC.MLDE,Amazon SageMaker
+ecs,CCC.Serverless,Amazon Elastic Container Service
+eks,CCC.Serverless,Amazon Elastic Kubernetes Service
+elasticache,CCC.Vector,Amazon ElastiCache
+athena,CCC.Warehouse,Amazon Athena
+glue,CCC.Warehouse,AWS Glue
+
