@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"cloud.google.com/go/iam/admin/apiv1"
+	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
 	"google.golang.org/api/option"
 	iampb "google.golang.org/genproto/googleapis/iam/v1"
@@ -52,7 +52,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 	// Service account ID must be between 6-30 characters, lowercase, digits, hyphens
 	serviceAccountID := sanitizeServiceAccountID(userName)
 	serviceAccountEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAccountID, s.projectID)
-	
+
 	var serviceAccount *adminpb.ServiceAccount
 	var accountAlreadyExists bool
 
@@ -60,7 +60,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 	getReq := &adminpb.GetServiceAccountRequest{
 		Name: fmt.Sprintf("projects/%s/serviceAccounts/%s", s.projectID, serviceAccountEmail),
 	}
-	
+
 	existingAccount, err := s.client.GetServiceAccount(s.ctx, getReq)
 	if err == nil {
 		// Service account exists - reuse it
@@ -78,7 +78,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 				Description: "Created by CCC-CFI-Compliance-Framework for testing",
 			},
 		}
-		
+
 		serviceAccount, err = s.client.CreateServiceAccount(s.ctx, createReq)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create service account %s: %w", serviceAccountID, err)
@@ -87,13 +87,13 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 
 	// Create service account key for authentication
 	var keyJSON []byte
-	
+
 	if accountAlreadyExists {
 		// List existing keys
 		listKeysReq := &adminpb.ListServiceAccountKeysRequest{
 			Name: serviceAccount.Name,
 		}
-		
+
 		keysResp, err := s.client.ListServiceAccountKeys(s.ctx, listKeysReq)
 		if err == nil && len(keysResp.Keys) > 0 {
 			fmt.Printf("   🔑 Service account has %d existing key(s)\n", len(keysResp.Keys))
@@ -105,7 +105,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 	createKeyReq := &adminpb.CreateServiceAccountKeyRequest{
 		Name: serviceAccount.Name,
 	}
-	
+
 	key, err := s.client.CreateServiceAccountKey(s.ctx, createKeyReq)
 	if err != nil {
 		// Cleanup: delete the service account if key creation fails (only if we just created it)
@@ -116,7 +116,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 		}
 		return nil, fmt.Errorf("failed to create service account key for %s: %w", serviceAccountID, err)
 	}
-	
+
 	keyJSON = key.PrivateKeyData
 	fmt.Printf("   🔑 Created new service account key\n")
 
@@ -138,7 +138,7 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 	identity.Credentials["unique_id"] = serviceAccount.UniqueId
 	identity.Credentials["project_id"] = s.projectID
 	identity.Credentials["service_account_key"] = string(keyJSON)
-	
+
 	if clientEmail, ok := keyData["client_email"].(string); ok {
 		identity.Credentials["client_email"] = clientEmail
 	}
@@ -180,14 +180,14 @@ func (s *GCPIAMService) SetAccess(identity *Identity, serviceID string, level st
 	// For project-level resources, use project as the resource
 	// For specific resources, use the resource ID
 	resourceName := s.parseResourceName(serviceID)
-	
+
 	fmt.Printf("🔐 Granting %s access to %s for %s...\n", level, resourceName, serviceAccountEmail)
 
 	// Get current policy
 	getPolicyReq := &iampb.GetIamPolicyRequest{
 		Resource: resourceName,
 	}
-	
+
 	policy, err := s.getResourcePolicy(s.ctx, resourceName, getPolicyReq)
 	if err != nil {
 		return fmt.Errorf("failed to get IAM policy for %s: %w", resourceName, err)
@@ -227,7 +227,7 @@ func (s *GCPIAMService) SetAccess(identity *Identity, serviceID string, level st
 		Resource: resourceName,
 		Policy:   policy,
 	}
-	
+
 	_, err = s.setResourcePolicy(s.ctx, resourceName, setPolicyReq)
 	if err != nil {
 		return fmt.Errorf("failed to set IAM policy for %s: %w", resourceName, err)
@@ -245,14 +245,14 @@ func (s *GCPIAMService) DestroyUser(identity *Identity) error {
 	}
 
 	serviceAccountName := fmt.Sprintf("projects/%s/serviceAccounts/%s", s.projectID, serviceAccountEmail)
-	
+
 	fmt.Printf("🗑️  Deleting service account %s...\n", serviceAccountEmail)
 
 	// List and delete all keys
 	listKeysReq := &adminpb.ListServiceAccountKeysRequest{
 		Name: serviceAccountName,
 	}
-	
+
 	keysResp, err := s.client.ListServiceAccountKeys(s.ctx, listKeysReq)
 	if err != nil {
 		// If we can't list keys, the account might not exist - continue anyway
@@ -264,7 +264,7 @@ func (s *GCPIAMService) DestroyUser(identity *Identity) error {
 				deleteKeyReq := &adminpb.DeleteServiceAccountKeyRequest{
 					Name: key.Name,
 				}
-				
+
 				err := s.client.DeleteServiceAccountKey(s.ctx, deleteKeyReq)
 				if err != nil {
 					fmt.Printf("   ⚠️  Failed to delete key %s: %v\n", key.Name, err)
@@ -277,7 +277,7 @@ func (s *GCPIAMService) DestroyUser(identity *Identity) error {
 	deleteReq := &adminpb.DeleteServiceAccountRequest{
 		Name: serviceAccountName,
 	}
-	
+
 	err = s.client.DeleteServiceAccount(s.ctx, deleteReq)
 	if err != nil {
 		// Check if account doesn't exist
@@ -297,7 +297,7 @@ func (s *GCPIAMService) DestroyUser(identity *Identity) error {
 func (s *GCPIAMService) getRoleForLevel(serviceID string, level string) (string, error) {
 	// Determine the appropriate IAM role based on service and level
 	// This is a simplified mapping - in production, you'd want more sophisticated logic
-	
+
 	switch level {
 	case "none":
 		return "", nil
@@ -329,13 +329,13 @@ func (s *GCPIAMService) parseResourceName(serviceID string) string {
 	if strings.HasPrefix(serviceID, "projects/") {
 		return serviceID
 	}
-	
+
 	// If it's a bucket name, format as bucket resource
 	if strings.Contains(serviceID, "storage") || strings.HasPrefix(serviceID, "gs://") {
 		bucketName := strings.TrimPrefix(serviceID, "gs://")
 		return fmt.Sprintf("projects/_/buckets/%s", bucketName)
 	}
-	
+
 	// Default: assume it's a project-level permission
 	return fmt.Sprintf("projects/%s", s.projectID)
 }
@@ -343,7 +343,7 @@ func (s *GCPIAMService) parseResourceName(serviceID string) string {
 func (s *GCPIAMService) getResourcePolicy(ctx context.Context, resourceName string, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {
 	// This is a simplified version - in production, you'd need to handle different resource types
 	// For now, assume project-level resources
-	
+
 	// Using the IAM admin client's method
 	// Note: Different resource types may require different clients
 	if strings.HasPrefix(resourceName, "projects/") && !strings.Contains(resourceName, "/") {
@@ -351,7 +351,7 @@ func (s *GCPIAMService) getResourcePolicy(ctx context.Context, resourceName stri
 		// For now, return a basic policy structure
 		return &iampb.Policy{Bindings: []*iampb.Binding{}}, nil
 	}
-	
+
 	// For other resources, return basic policy
 	return &iampb.Policy{Bindings: []*iampb.Binding{}}, nil
 }
@@ -366,7 +366,7 @@ func sanitizeServiceAccountID(userName string) string {
 	// Service account IDs must be 6-30 characters, lowercase letters, digits, hyphens
 	// Cannot start with a digit
 	result := strings.ToLower(userName)
-	
+
 	// Replace invalid characters with hyphens
 	sanitized := ""
 	for i, char := range result {
@@ -380,25 +380,24 @@ func sanitizeServiceAccountID(userName string) string {
 			sanitized += "-"
 		}
 	}
-	
+
 	// Ensure it starts with a letter
 	if len(sanitized) > 0 && (sanitized[0] < 'a' || sanitized[0] > 'z') {
 		sanitized = "sa-" + sanitized
 	}
-	
+
 	// Ensure minimum length
 	if len(sanitized) < 6 {
 		sanitized = sanitized + "-test"
 	}
-	
+
 	// Ensure maximum length
 	if len(sanitized) > 30 {
 		sanitized = sanitized[:30]
 	}
-	
+
 	// Remove trailing hyphens
 	sanitized = strings.TrimRight(sanitized, "-")
-	
+
 	return sanitized
 }
-
