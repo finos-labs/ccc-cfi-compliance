@@ -361,8 +361,8 @@ jobs:
           # Copy Prowler OCSF results
           cd "$GITHUB_WORKSPACE/prowler"
           
-          if ls runner/output/*.ocsf.json 1> /dev/null 2>&1; then
-            latest_file=$(ls -t runner/output/*.ocsf.json | head -n 1)
+          if ls output/*.ocsf.json 1> /dev/null 2>&1; then
+            latest_file=$(ls -t output/*.ocsf.json | head -n 1)
             if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
               cp "$latest_file" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}.ocsf.json"
               echo "✅ Successfully captured Prowler OCSF output for $TARGET_ID"
