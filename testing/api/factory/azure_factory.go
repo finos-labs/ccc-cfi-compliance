@@ -1,60 +1,89 @@
 package factory
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
 )
 
 // AzureFactory implements the Factory interface for Azure
 type AzureFactory struct {
-	subscriptionID string
-	config         map[string]interface{}
+	ctx context.Context
 }
 
 // NewAzureFactory creates a new Azure factory
 func NewAzureFactory() *AzureFactory {
 	return &AzureFactory{
-		config: make(map[string]interface{}),
+		ctx: context.Background(),
 	}
 }
 
-// GetServiceAPI returns a generic service API client for the given Azure resource ID
+// GetServiceAPI returns a generic service API client for the given service type
 func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	// TODO: Implement Azure service client creation
-	return nil, fmt.Errorf("GetServiceAPI not yet implemented for Azure: %s", serviceID)
+	var service generic.Service
+	var err error
+
+	// Get subscription ID and resource group from environment
+	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
+	resourceGroup := os.Getenv("AZURE_RESOURCE_GROUP")
+
+	switch serviceID {
+	case "iam":
+		service, err = iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
+	case "object-storage":
+		// TODO: Implement Azure Blob Storage service creation
+		return nil, fmt.Errorf("object-storage not yet implemented for Azure")
+	default:
+		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
+	}
+
+	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
 func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
-	// TODO: Implement Azure service client creation with specific identity
 	if identity.Provider != string(ProviderAzure) {
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
-	return nil, fmt.Errorf("GetServiceAPIWithIdentity not yet implemented for Azure: %s", serviceID)
-}
 
-// GetIAMService returns the IAM service for Azure
-func (f *AzureFactory) GetIAMService() (iam.IAMService, error) {
-	// TODO: Implement Azure IAM service
-	return nil, fmt.Errorf("GetIAMService not yet implemented for Azure")
-}
+	var service generic.Service
+	var err error
 
-// GetObjectStorageService returns an Azure Blob Storage service for the given service ID
-func (f *AzureFactory) GetObjectStorageService(serviceID string) (objstorage.Service, error) {
-	// TODO: Implement Azure Blob Storage service creation
-	return nil, fmt.Errorf("GetObjectStorageService not yet implemented for Azure: %s", serviceID)
-}
-
-// GetObjectStorageServiceWithIdentity returns an Azure Blob Storage service authenticated as the given identity
-func (f *AzureFactory) GetObjectStorageServiceWithIdentity(serviceID string, identity *iam.Identity) (objstorage.Service, error) {
-	// TODO: Implement Azure Blob Storage service creation with specific identity
-	if identity.Provider != string(ProviderAzure) {
-		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
+	// Get subscription ID and resource group from identity or environment
+	subscriptionID := identity.Credentials["subscription_id"]
+	resourceGroup := identity.Credentials["resource_group"]
+	if subscriptionID == "" {
+		subscriptionID = os.Getenv("AZURE_SUBSCRIPTION_ID")
 	}
-	return nil, fmt.Errorf("GetObjectStorageServiceWithIdentity not yet implemented for Azure: %s", serviceID)
+	if resourceGroup == "" {
+		resourceGroup = os.Getenv("AZURE_RESOURCE_GROUP")
+	}
+
+	switch serviceID {
+	case "iam":
+		// IAM service doesn't typically use per-identity clients, return the standard IAM service
+		service, err = iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
+
+	case "object-storage":
+		// TODO: Implement Azure Blob Storage service with credentials
+		return nil, fmt.Errorf("object-storage with identity not yet implemented for Azure")
+
+	default:
+		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
+	}
+
+	return service, nil
 }
 
 // GetProvider returns the cloud provider
@@ -62,7 +91,7 @@ func (f *AzureFactory) GetProvider() CloudProvider {
 	return ProviderAzure
 }
 
-// SetSubscriptionID sets the Azure subscription ID for this factory
-func (f *AzureFactory) SetSubscriptionID(subscriptionID string) {
-	f.subscriptionID = subscriptionID
+// SetContext sets the context for this factory
+func (f *AzureFactory) SetContext(ctx context.Context) {
+	f.ctx = ctx
 }

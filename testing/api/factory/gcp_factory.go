@@ -1,60 +1,92 @@
 package factory
 
 import (
+	"context"
 	"fmt"
+	"os"
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
 )
 
 // GCPFactory implements the Factory interface for GCP
 type GCPFactory struct {
-	projectID string
-	config    map[string]interface{}
+	ctx context.Context
 }
 
 // NewGCPFactory creates a new GCP factory
 func NewGCPFactory() *GCPFactory {
 	return &GCPFactory{
-		config: make(map[string]interface{}),
+		ctx: context.Background(),
 	}
 }
 
-// GetServiceAPI returns a generic service API client for the given GCP resource name
+// GetServiceAPI returns a generic service API client for the given service type
 func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	// TODO: Implement GCP service client creation
-	return nil, fmt.Errorf("GetServiceAPI not yet implemented for GCP: %s", serviceID)
+	var service generic.Service
+	var err error
+
+	// Get project ID from environment
+	projectID := os.Getenv("GCP_PROJECT_ID")
+	if projectID == "" {
+		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	}
+
+	switch serviceID {
+	case "iam":
+		service, err = iam.NewGCPIAMService(f.ctx, projectID)
+	case "object-storage":
+		// TODO: Implement GCS service creation
+		return nil, fmt.Errorf("object-storage not yet implemented for GCP")
+	default:
+		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCP service '%s': %w", serviceID, err)
+	}
+
+	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
 func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
-	// TODO: Implement GCP service client creation with specific identity
 	if identity.Provider != string(ProviderGCP) {
 		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
 	}
-	return nil, fmt.Errorf("GetServiceAPIWithIdentity not yet implemented for GCP: %s", serviceID)
-}
 
-// GetIAMService returns the IAM service for GCP
-func (f *GCPFactory) GetIAMService() (iam.IAMService, error) {
-	// TODO: Implement GCP IAM service
-	return nil, fmt.Errorf("GetIAMService not yet implemented for GCP")
-}
+	var service generic.Service
+	var err error
 
-// GetObjectStorageService returns a GCS service for the given service ID
-func (f *GCPFactory) GetObjectStorageService(serviceID string) (objstorage.Service, error) {
-	// TODO: Implement GCS service creation
-	return nil, fmt.Errorf("GetObjectStorageService not yet implemented for GCP: %s", serviceID)
-}
-
-// GetObjectStorageServiceWithIdentity returns a GCS service authenticated as the given identity
-func (f *GCPFactory) GetObjectStorageServiceWithIdentity(serviceID string, identity *iam.Identity) (objstorage.Service, error) {
-	// TODO: Implement GCS service creation with specific identity
-	if identity.Provider != string(ProviderGCP) {
-		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
+	// Get project ID from identity or environment
+	projectID := identity.Credentials["project_id"]
+	if projectID == "" {
+		projectID = os.Getenv("GCP_PROJECT_ID")
+		if projectID == "" {
+			projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+		}
 	}
-	return nil, fmt.Errorf("GetObjectStorageServiceWithIdentity not yet implemented for GCP: %s", serviceID)
+
+	switch serviceID {
+	case "iam":
+		// IAM service doesn't typically use per-identity clients, return the standard IAM service
+		service, err = iam.NewGCPIAMService(f.ctx, projectID)
+
+	case "object-storage":
+		// TODO: Implement GCS service with credentials
+		// credentialsJSON := identity.Credentials["service_account_key"]
+		// service, err = objstorage.NewGCSServiceWithCredentials(f.ctx, projectID, []byte(credentialsJSON))
+		return nil, fmt.Errorf("object-storage with identity not yet implemented for GCP")
+
+	default:
+		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCP service '%s' with identity: %w", serviceID, err)
+	}
+
+	return service, nil
 }
 
 // GetProvider returns the cloud provider
@@ -62,7 +94,7 @@ func (f *GCPFactory) GetProvider() CloudProvider {
 	return ProviderGCP
 }
 
-// SetProjectID sets the GCP project ID for this factory
-func (f *GCPFactory) SetProjectID(projectID string) {
-	f.projectID = projectID
+// SetContext sets the context for this factory
+func (f *GCPFactory) SetContext(ctx context.Context) {
+	f.ctx = ctx
 }

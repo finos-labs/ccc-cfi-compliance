@@ -155,6 +155,9 @@ jobs:
 
           accounts:
             "${{ secrets.AWS_ACCOUNT_ID }}":
+              # Account alias for safety verification
+              account-alias: "cfi-test-dev"
+              
               # Exclude critical resource types for safety
               resource-types:
                 excludes:
