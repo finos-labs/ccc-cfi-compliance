@@ -42,16 +42,23 @@ func TestRunCompliance(t *testing.T) {
 		log.Fatalf("Error: invalid provider '%s' (must be aws, azure, or gcp)", *provider)
 	}
 
-	// Create output directory
-	if err := os.MkdirAll(*outputDir, 0755); err != nil {
-		log.Fatalf("Failed to create output directory: %v", err)
-	}
-
 	log.Printf("🚀 Starting CCC CFI Compliance Tests")
 	log.Printf("   Provider: %s", *provider)
 	log.Printf("   Output Directory: %s", *outputDir)
 	log.Printf("   Features Path: %s", featuresPath)
 	log.Printf("   Timeout: %s", *timeout)
+	log.Println()
+
+	// Clean and create output directory
+	log.Printf("🧹 Cleaning output directory: %s", *outputDir)
+	if err := os.RemoveAll(*outputDir); err != nil && !os.IsNotExist(err) {
+		log.Printf("⚠️  Warning: Failed to clean output directory: %v", err)
+	}
+
+	if err := os.MkdirAll(*outputDir, 0755); err != nil {
+		log.Fatalf("Failed to create output directory: %v", err)
+	}
+	log.Printf("✅ Output directory ready")
 	log.Println()
 
 	// Create context with timeout

@@ -308,8 +308,6 @@ jobs:
           echo "☁️  Provider: $TARGET_PROVIDER"
           echo "🔧 Service: $TARGET_SERVICE"
 
-          mkdir -p "$OUTPUT_DIR"
-
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
           
           if [ "$TARGET_PROVIDER" = "aws" ]; then
@@ -365,13 +363,16 @@ jobs:
       - name: Copy OCSF Results
         if: always() && steps.terraform-apply.outcome == 'success'
         run: |
+          # Create output directory
+          mkdir -p output
+          
           # Copy Prowler OCSF results
           cd "$GITHUB_WORKSPACE/prowler"
           
           if ls output/*.ocsf.json 1> /dev/null 2>&1; then
             latest_file=$(ls -t output/*.ocsf.json | head -n 1)
             if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
-              cp "$latest_file" "../$OUTPUT_DIR/${TARGET_ID}.ocsf.json"
+              cp "$latest_file" "../output/${TARGET_ID}.ocsf.json"
               echo "✅ Successfully captured Prowler OCSF output for $TARGET_ID"
             else
               echo "⚠️  No valid Prowler OCSF file found for $TARGET_ID"
@@ -382,8 +383,8 @@ jobs:
           
           # Copy combined OCSF results from compliance tests
           cd "$GITHUB_WORKSPACE/testing"
-          if [ -f "$OUTPUT_DIR/combined.ocsf.json" ]; then
-            cp "$OUTPUT_DIR/combined.ocsf.json" "../$OUTPUT_DIR/${TARGET_ID}-combined.ocsf.json"
+          if [ -f "testing/runner/output/combined.ocsf.json" ]; then
+            cp "testing/runner/output/combined.ocsf.json" "../output/${TARGET_ID}-combined.ocsf.json"
             echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
           else
             echo "⚠️  No combined OCSF file found for $TARGET_ID"
