@@ -127,6 +127,14 @@ jobs:
           sudo mv aws-nuke /usr/local/bin/aws-nuke
           sudo chmod +x /usr/local/bin/aws-nuke
 
+      - name: Install azure-nuke
+        if: matrix.target.provider == 'azure'
+        run: |
+          wget -q https://github.com/ekristen/azure-nuke/releases/latest/download/azure-nuke-linux-amd64.tar.gz
+          tar -xzf azure-nuke-linux-amd64.tar.gz
+          sudo mv azure-nuke /usr/local/bin/azure-nuke
+          sudo chmod +x /usr/local/bin/azure-nuke
+
       - name: Install gcp-nuke
         if: matrix.target.provider == 'gcp'
         run: |
@@ -181,6 +189,10 @@ jobs:
                     value: "true"
           EOF
 
+          # Display the generated config for review
+          echo "📄 Generated AWS nuke configuration:"
+          cat nuke-config.yml
+
           # Save a copy of the nuke config for reference
           mkdir -p output
           cp nuke-config.yml output/nuke-config.yml
@@ -207,13 +219,73 @@ jobs:
         if: matrix.target.provider == 'azure'
         continue-on-error: true
         run: |
-          echo "🧹 Cleaning up Azure resources from previous runs..."
+          echo "🧹 Cleaning up Azure resources from previous runs using azure-nuke..."
 
-          # Delete resource groups with cfi-test or terraform prefix
-          for rg in $(az group list --query "[?contains(name, 'cfi-test') || contains(name, 'terraform-')].name" -o tsv); do
-            echo "Deleting resource group: $rg"
-            az group delete --name $rg --yes --no-wait || true
+          SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+
+          # Query all Azure regions dynamically
+          echo "🌍 Querying available Azure regions..."
+          REGIONS=( $(az account list-locations --query '[].name' --output tsv) )
+          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
+
+          # Create azure-nuke config to delete resources except those with CCC_INFRA_DONT_DELETE tag
+          cat > azure-nuke-config.yml << EOF
+          blocklist:
+            - "00000000-0000-0000-0000-000000000000" # Prevent accidental deletion in wrong subscription
+
+          regions:
+          EOF
+
+          # Add each region to the config
+          for region in "${REGIONS[@]}"; do
+            echo "  - $region" >> azure-nuke-config.yml
           done
+
+          cat >> azure-nuke-config.yml << EOF
+
+          subscriptions:
+            "$SUBSCRIPTION_ID":
+              presets:
+                - "terraform"
+              
+              resource-types:
+                excludes:
+                  - AzureADApplication          # Don't delete AD applications
+                  - AzureADServicePrincipal     # Don't delete service principals
+                  - AzureADGroup                # Don't delete AD groups
+                  - AzureRoleAssignment         # Don't delete role assignments
+                  - AzureFederatedIdentityCredential  # Don't delete federated identity credentials for OIDC
+              
+              filters:
+                # Protect resources with CCC_INFRA_DONT_DELETE tag
+                __global__:
+                  - property: tag:CCC_INFRA_DONT_DELETE
+                    value: "true"
+          EOF
+
+          # Display the generated config for review
+          echo "📄 Generated Azure nuke configuration:"
+          cat azure-nuke-config.yml
+
+          # Save a copy of the nuke config for reference
+          mkdir -p output
+          cp azure-nuke-config.yml output/azure-nuke-config.yml
+          echo "💾 Saved azure-nuke config to output/azure-nuke-config.yml"
+
+          # Verify Azure credentials are working
+          echo "🔐 Verifying Azure credentials..."
+          az account show || {
+            echo "❌ Azure credentials not configured properly"
+            exit 1
+          }
+
+          # Run azure-nuke in dry-run mode first to see what would be deleted
+          echo "📋 Dry-run to see what would be deleted:"
+          azure-nuke run -c azure-nuke-config.yml || true
+
+          # Actually delete resources (with force flag)
+          echo "💥 Deleting resources:"
+          azure-nuke run -c azure-nuke-config.yml --no-dry-run --force || true
 
           echo "✅ Azure cleanup completed"
 
@@ -264,6 +336,10 @@ jobs:
                     type: absent
                     invert: true
           EOF
+
+          # Display the generated config for review
+          echo "📄 Generated GCP nuke configuration:"
+          cat gcp-nuke-config.yml
 
           # Save a copy of the nuke config for reference
           mkdir -p output
