@@ -205,7 +205,7 @@ jobs:
 
       - name: Create Prowler Delta
         id: prowler-delta
-        if: success() && steps.prowler-scan-baseline.outcome == 'success' && steps.prowler-scan-complete.outcome == 'success'
+        if: always() 
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -250,7 +250,7 @@ jobs:
 
       - name: Modify Prowler metadata
         id: modify-prowler-metadata
-        if: success() && steps.prowler-scan-baseline.outcome == 'success' && steps.prowler-scan-complete.outcome == 'success'
+        if: always()
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -287,7 +287,7 @@ jobs:
 
       - name: Run Compliance Tests
         id: compliance-tests
-        if: success() && steps.terraform-apply.outcome == 'success'
+        if: always() && steps.terraform-apply.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
