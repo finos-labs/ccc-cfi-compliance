@@ -1,0 +1,16 @@
+blocklist:
+  - "000000000000" # Prevent accidental deletion in wrong project
+
+regions:
+  - global
+  - us-central1
+
+accounts:
+  "nodal-time-474015-p5": 
+    filters:
+      IAMWorkloadIdentityPool:
+        - "finos-oidc-pool"
+      IAMServiceAccount:
+        - "gha-deployer"
+      IAMWorkloadIdentityPoolProvider:
+        - "github-provider"

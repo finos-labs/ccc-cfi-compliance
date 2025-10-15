@@ -1,0 +1,10 @@
+blocklist:
+  - "00000000-0000-0000-0000-000000000000" # Prevent accidental deletion in wrong subscription
+
+regions:
+  - global
+  - us-east-1
+
+accounts:
+  "3bb71587-4549-4396-8898-9e15f062e665":
+   

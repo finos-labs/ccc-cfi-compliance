@@ -119,275 +119,6 @@ jobs:
           
           echo "✅ Steampipe installed and configured successfully"
 
-      - name: Install aws-nuke
-        if: matrix.target.provider == 'aws'
-        run: |
-          wget -q https://github.com/ekristen/aws-nuke/releases/download/v3.29.3/aws-nuke-v3.29.3-linux-amd64.tar.gz
-          tar -xzf aws-nuke-v3.29.3-linux-amd64.tar.gz
-          sudo mv aws-nuke /usr/local/bin/aws-nuke
-          sudo chmod +x /usr/local/bin/aws-nuke
-
-      - name: Install azure-nuke
-        if: matrix.target.provider == 'azure'
-        run: |
-          wget -q https://github.com/ekristen/azure-nuke/releases/latest/download/azure-nuke-linux-amd64.tar.gz
-          tar -xzf azure-nuke-linux-amd64.tar.gz
-          sudo mv azure-nuke /usr/local/bin/azure-nuke
-          sudo chmod +x /usr/local/bin/azure-nuke
-
-      - name: Install gcp-nuke
-        if: matrix.target.provider == 'gcp'
-        run: |
-          wget -q https://github.com/ekristen/gcp-nuke/releases/latest/download/gcp-nuke-linux-amd64.tar.gz
-          tar -xzf gcp-nuke-linux-amd64.tar.gz
-          sudo mv gcp-nuke /usr/local/bin/gcp-nuke
-          sudo chmod +x /usr/local/bin/gcp-nuke
-
-      - name: Cleanup AWS resources from previous runs
-        if: matrix.target.provider == 'aws'
-        continue-on-error: true
-        run: |
-          echo "🧹 Cleaning up AWS resources from previous runs using aws-nuke..."
-
-          # Query all AWS regions dynamically
-          echo "🌍 Querying available AWS regions..."
-          REGIONS=( $(aws ec2 describe-regions --query 'Regions[].RegionName' --output text) )
-          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
-
-          # Create aws-nuke config to delete everything EXCEPT resources tagged with CCC_INFRA_DONT_DELETE
-          cat > nuke-config.yml << EOF
-          blocklist:
-            - "999999999999" # Prevent accidental deletion in wrong account
-
-          regions:
-          EOF
-
-          # Add each region to the config
-          for region in "${REGIONS[@]}"; do
-            echo "  - $region" >> nuke-config.yml
-          done
-
-          cat >> nuke-config.yml << EOF
-
-          accounts:
-            "${{ secrets.AWS_ACCOUNT_ID }}":
-              presets:
-                - "terraform"
-              
-              resource-types:
-                excludes:
-                  - IAMUser  # Don't delete IAM users for safety
-                  - IAMGroup # Don't delete IAM groups for safety
-                  - IAMRole  # Don't delete IAM roles for safety
-                  - S3Object # Don't delete individual objects (will delete buckets)
-                  - IAMOIDCProvider  # Don't delete OIDC providers
-              
-              filters:
-                # Protect resources with CCC_INFRA_DONT_DELETE tag
-                __global__:
-                  - property: tag:CCC_INFRA_DONT_DELETE
-                    value: "true"
-          EOF
-
-          # Display the generated config for review
-          echo "📄 Generated AWS nuke configuration:"
-          cat nuke-config.yml
-
-          # Save a copy of the nuke config for reference
-          mkdir -p output
-          cp nuke-config.yml output/nuke-config.yml
-          echo "💾 Saved nuke config to output/nuke-config.yml"
-
-          # Verify AWS credentials are working
-          echo "🔐 Verifying AWS credentials..."
-          aws sts get-caller-identity || {
-            echo "❌ AWS credentials not configured properly"
-            exit 1
-          }
-
-          # Run aws-nuke in dry-run mode first to see what would be deleted
-          echo "📋 Dry-run to see what would be deleted:"
-          aws-nuke run -c nuke-config.yml || true
-
-          # Actually delete resources (with force flag)
-          echo "💥 Deleting resources:"
-          aws-nuke run -c nuke-config.yml --no-dry-run --force || true
-
-          echo "✅ AWS cleanup completed"
-
-      - name: Cleanup Azure resources from previous runs
-        if: matrix.target.provider == 'azure'
-        continue-on-error: true
-        run: |
-          echo "🧹 Cleaning up Azure resources from previous runs using azure-nuke..."
-
-          SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-
-          # Query all Azure regions dynamically
-          echo "🌍 Querying available Azure regions..."
-          REGIONS=( $(az account list-locations --query '[].name' --output tsv) )
-          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
-
-          # Create azure-nuke config to delete resources except those with CCC_INFRA_DONT_DELETE tag
-          cat > azure-nuke-config.yml << EOF
-          blocklist:
-            - "00000000-0000-0000-0000-000000000000" # Prevent accidental deletion in wrong subscription
-
-          regions:
-          EOF
-
-          # Add each region to the config
-          for region in "${REGIONS[@]}"; do
-            echo "  - $region" >> azure-nuke-config.yml
-          done
-
-          cat >> azure-nuke-config.yml << EOF
-
-          subscriptions:
-            "$SUBSCRIPTION_ID":
-              presets:
-                - "terraform"
-              
-              resource-types:
-                excludes:
-                  - AzureADApplication          # Don't delete AD applications
-                  - AzureADServicePrincipal     # Don't delete service principals
-                  - AzureADGroup                # Don't delete AD groups
-                  - AzureRoleAssignment         # Don't delete role assignments
-                  - AzureFederatedIdentityCredential  # Don't delete federated identity credentials for OIDC
-              
-              filters:
-                # Protect resources with CCC_INFRA_DONT_DELETE tag
-                __global__:
-                  - property: tag:CCC_INFRA_DONT_DELETE
-                    value: "true"
-          EOF
-
-          # Display the generated config for review
-          echo "📄 Generated Azure nuke configuration:"
-          cat azure-nuke-config.yml
-
-          # Save a copy of the nuke config for reference
-          mkdir -p output
-          cp azure-nuke-config.yml output/azure-nuke-config.yml
-          echo "💾 Saved azure-nuke config to output/azure-nuke-config.yml"
-
-          # Verify Azure credentials are working
-          echo "🔐 Verifying Azure credentials..."
-          az account show || {
-            echo "❌ Azure credentials not configured properly"
-            exit 1
-          }
-
-          # Run azure-nuke in dry-run mode first to see what would be deleted
-          echo "📋 Dry-run to see what would be deleted:"
-          azure-nuke run -c azure-nuke-config.yml || true
-
-          # Actually delete resources (with force flag)
-          echo "💥 Deleting resources:"
-          azure-nuke run -c azure-nuke-config.yml --no-dry-run --force || true
-
-          echo "✅ Azure cleanup completed"
-
-      - name: Cleanup GCP resources from previous runs
-        if: matrix.target.provider == 'gcp'
-        continue-on-error: true
-        run: |
-          echo "🧹 Cleaning up GCP resources from previous runs using gcp-nuke..."
-
-          PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
-
-          # Query all GCP regions dynamically
-          echo "🌍 Querying available GCP regions..."
-          REGIONS=( $(gcloud compute regions list --format='value(name)') )
-          echo "Found ${#REGIONS[@]} regions: ${REGIONS[@]}"
-
-          # Create gcp-nuke config to delete resources except those with CCC_INFRA_DONT_DELETE label
-          cat > gcp-nuke-config.yml << EOF
-          regions:
-            - global
-          EOF
-
-          # Add each region to the config
-          for region in "${REGIONS[@]}"; do
-            echo "  - $region" >> gcp-nuke-config.yml
-          done
-
-          cat >> gcp-nuke-config.yml << EOF
-
-          project-blocklist:
-            - "non-existent-project-12345" # Prevent accidental deletion in wrong project
-
-          accounts:
-            "$PROJECT_ID":
-              # Exclude critical resource types for safety
-              resource-types:
-                excludes:
-                  - IAMServiceAccount          # Don't delete service accounts
-                  - IAMRole                    # Don't delete IAM roles
-                  - IAMBinding                 # Don't delete IAM bindings
-                  - IAMWorkloadIdentityPool    # Don't delete workload identity pools
-                  - IAMWorkloadIdentityPoolProvider  # Don't delete OIDC providers
-              
-              filters:
-                # Protect resources with CCC_INFRA_DONT_DELETE label
-                __global__:
-                  - property: labels.CCC_INFRA_DONT_DELETE
-                    type: absent
-                    invert: true
-          EOF
-
-          # Display the generated config for review
-          echo "📄 Generated GCP nuke configuration:"
-          cat gcp-nuke-config.yml
-
-          # Save a copy of the nuke config for reference
-          mkdir -p output
-          cp gcp-nuke-config.yml output/gcp-nuke-config.yml
-          echo "💾 Saved gcp-nuke config to output/gcp-nuke-config.yml"
-
-          # Verify GCP credentials are working
-          echo "🔐 Verifying GCP credentials..."
-          gcloud auth list || {
-            echo "❌ GCP credentials not configured properly"
-            exit 1
-          }
-
-          # Run gcp-nuke in dry-run mode first to see what would be deleted
-          echo "📋 Dry-run to see what would be deleted:"
-          gcp-nuke nuke -c gcp-nuke-config.yml || true
-
-          # Actually delete resources (with force flag)
-          echo "💥 Deleting resources:"
-          gcp-nuke nuke -c gcp-nuke-config.yml --no-dry-run || true
-
-          echo "✅ GCP cleanup completed"
-
-      - name: Setup provider configuration with tagging
-        run: |
-          echo "📝 Copying provider configuration for $TARGET_PROVIDER..."
-
-          # GCP requires lowercase labels - sanitize target_id
-          if [ "$TARGET_PROVIDER" = "gcp" ]; then
-            export TF_VAR_target_id_sanitized=$(echo "$TARGET_ID" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-            export TF_VAR_github_run_id_sanitized=$(echo "${{ github.run_id }}" | tr '[:upper:]' '[:lower:]')
-            echo "📝 Sanitized for GCP: target_id=$TF_VAR_target_id_sanitized"
-          fi
-
-          # Copy the appropriate provider.tf.example to the target directory
-          if [ -f "remote/$TARGET_PROVIDER/provider.tf.example" ]; then
-            cp "remote/$TARGET_PROVIDER/provider.tf.example" "$TARGET_PATH/provider.tf"
-            echo "✅ Copied remote/$TARGET_PROVIDER/provider.tf.example to $TARGET_PATH/provider.tf"
-          else
-            echo "⚠️  No provider.tf.example found for $TARGET_PROVIDER"
-          fi
-
-          # Show what was copied
-          if [ -f "$TARGET_PATH/provider.tf" ]; then
-            echo "Provider configuration:"
-            cat "$TARGET_PATH/provider.tf"
-          fi
-
       - name: Cache Python Poetry virtualenv
         uses: actions/cache@v4
         with:
@@ -404,6 +135,26 @@ jobs:
           cd prowler
           pipx install poetry
           poetry install
+
+      - name: Run Prowler Scan (Baseline)
+        id: prowler-scan-baseline
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "🔍 Running Prowler baseline scan for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler"
+          mkdir -p output
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            poetry run python prowler-cli.py aws --output-filename baseline
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            poetry run python prowler-cli.py azure --az-cli-auth --output-filename baseline
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            poetry run python prowler-cli.py gcp --project-id ${{ secrets.GCP_PROJECT_ID }} --output-filename baseline
+          fi
+
+          echo "✅ Prowler baseline scan completed for $TARGET_ID"
 
       - name: Terraform Apply
         id: terraform-apply
@@ -432,25 +183,107 @@ jobs:
 
           echo "✅ Terraform apply completed successfully for $TARGET_ID"
 
-      - name: Run Prowler Scan
-        id: prowler-scan
+      - name: Run Prowler Scan (Complete)
+        id: prowler-scan-complete
         if: success() && steps.terraform-apply.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
 
-          echo "🔍 Running Prowler scan for $TARGET_ID..."
+          echo "🔍 Running Prowler complete scan for $TARGET_ID..."
           cd "$GITHUB_WORKSPACE/prowler"
 
           if [ "$TARGET_PROVIDER" = "aws" ]; then
-            poetry run python prowler-cli.py aws
+            poetry run python prowler-cli.py aws --output-filename complete
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
-            poetry run python prowler-cli.py azure --az-cli-auth
+            poetry run python prowler-cli.py azure --az-cli-auth --output-filename complete
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-            poetry run python prowler-cli.py gcp
+            poetry run python prowler-cli.py gcp --project-id ${{ secrets.GCP_PROJECT_ID }} --output-filename complete
           fi
 
-          echo "✅ Prowler scan completed successfully for $TARGET_ID"
+          echo "✅ Prowler complete scan completed successfully for $TARGET_ID"
+
+      - name: Create Prowler Delta
+        id: prowler-delta
+        if: success() && steps.prowler-scan-baseline.outcome == 'success' && steps.prowler-scan-complete.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "📊 Creating Prowler delta (new findings) for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler/output"
+
+          # Find the baseline and complete OCSF files
+          BASELINE_FILE=$(ls -t baseline*.ocsf.json 2>/dev/null | head -n 1)
+          COMPLETE_FILE=$(ls -t complete*.ocsf.json 2>/dev/null | head -n 1)
+
+          if [ -z "$BASELINE_FILE" ] || [ -z "$COMPLETE_FILE" ]; then
+            echo "⚠️  Could not find baseline or complete OCSF files"
+            exit 1
+          fi
+
+          echo "📄 Baseline file: $BASELINE_FILE"
+          echo "📄 Complete file: $COMPLETE_FILE"
+
+          # Extract UIDs from baseline findings
+          echo "🔍 Extracting baseline finding UIDs..."
+          jq -r '.[] | .finding_info.uid // empty' "$BASELINE_FILE" > baseline_uids.txt
+          BASELINE_COUNT=$(wc -l < baseline_uids.txt | tr -d ' ')
+          echo "Found $BASELINE_COUNT findings in baseline"
+
+          # Create delta: findings in complete that are NOT in baseline
+          echo "🔍 Creating delta (new findings)..."
+          jq --slurpfile baseline_uids <(cat baseline_uids.txt | jq -R .) \
+            '[.[] | select(.finding_info.uid as $uid | $baseline_uids | map(.) | index($uid) | not)]' \
+            "$COMPLETE_FILE" > delta.ocsf.json
+
+          DELTA_COUNT=$(jq 'length' delta.ocsf.json)
+          echo "✅ Delta created with $DELTA_COUNT new findings"
+          
+          # Show summary
+          echo ""
+          echo "📊 Summary:"
+          echo "  - Baseline findings: $BASELINE_COUNT"
+          COMPLETE_COUNT=$(jq 'length' "$COMPLETE_FILE")
+          echo "  - Complete findings: $COMPLETE_COUNT"
+          echo "  - New findings (delta): $DELTA_COUNT"
+
+      - name: Modify Prowler metadata
+        id: modify-prowler-metadata
+        if: success() && steps.prowler-scan-baseline.outcome == 'success' && steps.prowler-scan-complete.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "✏️  Modifying Prowler metadata for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler/output"
+
+          # Find the files
+          BASELINE_FILE=$(ls -t baseline*.ocsf.json 2>/dev/null | head -n 1)
+          COMPLETE_FILE=$(ls -t complete*.ocsf.json 2>/dev/null | head -n 1)
+
+          # Modify baseline file
+          if [ -n "$BASELINE_FILE" ] && [ -f "$BASELINE_FILE" ]; then
+            echo "📝 Modifying baseline metadata..."
+            jq 'map(.metadata.product.name = "Prowler (baseline)")' "$BASELINE_FILE" > baseline-modified.ocsf.json
+            echo "✅ Created baseline-modified.ocsf.json"
+          fi
+
+          # Modify complete file
+          if [ -n "$COMPLETE_FILE" ] && [ -f "$COMPLETE_FILE" ]; then
+            echo "📝 Modifying complete metadata..."
+            jq 'map(.metadata.product.name = "Prowler (complete)")' "$COMPLETE_FILE" > complete-modified.ocsf.json
+            echo "✅ Created complete-modified.ocsf.json"
+          fi
+
+          # Modify delta file
+          if [ -f "delta.ocsf.json" ]; then
+            echo "📝 Modifying delta metadata..."
+            jq 'map(.metadata.product.name = "Prowler (delta)")' delta.ocsf.json > delta-modified.ocsf.json
+            echo "✅ Created delta-modified.ocsf.json"
+          fi
+
+          echo "✅ All Prowler metadata modifications completed"
 
       - name: Run Compliance Tests
         id: compliance-tests
@@ -473,19 +306,31 @@ jobs:
           # Create output directory
           mkdir -p ${{ env.OUTPUT_DIR }}
           
-          # Copy Prowler OCSF results
-          cd "$GITHUB_WORKSPACE/prowler"
+          # Copy Prowler OCSF results (modified versions with updated metadata)
+          cd "$GITHUB_WORKSPACE/prowler/output"
           
-          if ls output/*.ocsf.json 1> /dev/null 2>&1; then
-            latest_file=$(ls -t output/*.ocsf.json | head -n 1)
-            if [ -n "$latest_file" ] && [ -f "$latest_file" ]; then
-              cp "$latest_file" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}.ocsf.json"
-              echo "✅ Successfully captured Prowler OCSF output for $TARGET_ID"
-            else
-              echo "⚠️  No valid Prowler OCSF file found for $TARGET_ID"
-            fi
+          # Copy modified baseline
+          if [ -f "baseline-modified.ocsf.json" ]; then
+            cp "baseline-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-baseline.ocsf.json"
+            echo "✅ Successfully captured Prowler baseline output for $TARGET_ID"
           else
-            echo "⚠️  No Prowler OCSF output files found for $TARGET_ID"
+            echo "⚠️  No Prowler baseline-modified OCSF file found for $TARGET_ID"
+          fi
+          
+          # Copy modified complete
+          if [ -f "complete-modified.ocsf.json" ]; then
+            cp "complete-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-complete.ocsf.json"
+            echo "✅ Successfully captured Prowler complete output for $TARGET_ID"
+          else
+            echo "⚠️  No Prowler complete-modified OCSF file found for $TARGET_ID"
+          fi
+          
+          # Copy modified delta
+          if [ -f "delta-modified.ocsf.json" ]; then
+            cp "delta-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-delta.ocsf.json"
+            echo "✅ Successfully captured Prowler delta output for $TARGET_ID"
+          else
+            echo "⚠️  No Prowler delta-modified OCSF file found for $TARGET_ID"
           fi
           
           # Copy combined OCSF results from compliance tests

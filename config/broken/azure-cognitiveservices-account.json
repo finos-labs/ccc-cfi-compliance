@@ -5,27 +5,5 @@
     "name": "CCC Azure Cognitive Services Account Terraform Module",
     "description": "This module creates a secure Azure Cognitive Services Account with encryption, networking, monitoring, and Responsible AI (RAI) policies.",
     "path": "remote/azure/cognitiveservices",
-    "authors": [
-        {
-            "name": "Azure",
-            "github_id": "Azure",
-            "company": "Microsoft"
-        }
-    ],
-    "resources": [
-        "Microsoft.CognitiveServices/accounts",
-        "Microsoft.CognitiveServices/accounts/privateEndpointConnections",
-        "Microsoft.CognitiveServices/accounts/privateLinkResources",
-        "Microsoft.CognitiveServices/accounts/deployments",
-        "Microsoft.CognitiveServices/accounts/raiPolicies",
-        "Microsoft.CognitiveServices/accounts/raiContentFilters",
-        "Microsoft.CognitiveServices/accounts/raiCustomBlockLists"
-    ],
-    "specifications": [
-        "CCC.AI",
-        "CCC.Encryption",
-        "CCC.Networking",
-        "CCC.Monitoring"
-    ],
     "git": "https://github.com/Azure/terraform-azurerm-avm-res-cognitiveservices-account"
 }

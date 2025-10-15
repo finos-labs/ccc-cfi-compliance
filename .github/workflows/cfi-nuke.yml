@@ -1,0 +1,148 @@
+name: CFI Nuke
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  schedule:
+    # Run every morning at 4 AM UTC (11 PM EST / 8 PM PST)
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  nuke-resources:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3  # Run all platforms concurrently
+      matrix:
+        platform:
+          - name: aws
+            config: aws-nuke-config.yaml
+            binary_url: https://github.com/ekristen/aws-nuke/releases/download/v3.29.3/aws-nuke-v3.29.3-linux-amd64.tar.gz
+            binary_name: aws-nuke
+          - name: azure
+            config: azure-nuke-config.yaml
+            binary_url: https://github.com/ekristen/azure-nuke/releases/latest/download/azure-nuke-linux-amd64.tar.gz
+            binary_name: azure-nuke
+          - name: gcp
+            config: gcp-nuke-config.yaml
+            binary_url: https://github.com/ekristen/gcp-nuke/releases/latest/download/gcp-nuke-linux-amd64.tar.gz
+            binary_name: gcp-nuke
+      fail-fast: false
+
+    env:
+      PLATFORM: ${{ matrix.platform.name }}
+      DRY_RUN_FLAG: "--no-dry-run"
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: matrix.platform.name == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure Azure Credentials (OIDC)
+        if: matrix.platform.name == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: matrix.platform.name == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Install ${{ matrix.platform.name }}-nuke
+        run: |
+          echo "📦 Installing ${{ matrix.platform.binary_name }}..."
+          wget -q ${{ matrix.platform.binary_url }}
+          tar -xzf ${{ matrix.platform.binary_name }}-*.tar.gz || tar -xzf *.tar.gz
+          sudo mv ${{ matrix.platform.binary_name }} /usr/local/bin/${{ matrix.platform.binary_name }}
+          sudo chmod +x /usr/local/bin/${{ matrix.platform.binary_name }}
+          ${{ matrix.platform.binary_name }} --version
+          echo "✅ ${{ matrix.platform.binary_name }} installed successfully"
+
+      - name: Verify credentials - AWS
+        if: matrix.platform.name == 'aws'
+        run: |
+          echo "🔐 Verifying AWS credentials..."
+          aws sts get-caller-identity
+          echo "✅ AWS credentials verified"
+
+      - name: Verify credentials - Azure
+        if: matrix.platform.name == 'azure'
+        run: |
+          echo "🔐 Verifying Azure credentials..."
+          az account show
+          echo "✅ Azure credentials verified"
+
+      - name: Verify credentials - GCP
+        if: matrix.platform.name == 'gcp'
+        run: |
+          echo "🔐 Verifying GCP credentials..."
+          gcloud auth list
+          gcloud config get-value project
+          echo "✅ GCP credentials verified"
+
+      - name: Display nuke configuration
+        run: |
+          echo "📄 Using configuration from .github/workflows/nuke/${{ matrix.platform.config }}"
+          cat .github/workflows/nuke/${{ matrix.platform.config }}
+
+      - name: Run ${{ matrix.platform.name }}-nuke
+        continue-on-error: true
+        run: |
+          echo "💥 Running ${{ matrix.platform.binary_name }} to clean up resources..."
+          echo "⚠️  Resources will be DELETED (except those protected by filters)!"
+          
+          if [ "${{ matrix.platform.name }}" = "gcp" ]; then
+            ${{ matrix.platform.binary_name }} run \
+              --config .github/workflows/nuke/${{ matrix.platform.config }} \
+              --project-id ${{ secrets.GCP_PROJECT_ID }} \
+              ${{ env.DRY_RUN_FLAG }} \
+              --force || true
+          elif [ "${{ matrix.platform.name }}" = "azure" ]; then
+            ${{ matrix.platform.binary_name }} run \
+              --config .github/workflows/nuke/${{ matrix.platform.config }} \
+              --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
+              --client-id ${{ secrets.AZURE_CLIENT_ID }} \
+              ${{ env.DRY_RUN_FLAG }} \
+              --force || true
+          else
+            ${{ matrix.platform.binary_name }} run \
+              --config .github/workflows/nuke/${{ matrix.platform.config }} \
+              ${{ env.DRY_RUN_FLAG }} \
+              --force || true
+          fi
+          
+          echo "✅ Nuke completed for ${{ matrix.platform.name }}"
+
+      - name: Save nuke output
+        if: always()
+        run: |
+          mkdir -p nuke-output
+          echo "Nuke run completed at $(date)" > nuke-output/${{ matrix.platform.name }}-nuke-log.txt
+          echo "Platform: ${{ matrix.platform.name }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
+          echo "Config: ${{ matrix.platform.config }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
+          echo "Workflow: ${{ github.workflow }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
+          echo "Run ID: ${{ github.run_id }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
+
+      - name: Upload nuke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuke-results-${{ matrix.platform.name }}
+          path: nuke-output/
+          retention-days: 30
+
