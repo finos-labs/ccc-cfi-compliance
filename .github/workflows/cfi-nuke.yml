@@ -7,14 +7,14 @@ permissions:
 on:
   schedule:
     # Run every morning at 4 AM UTC (11 PM EST / 8 PM PST)
-    - cron: '0 4 * * *'
+    - cron: "0 4 * * *"
   workflow_dispatch:
 
 jobs:
   nuke-resources:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 3  # Run all platforms concurrently
+      max-parallel: 3 # Run all platforms concurrently
       matrix:
         platform:
           - name: aws
@@ -105,13 +105,13 @@ jobs:
         run: |
           echo "💥 Running ${{ matrix.platform.binary_name }} to clean up resources..."
           echo "⚠️  Resources will be DELETED (except those protected by filters)!"
-          
+
           if [ "${{ matrix.platform.name }}" = "gcp" ]; then
             ${{ matrix.platform.binary_name }} run \
               --config .github/workflows/nuke/${{ matrix.platform.config }} \
               --project-id ${{ secrets.GCP_PROJECT_ID }} \
               ${{ env.DRY_RUN_FLAG }} \
-              --force || true
+              --no-prompt || true
           elif [ "${{ matrix.platform.name }}" = "azure" ]; then
             ${{ matrix.platform.binary_name }} run \
               --config .github/workflows/nuke/${{ matrix.platform.config }} \
@@ -125,7 +125,7 @@ jobs:
               ${{ env.DRY_RUN_FLAG }} \
               --force || true
           fi
-          
+
           echo "✅ Nuke completed for ${{ matrix.platform.name }}"
 
       - name: Save nuke output
@@ -145,4 +145,3 @@ jobs:
           name: nuke-results-${{ matrix.platform.name }}
           path: nuke-output/
           retention-days: 30
-
