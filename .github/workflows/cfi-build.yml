@@ -52,6 +52,8 @@ jobs:
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       OUTPUT_DIR: results
+      # PROWLER_BRANCH: PRWLR-7257-map-ccc-objects-in-aws-provider
+      PROWLER_BRANCH: master
       TARGET_ID: ${{ matrix.target.id }}
       TARGET_NAME: ${{ matrix.target.name }}
       TARGET_PATH: ${{ matrix.target.path }}
@@ -101,22 +103,22 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: "1.21"
 
       - name: Install Steampipe
         run: |
           echo "📦 Installing Steampipe..."
           sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
           steampipe --version
-          
+
           echo "📦 Installing Steampipe plugins..."
           steampipe plugin install aws
           steampipe plugin install azure
           steampipe plugin install gcp
-          
+
           echo "🚀 Starting Steampipe service..."
           steampipe service start
-          
+
           echo "✅ Steampipe installed and configured successfully"
 
       - name: Cache Python Poetry virtualenv
@@ -131,7 +133,7 @@ jobs:
 
       - name: Install Prowler and Python deps
         run: |
-          git clone -b PRWLR-7257-map-ccc-objects-in-aws-provider --single-branch https://github.com/prowler-cloud/prowler
+          git clone -b ${{ env.PROWLER_BRANCH }} --single-branch https://github.com/prowler-cloud/prowler
           cd prowler
           pipx install poetry
           poetry install
@@ -167,7 +169,7 @@ jobs:
           echo "🔧 Service: $TARGET_SERVICE"
 
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
-          
+
           if [ "$TARGET_PROVIDER" = "aws" ]; then
             terraform init
             terraform apply -auto-approve -input=false
@@ -205,7 +207,7 @@ jobs:
 
       - name: Create Prowler Delta
         id: prowler-delta
-        if: always() 
+        if: always()
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -239,7 +241,7 @@ jobs:
 
           DELTA_COUNT=$(jq 'length' delta.ocsf.json)
           echo "✅ Delta created with $DELTA_COUNT new findings"
-          
+
           # Show summary
           echo ""
           echo "📊 Summary:"
@@ -294,7 +296,7 @@ jobs:
 
           echo "🧪 Running compliance tests for $TARGET_ID..."
           cd "$GITHUB_WORKSPACE/testing"
-          
+
           chmod +x run-compliance-tests.sh
           ./run-compliance-tests.sh --provider "$TARGET_PROVIDER" --output "output"
 
@@ -305,10 +307,10 @@ jobs:
         run: |
           # Create output directory
           mkdir -p ${{ env.OUTPUT_DIR }}
-          
+
           # Copy Prowler OCSF results (modified versions with updated metadata)
           cd "$GITHUB_WORKSPACE/prowler/output"
-          
+
           # Copy modified baseline
           if [ -f "baseline-modified.ocsf.json" ]; then
             cp "baseline-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-baseline.ocsf.json"
@@ -316,7 +318,7 @@ jobs:
           else
             echo "⚠️  No Prowler baseline-modified OCSF file found for $TARGET_ID"
           fi
-          
+
           # Copy modified complete
           if [ -f "complete-modified.ocsf.json" ]; then
             cp "complete-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-complete.ocsf.json"
@@ -324,7 +326,7 @@ jobs:
           else
             echo "⚠️  No Prowler complete-modified OCSF file found for $TARGET_ID"
           fi
-          
+
           # Copy modified delta
           if [ -f "delta-modified.ocsf.json" ]; then
             cp "delta-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-delta.ocsf.json"
@@ -332,7 +334,7 @@ jobs:
           else
             echo "⚠️  No Prowler delta-modified OCSF file found for $TARGET_ID"
           fi
-          
+
           # Copy combined OCSF results from compliance tests
           cd "$GITHUB_WORKSPACE/testing"
           if [ -f "runner/output/combined.ocsf.json" ]; then
@@ -365,4 +367,3 @@ jobs:
           path: |
             ${{ env.OUTPUT_DIR }}
             config/${{ matrix.target.id }}.json
-
