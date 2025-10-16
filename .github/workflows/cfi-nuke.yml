@@ -25,10 +25,10 @@ jobs:
             config: azure-nuke-config.yaml
             binary_url: https://github.com/ekristen/azure-nuke/releases/download/v1.2.3/azure-nuke-v1.2.3-linux-amd64.tar.gz
             binary_name: azure-nuke
-          - name: gcp
-            config: gcp-nuke-config.yaml
-            binary_url: https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz
-            binary_name: gcp-nuke
+          # - name: gcp
+          #   config: gcp-nuke-config.yaml
+          #   binary_url: https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz
+          #   binary_name: gcp-nuke
       fail-fast: false
 
     env:
