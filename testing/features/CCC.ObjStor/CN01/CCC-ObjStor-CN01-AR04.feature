@@ -1,5 +1,5 @@
 @PerService @CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red
-Feature: CCC.ObjStor.C01.TR04
+Feature: CCC.ObjStor.CN01.AR04
   As a security administrator
   I want to prevent any requests to write to objects using untrusted KMS keys
   So that data encryption integrity and availability are protected against unauthorized encryption

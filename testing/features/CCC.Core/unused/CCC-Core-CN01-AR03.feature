@@ -1,5 +1,5 @@
 @PerPort @tlp-green @tlp-amber @tlp-red
-Feature: CCC.Core.C01.TR03
+Feature: CCC.Core.CN01.AR03
   As a security administrator
   I want unencrypted traffic to be blocked or redirected to secure equivalents
   So that no data is transmitted in plaintext

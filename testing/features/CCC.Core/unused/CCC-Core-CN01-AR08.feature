@@ -1,5 +1,5 @@
 @PerPort @tls @tlp-amber @tlp-red
-Feature: CCC.Core.C01.TR08
+Feature: CCC.Core.CN01.AR08
   As a security administrator
   I want to ensure mutual TLS is implemented for all TLS connections
   So that both client and server are authenticated to prevent unauthorized access

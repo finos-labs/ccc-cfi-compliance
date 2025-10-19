@@ -1,5 +1,5 @@
 @PerPort @tlp-clear @tlp-green @tlp-amber @tlp-red
-Feature: CCC.Core.C01.TR07
+Feature: CCC.Core.CN01.AR07
   As a security administrator
   I want to ensure that only the IANA-assigned protocol runs on each port
   So that services follow standard port assignments and avoid misconfigurations

@@ -1,7 +1,7 @@
-@PerService @CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red
-Feature: CCC.ObjStor.C01.TR03
+@PerService @CCC.ObjStor @tlp-amber @tlp-red
+Feature: CCC.ObjStor.CN01.AR01
   As a security administrator
-  I want to prevent any requests to write to buckets using untrusted KMS keys
+  I want to prevent any requests to read protected buckets using untrusted KMS keys
   So that data encryption integrity and availability are protected against unauthorized encryption
 
   Background:
@@ -11,25 +11,27 @@ Feature: CCC.ObjStor.C01.TR03
     And I call "{api}" with "GetServiceAPI" with parameter "iam"
     And I refer to "{result}" as "iamService"
 
-  Scenario: Service prevents creating bucket with untrusted KMS key
+  Scenario: Service prevents reading bucket with untrusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-untrusted"
+    And I call "{storage}" with "CreateBucket" with parameter "test-bucket-untrusted-kms"
+    When I call "{userStorage}" with "ListBuckets"
     Then "{result}" is an error
+    And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-untrusted-kms"
 
-  Scenario: Service allows creating bucket with trusted KMS key
+  Scenario: Service allows reading bucket with trusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"
     And I refer to "{result}" as "testUserTrusted"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "write"
+    And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "read"
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserTrusted}"
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-trusted"
+    And I call "{storage}" with "CreateBucket" with parameter "test-bucket-trusted-kms"
+    When I call "{userStorage}" with "ListBuckets"
     Then "{result}" is not nil
-    And "{result.ID}" is "test-bucket-write-trusted"
-    And I call "{storage}" with "DeleteBucket" with parameter "{result.ID}"
+    And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-trusted-kms"
 
   Scenario: Cleanup
     Given I call "{iamService}" with "DestroyUser" with parameter "{testUserUntrusted}"
