@@ -53,7 +53,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       OUTPUT_DIR: results
       # PROWLER_BRANCH: PRWLR-7257-map-ccc-objects-in-aws-provider
-      PROWLER_BRANCH: master
+      PROWLER_BRANCH: improve-ccc-mapping
       TARGET_ID: ${{ matrix.target.id }}
       TARGET_NAME: ${{ matrix.target.name }}
       TARGET_PATH: ${{ matrix.target.path }}
