@@ -373,7 +373,11 @@ func (pw *PropsWorld) iCallObjectWithMethod(field, fnName string) error {
 	}()
 
 	results := method.Call([]reflect.Value{})
-	if len(results) > 0 {
+
+	// Store results: if 2 results (value, error), store the error; otherwise store first value
+	if len(results) == 2 {
+		pw.Props["result"] = results[1].Interface()
+	} else if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
 	}
 
@@ -402,7 +406,11 @@ func (pw *PropsWorld) ICallObjectWithMethodWithParameter(field, fnName, param st
 	}()
 
 	results := method.Call([]reflect.Value{reflect.ValueOf(paramVal)})
-	if len(results) > 0 {
+
+	// Store results: if 2 results (value, error), store the error; otherwise store first value
+	if len(results) == 2 {
+		pw.Props["result"] = results[1].Interface()
+	} else if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
 	}
 
@@ -436,7 +444,10 @@ func (pw *PropsWorld) iCallObjectWithMethodWithTwoParameters(field, fnName, para
 		reflect.ValueOf(param2Val),
 	})
 
-	if len(results) > 0 {
+	// Store results: if 2 results (value, error), store the error; otherwise store first value
+	if len(results) == 2 {
+		pw.Props["result"] = results[1].Interface()
+	} else if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
 	}
 
@@ -477,7 +488,11 @@ func (pw *PropsWorld) iCallObjectWithMethodWithThreeParameters(field, fnName, pa
 		reflect.ValueOf(param2Val),
 		reflect.ValueOf(param3Val),
 	})
-	if len(results) > 0 {
+
+	// Store results: if 2 results (value, error), store the error; otherwise store first value
+	if len(results) == 2 {
+		pw.Props["result"] = results[1].Interface()
+	} else if len(results) > 0 {
 		pw.Props["result"] = results[0].Interface()
 	}
 
