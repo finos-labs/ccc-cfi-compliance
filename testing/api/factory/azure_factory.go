@@ -20,8 +20,18 @@ func NewAzureFactory() *AzureFactory {
 	}
 }
 
-// GetServiceAPI returns a service API client for the given service type
-func (f *AzureFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
+// GetServiceAPI returns a service API client for the given service type (string version for Gherkin)
+func (f *AzureFactory) GetServiceAPI(serviceType string) (any, error) {
+	return f.GetServiceAPIForType(ServiceType(serviceType))
+}
+
+// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity (string version for Gherkin)
+func (f *AzureFactory) GetServiceAPIWithIdentity(serviceType string, identity *iam.Identity) (any, error) {
+	return f.GetServiceAPIWithIdentityForType(ServiceType(serviceType), identity)
+}
+
+// GetServiceAPIForType returns a service API client for the given service type (typed version for Go code)
+func (f *AzureFactory) GetServiceAPIForType(serviceType ServiceType) (any, error) {
 	// Get subscription ID and resource group from environment
 	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	resourceGroup := os.Getenv("AZURE_RESOURCE_GROUP")
@@ -37,8 +47,8 @@ func (f *AzureFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
 	}
 }
 
-// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *AzureFactory) GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error) {
+// GetServiceAPIWithIdentityForType returns a service API client authenticated as the given identity (typed version for Go code)
+func (f *AzureFactory) GetServiceAPIWithIdentityForType(serviceType ServiceType, identity *iam.Identity) (any, error) {
 	if identity.Provider != string(ProviderAzure) {
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}

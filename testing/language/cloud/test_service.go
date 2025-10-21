@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 )
@@ -34,9 +35,17 @@ func buildServiceTagFilter(catalogType string) string {
 
 // setupServiceParams sets up parameters for @PerService tests
 func (suite *TestSuite) setupServiceParams(params reporters.TestParams) {
+	// Preserve the api (factory) reference before resetting
+	api := suite.Props["api"]
+
 	// Don't reset CloudWorld - just reset Props
 	// This ensures step registrations remain valid
 	suite.Props = make(map[string]interface{})
+
+	// Restore the api (factory) reference
+	if api != nil {
+		suite.Props["api"] = api
+	}
 
 	// Use reflection to automatically populate all fields from TestParams
 	v := reflect.ValueOf(params)
@@ -74,6 +83,16 @@ func init() {
 // RunServiceTests runs godog tests for a specific service configuration
 func RunServiceTests(t *testing.T, params reporters.TestParams, featuresPath, reportPath string) {
 	suite := NewTestSuite()
+
+	// Create factory for the cloud provider
+	cloudProvider := factory.CloudProvider(params.Provider)
+	f, err := factory.NewFactory(cloudProvider)
+	if err != nil {
+		t.Fatalf("Failed to create factory: %v", err)
+	}
+
+	// Inject the factory into the suite's props so it's available to test steps
+	suite.Props["api"] = f
 
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(reportPath)

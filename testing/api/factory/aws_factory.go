@@ -20,8 +20,18 @@ func NewAWSFactory() *AWSFactory {
 	}
 }
 
-// GetServiceAPI returns a service API client for the given service type
-func (f *AWSFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
+// GetServiceAPI returns a service API client for the given service type (string version for Gherkin)
+func (f *AWSFactory) GetServiceAPI(serviceType string) (any, error) {
+	return f.GetServiceAPIForType(ServiceType(serviceType))
+}
+
+// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity (string version for Gherkin)
+func (f *AWSFactory) GetServiceAPIWithIdentity(serviceType string, identity *iam.Identity) (any, error) {
+	return f.GetServiceAPIWithIdentityForType(ServiceType(serviceType), identity)
+}
+
+// GetServiceAPIForType returns a service API client for the given service type (typed version for Go code)
+func (f *AWSFactory) GetServiceAPIForType(serviceType ServiceType) (any, error) {
 	switch serviceType {
 	case ServiceTypeIAM:
 		return iam.NewAWSIAMService(f.ctx)
@@ -32,8 +42,8 @@ func (f *AWSFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
 	}
 }
 
-// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *AWSFactory) GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error) {
+// GetServiceAPIWithIdentityForType returns a service API client authenticated as the given identity (typed version for Go code)
+func (f *AWSFactory) GetServiceAPIWithIdentityForType(serviceType ServiceType, identity *iam.Identity) (any, error) {
 	if identity.Provider != string(ProviderAWS) {
 		return nil, fmt.Errorf("identity is not for AWS provider: %s", identity.Provider)
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
 )
 
 const (
@@ -90,8 +91,8 @@ func TestRunCompliance(t *testing.T) {
 	for _, svcType := range serviceTypes {
 		log.Printf("\n🔧 Testing service type: %s", svcType)
 
-		// Get the service API for this type
-		svc, err := f.GetServiceAPI(svcType)
+		// Get the service API for this type using the typed method
+		svc, err := f.GetServiceAPIForType(svcType)
 		if err != nil {
 			log.Printf("⚠️  Warning: Failed to get service API for %s: %v", svcType, err)
 			continue
@@ -193,17 +194,20 @@ func runServiceTestsGeneric(t *testing.T, service generic.Service, serviceType f
 func runInstanceTest(t *testing.T, params inspection.TestParams, serviceType factory.ServiceType, featuresPath, outputDir string) string {
 	// Create a safe filename from the resource name
 	filename := fmt.Sprintf("%s-%s", serviceType, sanitizeFilename(params.ResourceName))
-	// reportPath := filepath.Join(outputDir, filename) // TODO: Use this when implementing actual tests
+	reportPath := filepath.Join(outputDir, filename)
 
 	// Create a subtest for this instance
 	result := "passed"
 	t.Run(filename, func(st *testing.T) {
-		// TODO: Implement instance testing using the godog framework
-		// This should run the appropriate feature files for this service type against this specific instance
-		log.Printf("         TODO: Implement testing for service type %s", serviceType)
-		log.Printf("         Testing %s (catalog: %s)", params.ResourceName, params.CatalogType)
-		st.Skip("Instance testing not yet implemented with factory pattern")
-		result = "skipped"
+		// Run the actual godog tests for this service instance
+		cloud.RunServiceTests(st, params, featuresPath, reportPath)
+
+		// Check test result
+		if st.Failed() {
+			result = "failed"
+		} else if st.Skipped() {
+			result = "skipped"
+		}
 	})
 
 	return result

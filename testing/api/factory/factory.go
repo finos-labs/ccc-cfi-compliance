@@ -25,15 +25,25 @@ const (
 
 // Factory creates cloud service API clients for different providers
 type Factory interface {
-	// GetServiceAPI returns a service API client for the given service type
-	// Returns any since the concrete service type depends on the ServiceType requested
+	// GetServiceAPI returns a service API client for the given service type (string version for Gherkin)
+	// Returns any since the concrete service type depends on the serviceType requested
 	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
-	GetServiceAPI(serviceType ServiceType) (any, error)
+	GetServiceAPI(serviceType string) (any, error)
 
-	// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
+	// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity (string version for Gherkin)
+	// Returns any since the concrete service type depends on the serviceType requested
+	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
+	GetServiceAPIWithIdentity(serviceType string, identity *iam.Identity) (any, error)
+
+	// GetServiceAPIForType returns a service API client for the given service type (typed version for Go code)
 	// Returns any since the concrete service type depends on the ServiceType requested
 	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
-	GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error)
+	GetServiceAPIForType(serviceType ServiceType) (any, error)
+
+	// GetServiceAPIWithIdentityForType returns a service API client authenticated as the given identity (typed version for Go code)
+	// Returns any since the concrete service type depends on the ServiceType requested
+	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
+	GetServiceAPIWithIdentityForType(serviceType ServiceType, identity *iam.Identity) (any, error)
 
 	// GetProvider returns the cloud provider this factory is configured for
 	GetProvider() CloudProvider

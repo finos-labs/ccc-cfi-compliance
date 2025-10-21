@@ -20,8 +20,18 @@ func NewGCPFactory() *GCPFactory {
 	}
 }
 
-// GetServiceAPI returns a service API client for the given service type
-func (f *GCPFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
+// GetServiceAPI returns a service API client for the given service type (string version for Gherkin)
+func (f *GCPFactory) GetServiceAPI(serviceType string) (any, error) {
+	return f.GetServiceAPIForType(ServiceType(serviceType))
+}
+
+// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity (string version for Gherkin)
+func (f *GCPFactory) GetServiceAPIWithIdentity(serviceType string, identity *iam.Identity) (any, error) {
+	return f.GetServiceAPIWithIdentityForType(ServiceType(serviceType), identity)
+}
+
+// GetServiceAPIForType returns a service API client for the given service type (typed version for Go code)
+func (f *GCPFactory) GetServiceAPIForType(serviceType ServiceType) (any, error) {
 	// Get project ID from environment
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
@@ -39,8 +49,8 @@ func (f *GCPFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
 	}
 }
 
-// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *GCPFactory) GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error) {
+// GetServiceAPIWithIdentityForType returns a service API client authenticated as the given identity (typed version for Go code)
+func (f *GCPFactory) GetServiceAPIWithIdentityForType(serviceType ServiceType, identity *iam.Identity) (any, error) {
 	if identity.Provider != string(ProviderGCP) {
 		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
 	}
