@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 )
 
@@ -21,42 +20,30 @@ func NewGCPFactory() *GCPFactory {
 	}
 }
 
-// GetServiceAPI returns a generic service API client for the given service type
-func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	var service generic.Service
-	var err error
-
+// GetServiceAPI returns a service API client for the given service type
+func (f *GCPFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
 	// Get project ID from environment
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
 		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
 
-	switch serviceID {
-	case "iam":
-		service, err = iam.NewGCPIAMService(f.ctx, projectID)
-	case "object-storage":
+	switch serviceType {
+	case ServiceTypeIAM:
+		return iam.NewGCPIAMService(f.ctx, projectID)
+	case ServiceTypeObjectStorage:
 		// TODO: Implement GCS service creation
 		return nil, fmt.Errorf("object-storage not yet implemented for GCP")
 	default:
-		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
+		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceType)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCP service '%s': %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
+func (f *GCPFactory) GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error) {
 	if identity.Provider != string(ProviderGCP) {
 		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
 	}
-
-	var service generic.Service
-	var err error
 
 	// Get project ID from identity or environment
 	projectID := identity.Credentials["project_id"]
@@ -67,26 +54,20 @@ func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		}
 	}
 
-	switch serviceID {
-	case "iam":
+	switch serviceType {
+	case ServiceTypeIAM:
 		// IAM service doesn't typically use per-identity clients, return the standard IAM service
-		service, err = iam.NewGCPIAMService(f.ctx, projectID)
+		return iam.NewGCPIAMService(f.ctx, projectID)
 
-	case "object-storage":
+	case ServiceTypeObjectStorage:
 		// TODO: Implement GCS service with credentials
 		// credentialsJSON := identity.Credentials["service_account_key"]
-		// service, err = objstorage.NewGCSServiceWithCredentials(f.ctx, projectID, []byte(credentialsJSON))
+		// return objstorage.NewGCSServiceWithCredentials(f.ctx, projectID, []byte(credentialsJSON))
 		return nil, fmt.Errorf("object-storage with identity not yet implemented for GCP")
 
 	default:
-		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
+		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceType)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCP service '%s' with identity: %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetProvider returns the cloud provider

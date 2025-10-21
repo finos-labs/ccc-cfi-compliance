@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
 )
 
 // AWSS3Service implements Service for AWS S3
@@ -54,6 +55,41 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity)
 		client: s3.NewFromConfig(cfg),
 		ctx:    ctx,
 	}, nil
+}
+
+// GetAllInstances returns all buckets as TestParams (implements generic.Service)
+func (s *AWSS3Service) GetAllInstances() ([]inspection.TestParams, error) {
+	buckets, err := s.ListBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert []Bucket to []TestParams
+	testParams := make([]inspection.TestParams, len(buckets))
+	for i, bucket := range buckets {
+		// Determine the region - might need to fetch it separately for each bucket
+		region := bucket.Region
+		if region == "" {
+			// Attempt to get the bucket region
+			if r, err := s.GetBucketRegion(bucket.ID); err == nil {
+				region = r
+			}
+		}
+
+		testParams[i] = inspection.TestParams{
+			ProviderServiceType: "s3",
+			CatalogType:         "CCC.ObjStor",
+			Region:              region,
+			Provider:            "aws",
+			UID:                 bucket.ID, // For S3, the bucket name is the unique ID
+			ResourceName:        bucket.Name,
+			HostName:            "",
+			Protocol:            "",
+			Labels:              []string{}, // Could add tags here if available
+		}
+	}
+
+	return testParams, nil
 }
 
 // ListBuckets lists all S3 buckets

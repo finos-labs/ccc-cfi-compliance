@@ -3,7 +3,6 @@ package factory
 import (
 	"fmt"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 )
 
@@ -16,13 +15,25 @@ const (
 	ProviderGCP   CloudProvider = "gcp"
 )
 
+// ServiceType represents the types of cloud services
+type ServiceType string
+
+const (
+	ServiceTypeIAM           ServiceType = "iam"
+	ServiceTypeObjectStorage ServiceType = "object-storage"
+)
+
 // Factory creates cloud service API clients for different providers
 type Factory interface {
-	// GetServiceAPI returns a generic service API client for the given service ID
-	GetServiceAPI(serviceID string) (generic.Service, error)
+	// GetServiceAPI returns a service API client for the given service type
+	// Returns any since the concrete service type depends on the ServiceType requested
+	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
+	GetServiceAPI(serviceType ServiceType) (any, error)
 
 	// GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-	GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error)
+	// Returns any since the concrete service type depends on the ServiceType requested
+	// Callers should type-assert to the specific service interface (e.g., objstorage.Service)
+	GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error)
 
 	// GetProvider returns the cloud provider this factory is configured for
 	GetProvider() CloudProvider

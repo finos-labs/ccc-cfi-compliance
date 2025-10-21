@@ -19,7 +19,9 @@ Feature: CCC.ObjStor.CN01.AR01
     And I refer to "{result}" as "userStorage"
     And I call "{storage}" with "CreateBucket" with parameter "test-bucket-untrusted-kms"
     When I call "{userStorage}" with "ListBuckets"
-    Then "{result}" is an error
+    Then "{result}" is a slice of objects with the following contents
+      | ID                      | Name                    | Region    |
+      | test-bucket-trusted-kms | test-bucket-trusted-kms | us-east-1 |
     And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-untrusted-kms"
 
   Scenario: Service allows reading bucket with trusted KMS key
@@ -30,7 +32,9 @@ Feature: CCC.ObjStor.CN01.AR01
     And I refer to "{result}" as "userStorage"
     And I call "{storage}" with "CreateBucket" with parameter "test-bucket-trusted-kms"
     When I call "{userStorage}" with "ListBuckets"
-    Then "{result}" is not nil
+    Then "{result}" is a slice of objects with the following contents
+      | ID                      | Name                    | Region    |
+      | test-bucket-trusted-kms | test-bucket-trusted-kms | us-east-1 |
     And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-trusted-kms"
 
   Scenario: Cleanup

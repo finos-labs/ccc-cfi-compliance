@@ -23,7 +23,7 @@ type Object struct {
 // Service provides operations for object storage testing
 // This interface abstracts S3, Azure Blob Storage, and GCS operations
 type Service interface {
-	generic.Service // Extends the base Service interface
+	generic.Service // Extends the base Service interface (returns TestParams)
 
 	// Bucket operations
 	ListBuckets() ([]Bucket, error)

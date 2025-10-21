@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,8 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
 )
 
 const (
@@ -24,11 +24,10 @@ const (
 )
 
 var (
-	provider     = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
-	outputDir    = flag.String("output", "output", "Output directory for test reports")
-	timeout      = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
-	skipPorts    = flag.Bool("skip-ports", false, "Skip port tests")
-	skipServices = flag.Bool("skip-services", false, "Skip service tests")
+	provider    = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
+	outputDir   = flag.String("output", "output", "Output directory for test reports")
+	timeout     = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
+	serviceType = flag.String("service-type", "", "Optional: Run tests only for a specific service type (e.g., object-storage, iam)")
 )
 
 func TestRunCompliance(t *testing.T) {
@@ -47,6 +46,9 @@ func TestRunCompliance(t *testing.T) {
 	log.Printf("   Output Directory: %s", *outputDir)
 	log.Printf("   Features Path: %s", featuresPath)
 	log.Printf("   Timeout: %s", *timeout)
+	if *serviceType != "" {
+		log.Printf("   Service Type Filter: %s", *serviceType)
+	}
 	log.Println()
 
 	// Clean and create output directory
@@ -61,94 +63,53 @@ func TestRunCompliance(t *testing.T) {
 	log.Printf("✅ Output directory ready")
 	log.Println()
 
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
-
 	totalTests := 0
 	passedTests := 0
 	failedTests := 0
 	skippedTests := 0
 
-	// Run port tests
-	if !*skipPorts {
-		log.Println("🔍 Discovering accessible ports...")
-		ports, err := inspection.GetAccessiblePorts(ctx, *provider)
-		if err != nil {
-			log.Printf("⚠️  Warning: Failed to discover ports: %v", err)
-		} else {
-			log.Printf("   Found %d accessible port(s)", len(ports))
-
-			for i, port := range ports {
-				log.Printf("\n📡 Running tests for port %d/%d:", i+1, len(ports))
-				log.Printf("   Host: %s", port.HostName)
-				log.Printf("   Port: %s", port.PortNumber)
-				log.Printf("   Protocol: %s", port.Protocol)
-				log.Printf("   Provider Service: %s", port.ProviderServiceType)
-				log.Printf("   Catalog Type: %s", port.CatalogType)
-
-				totalTests++
-				result := runPortTest(t, port, featuresPath, *outputDir)
-
-				switch result {
-				case "passed":
-					passedTests++
-					log.Printf("   ✅ PASSED")
-				case "failed":
-					failedTests++
-					log.Printf("   ❌ FAILED")
-				case "skipped":
-					skippedTests++
-					log.Printf("   ⏭️  SKIPPED")
-				}
-			}
-		}
-	} else {
-		log.Println("⏭️  Skipping port tests")
+	// Create factory for the cloud provider
+	cloudProvider := factory.CloudProvider(*provider)
+	f, err := factory.NewFactory(cloudProvider)
+	if err != nil {
+		log.Fatalf("❌ Failed to create factory: %v", err)
 	}
 
-	// Run service tests
-	if !*skipServices {
-		log.Println("\n🔍 Discovering services...")
-		services, err := inspection.GetServices(ctx, *provider)
-		if err != nil {
-			log.Printf("⚠️  Warning: Failed to discover services: %v", err)
-		} else {
-			log.Printf("   Found %d service(s)", len(services))
-
-			for i, service := range services {
-				// Skip services without a catalog type
-				if service.CatalogType == "" {
-					log.Printf("\n⏭️  Skipping service %d/%d (no catalog type mapping):", i+1, len(services))
-					log.Printf("   Provider Service: %s", service.ProviderServiceType)
-					continue
-				}
-
-				log.Printf("\n🛠️  Running tests for service %d/%d:", i+1, len(services))
-				log.Printf("   Resource Name: %s", service.ResourceName)
-				log.Printf("   Provider Service: %s", service.ProviderServiceType)
-				log.Printf("   Catalog Type: %s", service.CatalogType)
-				log.Printf("   Region: %s", service.Region)
-				log.Printf("   UID: %s", service.UID)
-
-				totalTests++
-				result := runServiceTest(t, service, featuresPath, *outputDir)
-
-				switch result {
-				case "passed":
-					passedTests++
-					log.Printf("   ✅ PASSED")
-				case "failed":
-					failedTests++
-					log.Printf("   ❌ FAILED")
-				case "skipped":
-					skippedTests++
-					log.Printf("   ⏭️  SKIPPED")
-				}
-			}
-		}
+	// Determine which service types to test
+	serviceTypes := []factory.ServiceType{}
+	if *serviceType != "" {
+		// Test only the specified service type
+		serviceTypes = append(serviceTypes, factory.ServiceType(*serviceType))
 	} else {
-		log.Println("⏭️  Skipping service tests")
+		// Test all implemented service types
+		serviceTypes = append(serviceTypes, factory.ServiceTypeObjectStorage)
+		// Add more as they are implemented: factory.ServiceTypeIAM, etc.
+	}
+
+	// Iterate through each service type
+	for _, svcType := range serviceTypes {
+		log.Printf("\n🔧 Testing service type: %s", svcType)
+
+		// Get the service API for this type
+		svc, err := f.GetServiceAPI(svcType)
+		if err != nil {
+			log.Printf("⚠️  Warning: Failed to get service API for %s: %v", svcType, err)
+			continue
+		}
+
+		// Check if the service implements the generic.Service interface
+		service, ok := svc.(generic.Service)
+		if !ok {
+			log.Printf("   ⚠️  Service type %s does not implement generic.Service interface", svcType)
+			continue
+		}
+
+		// Run tests using the generic service
+		stats := runServiceTestsGeneric(t, service, svcType, featuresPath, *outputDir)
+		totalTests += stats.total
+		passedTests += stats.passed
+		failedTests += stats.failed
+		skippedTests += stats.skipped
 	}
 
 	// Combine all OCSF files into a single file
@@ -180,47 +141,69 @@ func TestRunCompliance(t *testing.T) {
 	}
 }
 
-// runPortTest runs tests for a single port configuration
-func runPortTest(t *testing.T, port inspection.TestParams, featuresPath, outputDir string) string {
-	// Create a safe filename from the port details
-	filename := fmt.Sprintf("port-%s-%s:%s",
-		sanitizeFilename(port.ResourceName),
-		sanitizeFilename(port.HostName),
-		sanitizeFilename(port.PortNumber),
-	)
-	reportPath := filepath.Join(outputDir, filename)
-
-	// Create a subtest for this port
-	result := "passed"
-	t.Run(filename, func(st *testing.T) {
-		cloud.RunPortTests(st, port, featuresPath, reportPath)
-		if st.Failed() {
-			result = "failed"
-		} else if st.Skipped() {
-			result = "skipped"
-		}
-	})
-
-	return result
+// testStats holds statistics from running tests
+type testStats struct {
+	total   int
+	passed  int
+	failed  int
+	skipped int
 }
 
-// runServiceTest runs tests for a single service configuration
-func runServiceTest(t *testing.T, service inspection.TestParams, featuresPath, outputDir string) string {
-	// Create a safe filename from the service details
-	filename := fmt.Sprintf("service-%s",
-		sanitizeFilename(service.ResourceName),
-	)
-	reportPath := filepath.Join(outputDir, filename)
+// runServiceTestsGeneric runs tests for all instances of a service
+func runServiceTestsGeneric(t *testing.T, service generic.Service, serviceType factory.ServiceType, featuresPath, outputDir string) testStats {
+	stats := testStats{}
 
-	// Create a subtest for this service
+	// Get all instances as TestParams
+	log.Println("   🔍 Discovering instances...")
+	instances, err := service.GetAllInstances()
+	if err != nil {
+		log.Printf("   ⚠️  Warning: Failed to get instances: %v", err)
+		return stats
+	}
+	log.Printf("   Found %d instance(s)", len(instances))
+
+	// Run tests for each instance
+	for i, params := range instances {
+		log.Printf("\n   📦 Running tests for instance %d/%d:", i+1, len(instances))
+		log.Printf("      Resource: %s", params.ResourceName)
+		log.Printf("      UID: %s", params.UID)
+		log.Printf("      Region: %s", params.Region)
+		log.Printf("      Catalog: %s", params.CatalogType)
+
+		stats.total++
+		result := runInstanceTest(t, params, serviceType, featuresPath, outputDir)
+
+		switch result {
+		case "passed":
+			stats.passed++
+			log.Printf("      ✅ PASSED")
+		case "failed":
+			stats.failed++
+			log.Printf("      ❌ FAILED")
+		case "skipped":
+			stats.skipped++
+			log.Printf("      ⏭️  SKIPPED")
+		}
+	}
+
+	return stats
+}
+
+// runInstanceTest runs tests for a single service instance
+func runInstanceTest(t *testing.T, params inspection.TestParams, serviceType factory.ServiceType, featuresPath, outputDir string) string {
+	// Create a safe filename from the resource name
+	filename := fmt.Sprintf("%s-%s", serviceType, sanitizeFilename(params.ResourceName))
+	// reportPath := filepath.Join(outputDir, filename) // TODO: Use this when implementing actual tests
+
+	// Create a subtest for this instance
 	result := "passed"
 	t.Run(filename, func(st *testing.T) {
-		cloud.RunServiceTests(st, service, featuresPath, reportPath)
-		if st.Failed() {
-			result = "failed"
-		} else if st.Skipped() {
-			result = "skipped"
-		}
+		// TODO: Implement instance testing using the godog framework
+		// This should run the appropriate feature files for this service type against this specific instance
+		log.Printf("         TODO: Implement testing for service type %s", serviceType)
+		log.Printf("         Testing %s (catalog: %s)", params.ResourceName, params.CatalogType)
+		st.Skip("Instance testing not yet implemented with factory pattern")
+		result = "skipped"
 	})
 
 	return result

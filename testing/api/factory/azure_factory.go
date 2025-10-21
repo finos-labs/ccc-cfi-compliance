@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 )
 
@@ -21,40 +20,28 @@ func NewAzureFactory() *AzureFactory {
 	}
 }
 
-// GetServiceAPI returns a generic service API client for the given service type
-func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	var service generic.Service
-	var err error
-
+// GetServiceAPI returns a service API client for the given service type
+func (f *AzureFactory) GetServiceAPI(serviceType ServiceType) (any, error) {
 	// Get subscription ID and resource group from environment
 	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	resourceGroup := os.Getenv("AZURE_RESOURCE_GROUP")
 
-	switch serviceID {
-	case "iam":
-		service, err = iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
-	case "object-storage":
+	switch serviceType {
+	case ServiceTypeIAM:
+		return iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
+	case ServiceTypeObjectStorage:
 		// TODO: Implement Azure Blob Storage service creation
 		return nil, fmt.Errorf("object-storage not yet implemented for Azure")
 	default:
-		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
+		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceType)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
+func (f *AzureFactory) GetServiceAPIWithIdentity(serviceType ServiceType, identity *iam.Identity) (any, error) {
 	if identity.Provider != string(ProviderAzure) {
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
-
-	var service generic.Service
-	var err error
 
 	// Get subscription ID and resource group from identity or environment
 	subscriptionID := identity.Credentials["subscription_id"]
@@ -66,24 +53,18 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 		resourceGroup = os.Getenv("AZURE_RESOURCE_GROUP")
 	}
 
-	switch serviceID {
-	case "iam":
+	switch serviceType {
+	case ServiceTypeIAM:
 		// IAM service doesn't typically use per-identity clients, return the standard IAM service
-		service, err = iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
+		return iam.NewAzureIAMService(f.ctx, subscriptionID, resourceGroup)
 
-	case "object-storage":
+	case ServiceTypeObjectStorage:
 		// TODO: Implement Azure Blob Storage service with credentials
 		return nil, fmt.Errorf("object-storage with identity not yet implemented for Azure")
 
 	default:
-		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
+		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceType)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetProvider returns the cloud provider
