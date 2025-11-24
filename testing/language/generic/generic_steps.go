@@ -933,6 +933,20 @@ func (pw *PropsWorld) fieldIsErrorWithMessage(field, errorType string) error {
 	return nil
 }
 
+func (pw *PropsWorld) fieldIsNotError(field string) error {
+	actual := pw.HandleResolve(field)
+
+	fmt.Printf("EXPECTED: not an error\n")
+	fmt.Printf("ACTUAL:   %v (type: %T)\n", actual, actual)
+
+	if _, ok := actual.(error); ok {
+		return fmt.Errorf("expected %s to not be an error, but got: %v", field, actual)
+	}
+
+	fmt.Printf("✓ Value is not an error\n")
+	return nil
+}
+
 func (pw *PropsWorld) fieldContains(field, substring string) error {
 	actual := pw.HandleResolve(field)
 
@@ -1369,7 +1383,9 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^"([^"]*)" is empty$`, pw.fieldIsEmpty)
 	s.Step(`^"([^"]*)" is "([^"]*)"$`, pw.fieldEquals)
 	s.Step(`^"([^"]*)" is an error with message "([^"]*)"$`, pw.fieldIsErrorWithMessage)
+	s.Step(`^"([^"]*)" has error message "([^"]*)"$`, pw.fieldIsErrorWithMessage)
 	s.Step(`^"([^"]*)" is an error$`, pw.fieldIsError)
+	s.Step(`^"([^"]*)" is not an error$`, pw.fieldIsNotError)
 	s.Step(`^"([^"]*)" contains "([^"]*)"$`, pw.fieldContains)
 
 	// Test setup patterns
