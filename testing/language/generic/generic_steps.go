@@ -431,6 +431,11 @@ func (pw *PropsWorld) iAttachToTestOutput(content string) error {
 	var name string
 
 	switch v := resolved.(type) {
+	case error:
+		// Handle errors specifically - convert to text
+		data = []byte(v.Error())
+		mediaType = "text/plain"
+		name = "error.txt"
 	case string:
 		data = []byte(v)
 		mediaType = "text/plain"

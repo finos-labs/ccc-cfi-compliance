@@ -18,22 +18,21 @@ type FormatterFactory struct {
 }
 
 // NewFormatterFactory creates a new formatter factory with the given parameters
-func NewFormatterFactory(params TestParams) *FormatterFactory {
-	return &FormatterFactory{
+// Optionally accepts an attachment provider as the second parameter
+func NewFormatterFactory(params TestParams, attachmentProvider ...attachments.Provider) *FormatterFactory {
+	ff := &FormatterFactory{
 		params: params,
 	}
+	if len(attachmentProvider) > 0 {
+		ff.attachmentProvider = attachmentProvider[0]
+	}
+	return ff
 }
 
 // UpdateParams updates the test parameters for this factory
 // Call this before running each test to ensure formatters use the correct params
 func (ff *FormatterFactory) UpdateParams(params TestParams) {
 	ff.params = params
-}
-
-// SetAttachmentProvider sets the attachment provider for the factory
-// This allows formatters to access attachments from PropsWorld
-func (ff *FormatterFactory) SetAttachmentProvider(provider attachments.Provider) {
-	ff.attachmentProvider = provider
 }
 
 // GetHTMLFormatterFunc returns a configured HTML formatter function

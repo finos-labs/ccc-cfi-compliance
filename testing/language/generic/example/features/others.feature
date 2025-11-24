@@ -50,3 +50,10 @@ Feature: Other test patterns
     And I call "{text2}"
     And I attach "{result}" to the test output
     Then "{result}" is "Second attachment"
+
+  @others @attach
+  Scenario: Attach error to test output
+    Given "errorFunction" is a function which throws an error
+    When I call "{errorFunction}"
+    Then "{result}" is an error
+    And I attach "{result}" to the test output

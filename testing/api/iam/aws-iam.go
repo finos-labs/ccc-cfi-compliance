@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -65,40 +66,47 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 		}
 	}
 
-	// Create access key for the user (or get existing one)
+	// Create access key for the user
+	// Note: We always create a new access key because we can't retrieve secrets for existing keys
 	var accessKeyId, secretAccessKey string
 
+	// If user already exists, delete any existing access keys to avoid hitting the limit (AWS allows max 2 keys)
 	if userAlreadyExists {
-		// List existing access keys
 		listKeysOutput, err := s.client.ListAccessKeys(s.ctx, &iam.ListAccessKeysInput{
 			UserName: aws.String(userName),
 		})
-		if err == nil && len(listKeysOutput.AccessKeyMetadata) > 0 {
-			// Use first existing key
-			accessKeyId = aws.ToString(listKeysOutput.AccessKeyMetadata[0].AccessKeyId)
-			fmt.Printf("   🔑 Reusing existing access key: %s\n", accessKeyId)
-			// Note: We can't retrieve the secret for existing keys, so we create a new one
+		if err == nil {
+			for _, keyMetadata := range listKeysOutput.AccessKeyMetadata {
+				fmt.Printf("   🗑️  Deleting old access key: %s\n", aws.ToString(keyMetadata.AccessKeyId))
+				s.client.DeleteAccessKey(s.ctx, &iam.DeleteAccessKeyInput{
+					UserName:    aws.String(userName),
+					AccessKeyId: keyMetadata.AccessKeyId,
+				})
+			}
 		}
 	}
 
-	if accessKeyId == "" {
-		// Create new access key
-		createKeyOutput, err := s.client.CreateAccessKey(s.ctx, &iam.CreateAccessKeyInput{
-			UserName: aws.String(userName),
-		})
-		if err != nil {
-			// Cleanup: delete the user if key creation fails (only if we just created it)
-			if !userAlreadyExists {
-				s.client.DeleteUser(s.ctx, &iam.DeleteUserInput{
-					UserName: aws.String(userName),
-				})
-			}
-			return nil, fmt.Errorf("failed to create access key for user %s: %w", userName, err)
+	// Create new access key
+	createKeyOutput, err := s.client.CreateAccessKey(s.ctx, &iam.CreateAccessKeyInput{
+		UserName: aws.String(userName),
+	})
+	if err != nil {
+		// Cleanup: delete the user if key creation fails (only if we just created it)
+		if !userAlreadyExists {
+			s.client.DeleteUser(s.ctx, &iam.DeleteUserInput{
+				UserName: aws.String(userName),
+			})
 		}
-		accessKeyId = aws.ToString(createKeyOutput.AccessKey.AccessKeyId)
-		secretAccessKey = aws.ToString(createKeyOutput.AccessKey.SecretAccessKey)
-		fmt.Printf("   🔑 Created new access key: %s\n", accessKeyId)
+		return nil, fmt.Errorf("failed to create access key for user %s: %w", userName, err)
 	}
+	accessKeyId = aws.ToString(createKeyOutput.AccessKey.AccessKeyId)
+	secretAccessKey = aws.ToString(createKeyOutput.AccessKey.SecretAccessKey)
+	fmt.Printf("   🔑 Created new access key: %s\n", accessKeyId)
+
+	// Wait for IAM to propagate the new access key (eventual consistency)
+	// AWS recommends waiting a few seconds for IAM changes to become effective
+	fmt.Printf("   ⏳ Waiting 5s for access key to propagate across AWS...\n")
+	time.Sleep(5 * time.Second)
 
 	// Create identity with credentials in map
 	identity := &Identity{
@@ -156,6 +164,12 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 	if err != nil {
 		return fmt.Errorf("failed to attach policy to user %s: %w", identity.UserName, err)
 	}
+
+	fmt.Printf("📋 Attached policy '%s' to user %s\n", policyName, identity.UserName)
+	
+	// Wait for policy to propagate (eventual consistency)
+	fmt.Printf("   ⏳ Waiting 3s for policy to propagate...\n")
+	time.Sleep(3 * time.Second)
 
 	return nil
 }

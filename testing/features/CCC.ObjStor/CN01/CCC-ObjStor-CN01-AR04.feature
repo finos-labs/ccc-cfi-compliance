@@ -21,6 +21,7 @@ Feature: CCC.ObjStor.CN01.AR04
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateObject" with parameters "{bucket.ID}", "test-object.txt" and "test content"
     Then "{result}" is an error
+    And I attach "{result}" to the test output
     And I call "{iamService}" with "DestroyUser" with parameter "{testUserUntrusted}"
 
   Scenario: Service allows writing object with trusted KMS key

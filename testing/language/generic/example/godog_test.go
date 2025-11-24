@@ -82,10 +82,7 @@ func TestGodogFeatures(t *testing.T) {
 	suite := NewTestSuite()
 	suite.T = t
 
-	factory := reporters.NewFormatterFactory(reporters.TestParams{})
-
-	// Set the PropsWorld as the attachment provider so the formatter can access attachments
-	factory.SetAttachmentProvider(suite.PropsWorld)
+	factory := reporters.NewFormatterFactory(reporters.TestParams{}, suite.PropsWorld)
 
 	godog.Format("html", "HTML report", factory.GetHTMLFormatterFunc())
 

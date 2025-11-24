@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 )
 
@@ -31,9 +32,10 @@ func NewTestSuite() *TestSuite {
 
 // Setup method called before each scenario with provided parameters
 func (suite *TestSuite) setupWithParams(params reporters.TestParams) {
-	// Don't reset CloudWorld - just reset Props
-	// This ensures step registrations remain valid
+	// Reset Props and AsyncManager, but keep the same CloudWorld instance
+	// so the formatter can access attachments from the previous scenario
 	suite.Props = make(map[string]interface{})
+	suite.AsyncManager = generic.NewAsyncTaskManager()
 
 	// Use reflection to automatically populate all fields from TestParams
 	v := reflect.ValueOf(params)
@@ -76,16 +78,6 @@ func buildTagFilter(protocol string) string {
 	return strings.Join(append(tags, exclusions...), " && ")
 }
 
-// Global formatter factory that will be updated with params before each test
-var portFormatterFactory *reporters.FormatterFactory
-
-func init() {
-	// Initialize factory once and register formatters globally
-	portFormatterFactory = reporters.NewFormatterFactory(reporters.TestParams{})
-	godog.Format("html-port", "HTML report for port tests", portFormatterFactory.GetHTMLFormatterFunc())
-	godog.Format("ocsf-port", "OCSF report for port tests", portFormatterFactory.GetOCSFFormatterFunc())
-}
-
 // RunPortTests runs godog tests for a specific port configuration
 func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, reportPath string) {
 	suite := NewTestSuite()
@@ -100,8 +92,15 @@ func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, repor
 	htmlReportPath := reportPath + ".html"
 	ocsfReportPath := reportPath + ".ocsf.json"
 
-	// Update factory with current test parameters before running
-	portFormatterFactory.UpdateParams(params)
+	// Create formatter factory with params and attachment provider
+	factory := reporters.NewFormatterFactory(params, suite.CloudWorld)
+
+	// Generate unique format names for this test run to avoid conflicts
+	htmlFormat := fmt.Sprintf("html-port-%p", suite)
+	ocsfFormat := fmt.Sprintf("ocsf-port-%p", suite)
+
+	godog.Format(htmlFormat, "HTML report for port tests", factory.GetHTMLFormatterFunc())
+	godog.Format(ocsfFormat, "OCSF report for port tests", factory.GetOCSFFormatterFunc())
 
 	// Build tag filter based on protocol
 	tagFilter := buildTagFilter(params.Protocol)
@@ -111,7 +110,7 @@ func RunPortTests(t *testing.T, params reporters.TestParams, featuresPath, repor
 	reportTitle := "Port Test Report: " + params.HostName + ":" + params.PortNumber + " (" + params.Protocol + ")"
 
 	opts := godog.Options{
-		Format:   fmt.Sprintf("html-port:%s,ocsf-port:%s", htmlReportPath, ocsfReportPath),
+		Format:   fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
 		Paths:    []string{featuresPath},
 		Tags:     tagFilter,
 		TestingT: nil, // Don't use TestingT to allow proper file output

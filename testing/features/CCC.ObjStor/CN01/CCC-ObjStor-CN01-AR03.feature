@@ -19,6 +19,7 @@ Feature: CCC.ObjStor.CN01.AR03
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-untrusted"
     Then "{result}" is an error
+    And I attach "{result}" to the test output
 
   Scenario: Service allows creating bucket with trusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"

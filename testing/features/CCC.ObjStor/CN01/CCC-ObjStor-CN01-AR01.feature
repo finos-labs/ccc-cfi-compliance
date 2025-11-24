@@ -10,29 +10,34 @@ Feature: CCC.ObjStor.CN01.AR01
     And I refer to "{result}" as "storage"
     And I call "{api}" with "GetServiceAPI" with parameter "iam"
     And I refer to "{result}" as "iamService"
-
-  Scenario: Service prevents reading bucket with untrusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
-    And I refer to "{result}" as "userStorage"
-    And I call "{storage}" with "CreateBucket" with parameter "test-bucket-untrusted-kms"
-    When I call "{userStorage}" with "ListBuckets"
-    Then "{result}" is an error
-    And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-untrusted-kms"
-
-  Scenario: Service allows reading bucket with trusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"
     And I refer to "{result}" as "testUserTrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "read"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserTrusted}"
+
+  Scenario: Service prevents reading bucket with untrusted KMS key
+    Given I attach "{testUserUntrusted}" to the test output
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
+    And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    And I call "{storage}" with "CreateBucket" with parameter "test-bucket-trusted-kms"
-    When I call "{userStorage}" with "ListBuckets"
-    Then "{result}" is not nil
-    And I call "{storage}" with "DeleteBucket" with parameter "test-bucket-trusted-kms"
+    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
+    Then "{result}" is an error
+    And I attach "{result}" to the test output
+
+  Scenario: Service allows reading bucket with trusted KMS key
+    Given I attach "{testUserTrusted}" to the test output
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserTrusted}"
+    And "{result}" is not an error
+    And I attach "{result}" to the test output
+    And I refer to "{result}" as "userStorage"
+    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
+    Then "{result}" is not an error
+    And I attach "{result}" to the test output
 
   Scenario: Cleanup
     Given I call "{iamService}" with "DestroyUser" with parameter "{testUserUntrusted}"
+    Then "{result}" is not an error
     And I call "{iamService}" with "DestroyUser" with parameter "{testUserTrusted}"
+    Then "{result}" is not an error

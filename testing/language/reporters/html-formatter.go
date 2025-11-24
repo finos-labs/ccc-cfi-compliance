@@ -35,6 +35,7 @@ type HTMLFormatter struct {
 	scenarioOpened     bool
 	featureOpened      bool
 	stepKeywords       map[string]string    // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
+	backgroundSteps    map[string]bool      // Maps step AST node IDs to whether they're from Background
 	attachmentProvider attachments.Provider // Provider for accessing attachments from PropsWorld
 	params             *TestParams          // Optional test parameters
 }

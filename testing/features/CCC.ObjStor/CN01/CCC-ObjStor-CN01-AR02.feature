@@ -22,6 +22,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I call "{storage}" with "CreateObject" with parameters "{bucketUntrusted.ID}", "test-object.txt" and "test content"
     When I call "{userStorage}" with "ReadObject" with parameters "{bucketUntrusted.ID}" and "test-object.txt"
     Then "{result}" is an error
+    And I attach "{result}" to the test output
     And I call "{storage}" with "DeleteObject" with parameters "{bucketUntrusted.ID}" and "test-object.txt"
     And I call "{storage}" with "DeleteBucket" with parameter "{bucketUntrusted.ID}"
 
