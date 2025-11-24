@@ -8,7 +8,7 @@ Feature: Data comparison and validation patterns
 
   @comparison
   Scenario: Array validation with data tables
-    Then "{users}" is an slice of objects with the following contents
+    Then "{users}" is a slice of objects with the following contents
       | name     | active | profile.email    |
       | John Doe | true   | john@example.com |
       | Jane Doe | false  | jane@example.com |
@@ -30,12 +30,12 @@ Feature: Data comparison and validation patterns
 
   @comparison
   Scenario: Array length validation
-    Then "{users}" is an slice of objects with length "2"
+    Then "{users}" is a slice of objects with length "2"
 
   @comparison
   Scenario: String array validation
     Given "colorArray" is a string array with colors
-    Then "{colorArray}" is an slice of strings with the following values
+    Then "{colorArray}" is a slice of strings with the following values
       | value |
       | red   |
       | blue  |

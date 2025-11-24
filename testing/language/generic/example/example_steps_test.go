@@ -44,6 +44,74 @@ func (c *APIClient) Post(endpoint string, data interface{}) map[string]interface
 	}
 }
 
+// GetWithError returns data or error depending on the endpoint
+func (c *APIClient) GetWithError(endpoint string) (map[string]interface{}, error) {
+	if endpoint == "/invalid" {
+		return nil, fmt.Errorf("endpoint not found: %s", endpoint)
+	}
+	return map[string]interface{}{
+		"status":  200,
+		"message": "success",
+	}, nil
+}
+
+// ErrorTestService is a test service that demonstrates error handling with (value, error) returns
+type ErrorTestService struct{}
+
+// Methods with no parameters
+func (s *ErrorTestService) FailWithNoParams() (string, error) {
+	return "", fmt.Errorf("method failed: no params")
+}
+
+func (s *ErrorTestService) SucceedWithNoParams() (string, error) {
+	return "success: no params", nil
+}
+
+// Methods with one parameter
+func (s *ErrorTestService) FailWithOneParam(param string) (string, error) {
+	return "", fmt.Errorf("method failed with param: %s", param)
+}
+
+func (s *ErrorTestService) SucceedWithOneParam(param string) (string, error) {
+	return fmt.Sprintf("success: %s", param), nil
+}
+
+// Methods with two parameters
+func (s *ErrorTestService) FailWithTwoParams(param1, param2 string) (string, error) {
+	return "", fmt.Errorf("method failed with params: %s, %s", param1, param2)
+}
+
+func (s *ErrorTestService) SucceedWithTwoParams(param1, param2 string) (string, error) {
+	return fmt.Sprintf("success: %s, %s", param1, param2), nil
+}
+
+// Methods with three parameters
+func (s *ErrorTestService) FailWithThreeParams(param1, param2, param3 string) (string, error) {
+	return "", fmt.Errorf("method failed with params: %s, %s, %s", param1, param2, param3)
+}
+
+func (s *ErrorTestService) SucceedWithThreeParams(param1, param2, param3 string) (string, error) {
+	return fmt.Sprintf("success: %s, %s, %s", param1, param2, param3), nil
+}
+
+// Panic methods for testing panic recovery
+
+func (s *ErrorTestService) PanicWithNoParams() string {
+	panic("panic: this method panics")
+}
+
+func (s *ErrorTestService) PanicWithOneParam(param string) string {
+	panic(fmt.Sprintf("panic: %s", param))
+}
+
+func (s *ErrorTestService) PanicWithTwoParams(param1, param2 string) string {
+	panic(fmt.Sprintf("panic: %s, %s", param1, param2))
+}
+
+func (s *ErrorTestService) PanicWithThreeParams(param1, param2, param3 string) string {
+	panic(fmt.Sprintf("panic: %s, %s, %s", param1, param2, param3))
+}
+
 // NewExampleSteps creates a new example steps instance
 func NewExampleSteps(world *generic.PropsWorld) *ExampleSteps {
 	return &ExampleSteps{
@@ -67,6 +135,13 @@ func (es *ExampleSteps) RegisterExampleSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^"([^"]*)" is a test function with two parameters$`, es.functionTwoParams)
 	ctx.Step(`^"([^"]*)" is a test function with three parameters$`, es.functionThreeParams)
 	ctx.Step(`^I have a test object in "([^"]*)"$`, es.iHaveTestObjectIn)
+
+	// Error handling test steps
+	ctx.Step(`^I have an API client with error handling in "([^"]*)"$`, es.iHaveAPIClientWithErrorHandlingIn)
+	ctx.Step(`^I have a service with error methods in "([^"]*)"$`, es.iHaveServiceWithErrorMethodsIn)
+
+	// Slice test steps
+	ctx.Step(`^I have test slices configured in "([^"]*)"$`, es.iHaveTestSlicesConfiguredIn)
 }
 
 // Example-specific step definitions
@@ -191,5 +266,131 @@ func (es *ExampleSteps) structWithNameAndAge(variableName, name, age string) err
 		Age:  age,
 	}
 	es.Props[variableName] = person
+	return nil
+}
+
+// Error handling step definitions
+func (es *ExampleSteps) iHaveAPIClientWithErrorHandlingIn(variableName string) error {
+	apiClient := &APIClient{baseURL: "https://api.example.com"}
+	es.Props[variableName] = apiClient
+	return nil
+}
+
+func (es *ExampleSteps) iHaveServiceWithErrorMethodsIn(variableName string) error {
+	errorService := &ErrorTestService{}
+	es.Props[variableName] = errorService
+	return nil
+}
+
+// Slice test step definitions
+func (es *ExampleSteps) iHaveTestSlicesConfiguredIn(variableName string) error {
+	testSlices := map[string]interface{}{
+		"users": []interface{}{
+			map[string]interface{}{
+				"id":     "1",
+				"name":   "Alice",
+				"email":  "alice@example.com",
+				"active": "true",
+			},
+			map[string]interface{}{
+				"id":     "2",
+				"name":   "Bob",
+				"email":  "bob@example.com",
+				"active": "false",
+			},
+			map[string]interface{}{
+				"id":     "3",
+				"name":   "Charlie",
+				"email":  "charlie@example.com",
+				"active": "true",
+			},
+		},
+		"colors": []interface{}{"red", "green", "blue"},
+		"empty":  []interface{}{},
+		"single": []interface{}{
+			map[string]interface{}{
+				"id":    "1",
+				"value": "only-item",
+			},
+		},
+		"numbers": []interface{}{"1", "2", "3", "4", "5"},
+		"products": []interface{}{
+			map[string]interface{}{
+				"id":    "1",
+				"name":  "Widget",
+				"price": "9.99",
+			},
+			map[string]interface{}{
+				"id":    "2",
+				"name":  "Gadget",
+				"price": "19.99",
+			},
+			map[string]interface{}{
+				"id":    "3",
+				"name":  "Doohickey",
+				"price": "29.99",
+			},
+		},
+		"flags": []interface{}{
+			map[string]interface{}{
+				"enabled": "true",
+				"visible": "false",
+			},
+			map[string]interface{}{
+				"enabled": "false",
+				"visible": "true",
+			},
+			map[string]interface{}{
+				"enabled": "true",
+				"visible": "true",
+			},
+		},
+		"special": []interface{}{"hello-world", "test_value", "some.thing"},
+		"large": []interface{}{
+			map[string]interface{}{"id": "1"},
+			map[string]interface{}{"id": "2"},
+			map[string]interface{}{"id": "3"},
+			map[string]interface{}{"id": "4"},
+			map[string]interface{}{"id": "5"},
+			map[string]interface{}{"id": "6"},
+			map[string]interface{}{"id": "7"},
+			map[string]interface{}{"id": "8"},
+			map[string]interface{}{"id": "9"},
+			map[string]interface{}{"id": "10"},
+		},
+		"countries": []interface{}{
+			map[string]interface{}{
+				"code": "US",
+				"name": "United States",
+			},
+			map[string]interface{}{
+				"code": "UK",
+				"name": "United Kingdom",
+			},
+			map[string]interface{}{
+				"code": "CA",
+				"name": "Canada",
+			},
+		},
+		"daysOfWeek": []interface{}{
+			"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+		},
+		"mixed": []interface{}{
+			map[string]interface{}{
+				"id":     "1",
+				"name":   "First",
+				"count":  "100",
+				"active": "true",
+			},
+			map[string]interface{}{
+				"id":     "2",
+				"name":   "Second",
+				"count":  "200",
+				"active": "false",
+			},
+		},
+		"statusCodes": []interface{}{"200", "201", "400", "404", "500"},
+	}
+	es.Props[variableName] = testSlices
 	return nil
 }

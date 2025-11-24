@@ -26,8 +26,10 @@ func NewTestSuite() *TestSuite {
 
 // Setup method called before each scenario
 func (suite *TestSuite) setup() {
-	// Reset the world for each scenario
-	suite.PropsWorld = generic.NewPropsWorld()
+	// Reset the Props, but keep the same PropsWorld instance
+	suite.Props = make(map[string]interface{})
+	suite.AsyncManager = generic.NewAsyncTaskManager()
+
 	suite.ExampleSteps = NewExampleSteps(suite.PropsWorld)
 
 	// Setup test data for examples
@@ -81,6 +83,9 @@ func TestGodogFeatures(t *testing.T) {
 	suite.T = t
 
 	factory := reporters.NewFormatterFactory(reporters.TestParams{})
+
+	// Set the PropsWorld as the attachment provider so the formatter can access attachments
+	factory.SetAttachmentProvider(suite.PropsWorld)
 
 	godog.Format("html", "HTML report", factory.GetHTMLFormatterFunc())
 

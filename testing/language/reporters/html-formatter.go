@@ -11,14 +11,8 @@ import (
 
 	"github.com/cucumber/godog/formatters"
 	messages "github.com/cucumber/messages/go/v21"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
 )
-
-// Attachment represents a file or data attached to the report
-type Attachment struct {
-	Name      string
-	MediaType string
-	Data      []byte
-}
 
 // HTMLFormatter is a godog formatter that generates HTML reports
 type HTMLFormatter struct {
@@ -37,13 +31,12 @@ type HTMLFormatter struct {
 		skippedSteps    int
 		undefinedSteps  int
 	}
-	bodyBuffer      bytes.Buffer
-	scenarioOpened  bool
-	featureOpened   bool
-	stepKeywords    map[string]string // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
-	attachments     []Attachment      // Store attachments for current scenario
-	scenarioContext interface{}       // Store scenario context to access attachments
-	params          *TestParams       // Optional test parameters
+	bodyBuffer         bytes.Buffer
+	scenarioOpened     bool
+	featureOpened      bool
+	stepKeywords       map[string]string    // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
+	attachmentProvider attachments.Provider // Provider for accessing attachments from PropsWorld
+	params             *TestParams          // Optional test parameters
 }
 
 // Feature captures feature information
@@ -84,6 +77,15 @@ func (f *HTMLFormatter) Feature(gd *messages.GherkinDocument, uri string, c []by
 func (f *HTMLFormatter) Pickle(pickle *messages.Pickle) {
 	// Close previous scenario if one was opened
 	if f.scenarioOpened {
+		// Render any attachments collected during the scenario
+		if f.attachmentProvider != nil {
+			attachments := f.attachmentProvider.GetAttachments()
+			if len(attachments) > 0 {
+				f.bodyBuffer.WriteString(formatAttachments(attachments))
+				// Clear attachments for next scenario
+				f.attachmentProvider.ClearAttachments()
+			}
+		}
 		fmt.Fprintf(&f.bodyBuffer, `</div>`)
 	}
 
@@ -111,6 +113,13 @@ func (f *HTMLFormatter) Summary() {
 
 	// Close the last scenario if one was opened
 	if f.scenarioOpened {
+		// Render any remaining attachments
+		if f.attachmentProvider != nil {
+			attachments := f.attachmentProvider.GetAttachments()
+			if len(attachments) > 0 {
+				f.bodyBuffer.WriteString(formatAttachments(attachments))
+			}
+		}
 		fmt.Fprintf(&f.bodyBuffer, `</div>`)
 	}
 
@@ -268,7 +277,7 @@ func addSpacesToCamelCase(s string) string {
 }
 
 // formatAttachments renders attachments as HTML
-func formatAttachments(attachments []Attachment) string {
+func formatAttachments(attachments []attachments.Attachment) string {
 	if len(attachments) == 0 {
 		return ""
 	}
@@ -289,6 +298,9 @@ func formatAttachments(attachments []Attachment) string {
 		} else if att.MediaType == "application/json" {
 			// Pretty-print JSON in a collapsible section
 			buf.WriteString(fmt.Sprintf(`<details style="margin-top: 5px;"><summary style="cursor: pointer; font-weight: bold;">View JSON (%d bytes)</summary><pre style="margin: 5px 0; padding: 10px; background: #fff; border: 1px solid #ddd; overflow-x: auto; max-height: 400px;">%s</pre></details>`, len(att.Data), string(att.Data)))
+		} else if strings.HasPrefix(att.MediaType, "text/") {
+			// Display text content in a collapsible section
+			buf.WriteString(fmt.Sprintf(`<details style="margin-top: 5px;"><summary style="cursor: pointer; font-weight: bold;">View Content (%d bytes)</summary><pre style="margin: 5px 0; padding: 10px; background: #fff; border: 1px solid #ddd; overflow-x: auto; max-height: 400px;">%s</pre></details>`, len(att.Data), string(att.Data)))
 		} else {
 			// For other types, provide download info
 			buf.WriteString(fmt.Sprintf(`<div style="color: #666;">Type: %s, Size: %d bytes</div>`, att.MediaType, len(att.Data)))
@@ -416,11 +428,17 @@ func (f *HTMLFormatter) generateHTML() string {
 
 // NewHTMLFormatterWithParams creates a new HTML formatter with test parameters
 func NewHTMLFormatterWithParams(suite string, out io.Writer, params TestParams) formatters.Formatter {
+	return NewHTMLFormatterWithAttachments(suite, out, params, nil)
+}
+
+// NewHTMLFormatterWithAttachments creates a new HTML formatter with test parameters and attachment provider
+func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider attachments.Provider) formatters.Formatter {
 	f := &HTMLFormatter{
-		out:          out,
-		title:        suite,
-		stepKeywords: make(map[string]string),
-		params:       &params,
+		out:                out,
+		title:              suite,
+		stepKeywords:       make(map[string]string),
+		params:             &params,
+		attachmentProvider: attachmentProvider,
 	}
 	f.stats.startTime = time.Now()
 	return f

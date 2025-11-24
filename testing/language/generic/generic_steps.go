@@ -12,6 +12,7 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/cucumber/godog"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
 )
 
 // AsyncTask represents an asynchronous operation
@@ -97,19 +98,12 @@ func (atm *AsyncTaskManager) GetTaskResult(name string) (interface{}, error) {
 	}
 }
 
-// Attachment represents a file or data attached to a test
-type Attachment struct {
-	Name      string
-	MediaType string
-	Data      []byte
-}
-
 // PropsWorld represents the test context equivalent to TypeScript PropsWorld
 type PropsWorld struct {
 	Props        map[string]interface{}
 	T            TestingT // Interface for assertions
 	AsyncManager *AsyncTaskManager
-	Attachments  []Attachment // Store attachments for the current scenario
+	Attachments  []attachments.Attachment // Store attachments for the current scenario
 	mutex        sync.RWMutex
 }
 
@@ -124,7 +118,7 @@ func NewPropsWorld() *PropsWorld {
 	return &PropsWorld{
 		Props:        make(map[string]interface{}),
 		AsyncManager: NewAsyncTaskManager(),
-		Attachments:  make([]Attachment, 0),
+		Attachments:  make([]attachments.Attachment, 0),
 	}
 }
 
@@ -132,12 +126,30 @@ func NewPropsWorld() *PropsWorld {
 func (pw *PropsWorld) Attach(name, mediaType string, data []byte) {
 	pw.mutex.Lock()
 	defer pw.mutex.Unlock()
-	pw.Attachments = append(pw.Attachments, Attachment{
+	pw.Attachments = append(pw.Attachments, attachments.Attachment{
 		Name:      name,
 		MediaType: mediaType,
 		Data:      data,
 	})
 	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
+}
+
+// GetAttachments returns a copy of the current attachments (implements attachments.Provider)
+func (pw *PropsWorld) GetAttachments() []attachments.Attachment {
+	pw.mutex.RLock()
+	defer pw.mutex.RUnlock()
+
+	// Return a copy to avoid race conditions
+	attachmentsCopy := make([]attachments.Attachment, len(pw.Attachments))
+	copy(attachmentsCopy, pw.Attachments)
+	return attachmentsCopy
+}
+
+// ClearAttachments clears all attachments (implements attachments.Provider)
+func (pw *PropsWorld) ClearAttachments() {
+	pw.mutex.Lock()
+	defer pw.mutex.Unlock()
+	pw.Attachments = make([]attachments.Attachment, 0)
 }
 
 // formatValueForComparison formats a value for display in comparisons
@@ -343,7 +355,104 @@ func (pw *PropsWorld) matchData(actual []interface{}, expected []map[string]stri
 	return nil
 }
 
+// recoverFromMethodCallPanic creates a deferred function that recovers from panics during method calls
+// and stores the error in the result. This centralizes panic recovery logic.
+func (pw *PropsWorld) recoverFromMethodCallPanic(objectName, methodName string, params ...interface{}) {
+	if r := recover(); r != nil {
+		// Build the error message based on the number of parameters
+		var paramStr string
+		if len(params) == 0 {
+			paramStr = ""
+		} else if len(params) == 1 {
+			paramStr = fmt.Sprintf("(%v)", params[0])
+		} else {
+			// Convert params to string representations
+			paramStrs := make([]string, len(params))
+			for i, p := range params {
+				paramStrs[i] = fmt.Sprintf("%v", p)
+			}
+			paramStr = fmt.Sprintf("(%s)", strings.Join(paramStrs, ", "))
+		}
+
+		errMsg := fmt.Sprintf("Error calling %s.%s%s: %v", objectName, methodName, paramStr, r)
+		fmt.Printf("\n❌ %s\n", errMsg)
+		pw.Props["result"] = fmt.Errorf("%s", errMsg)
+	}
+}
+
+// handleMethodResultsSync processes method call results for synchronous operations.
+// It checks if the last return value is an error and stores it in Props["result"].
+// This is used by sync method calls that store results in the Props map.
+func (pw *PropsWorld) handleMethodResultsSync(results []reflect.Value) {
+	// Check if the last return value is an error
+	if len(results) > 1 {
+		if err, ok := results[len(results)-1].Interface().(error); ok && err != nil {
+			// Store the error in result so tests can assert on it
+			pw.Props["result"] = err
+			return
+		}
+	}
+
+	if len(results) > 0 {
+		pw.Props["result"] = results[0].Interface()
+	}
+}
+
+// handleMethodResultsAsync processes method call results for async operations.
+// It checks if the last return value is an error and returns it properly.
+// This is used by async task methods that return (result, error) tuples.
+func handleMethodResultsAsync(results []reflect.Value) (interface{}, error) {
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	// Check if the last return value is an error
+	if len(results) > 1 {
+		if err, ok := results[len(results)-1].Interface().(error); ok && err != nil {
+			return nil, err
+		}
+	}
+
+	result := results[0].Interface()
+	if err, ok := result.(error); ok {
+		return nil, err
+	}
+	return result, nil
+}
+
 // Step Definitions
+
+func (pw *PropsWorld) iAttachToTestOutput(content string) error {
+	resolved := pw.HandleResolve(content)
+
+	// Determine the media type and convert to bytes
+	var data []byte
+	var mediaType string
+	var name string
+
+	switch v := resolved.(type) {
+	case string:
+		data = []byte(v)
+		mediaType = "text/plain"
+		name = "attachment.txt"
+	case []byte:
+		data = v
+		mediaType = "application/octet-stream"
+		name = "attachment.bin"
+	default:
+		// Try to convert to JSON for complex objects
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to marshal attachment: %w", err)
+		}
+		data = jsonData
+		mediaType = "application/json"
+		name = "attachment.json"
+	}
+
+	pw.Attach(name, mediaType, data)
+	return nil
+}
 
 func (pw *PropsWorld) iCallFunction(fnName string) error {
 	fn := pw.HandleResolve(fnName)
@@ -364,19 +473,10 @@ func (pw *PropsWorld) iCallObjectWithMethod(field, fnName string) error {
 	}
 
 	// Add panic recovery for better error messages
-	defer func() {
-		if r := recover(); r != nil {
-			errMsg := fmt.Sprintf("Error calling %s.%s(): %v", field, fnName, r)
-			fmt.Printf("\n❌ %s\n", errMsg)
-			pw.Props["result"] = fmt.Errorf("%s", errMsg)
-		}
-	}()
+	defer pw.recoverFromMethodCallPanic(field, fnName)
 
 	results := method.Call([]reflect.Value{})
-	if len(results) > 0 {
-		pw.Props["result"] = results[0].Interface()
-	}
-
+	pw.handleMethodResultsSync(results)
 	return nil
 }
 
@@ -393,19 +493,10 @@ func (pw *PropsWorld) ICallObjectWithMethodWithParameter(field, fnName, param st
 	}
 
 	// Add panic recovery for better error messages
-	defer func() {
-		if r := recover(); r != nil {
-			errMsg := fmt.Sprintf("Error calling %s.%s(%v): %v", field, fnName, param, r)
-			fmt.Printf("\n❌ %s\n", errMsg)
-			pw.Props["result"] = fmt.Errorf("%s", errMsg)
-		}
-	}()
+	defer pw.recoverFromMethodCallPanic(field, fnName, param)
 
 	results := method.Call([]reflect.Value{reflect.ValueOf(paramVal)})
-	if len(results) > 0 {
-		pw.Props["result"] = results[0].Interface()
-	}
-
+	pw.handleMethodResultsSync(results)
 	return nil
 }
 
@@ -423,23 +514,13 @@ func (pw *PropsWorld) iCallObjectWithMethodWithTwoParameters(field, fnName, para
 	}
 
 	// Add panic recovery for better error messages
-	defer func() {
-		if r := recover(); r != nil {
-			errMsg := fmt.Sprintf("Error calling %s.%s(%v, %v): %v", field, fnName, param1, param2, r)
-			fmt.Printf("\n❌ %s\n", errMsg)
-			pw.Props["result"] = fmt.Errorf("%s", errMsg)
-		}
-	}()
+	defer pw.recoverFromMethodCallPanic(field, fnName, param1, param2)
 
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(param1Val),
 		reflect.ValueOf(param2Val),
 	})
-
-	if len(results) > 0 {
-		pw.Props["result"] = results[0].Interface()
-	}
-
+	pw.handleMethodResultsSync(results)
 	return nil
 }
 
@@ -464,23 +545,14 @@ func (pw *PropsWorld) iCallObjectWithMethodWithThreeParameters(field, fnName, pa
 	}
 
 	// Add panic recovery for better error messages
-	defer func() {
-		if r := recover(); r != nil {
-			errMsg := fmt.Sprintf("Error calling %s.%s(%v, %v, %v): %v", field, fnName, param1, param2, param3, r)
-			fmt.Printf("\n❌ %s\n", errMsg)
-			pw.Props["result"] = fmt.Errorf("%s", errMsg)
-		}
-	}()
+	defer pw.recoverFromMethodCallPanic(field, fnName, param1, param2, param3)
 
 	results := method.Call([]reflect.Value{
 		reflect.ValueOf(param1Val),
 		reflect.ValueOf(param2Val),
 		reflect.ValueOf(param3Val),
 	})
-	if len(results) > 0 {
-		pw.Props["result"] = results[0].Interface()
-	}
-
+	pw.handleMethodResultsSync(results)
 	return nil
 }
 
@@ -861,6 +933,27 @@ func (pw *PropsWorld) fieldIsErrorWithMessage(field, errorType string) error {
 	return nil
 }
 
+func (pw *PropsWorld) fieldContains(field, substring string) error {
+	actual := pw.HandleResolve(field)
+
+	var actualStr string
+	if err, ok := actual.(error); ok {
+		actualStr = err.Error()
+	} else {
+		actualStr = fmt.Sprintf("%v", actual)
+	}
+
+	fmt.Printf("EXPECTED: contains \"%s\"\n", substring)
+	fmt.Printf("ACTUAL:   %s\n", actualStr)
+
+	if !strings.Contains(actualStr, substring) {
+		return fmt.Errorf("expected %s to contain '%s', but got '%s'", field, substring, actualStr)
+	}
+
+	fmt.Printf("✓ String contains substring\n")
+	return nil
+}
+
 func (pw *PropsWorld) fieldIsError(field string) error {
 	actual := pw.HandleResolve(field)
 
@@ -1057,15 +1150,7 @@ func (pw *PropsWorld) iStartTaskByCallingObjectWithMethodWithParameter(taskName,
 
 		resolvedParam1 := pw.HandleResolve(param1)
 		results := method.Call([]reflect.Value{reflect.ValueOf(resolvedParam1)})
-		if len(results) == 0 {
-			return nil, nil
-		}
-
-		result := results[0].Interface()
-		if err, ok := result.(error); ok {
-			return nil, err
-		}
-		return result, nil
+		return handleMethodResultsAsync(results)
 	})
 	return nil
 }
@@ -1088,15 +1173,7 @@ func (pw *PropsWorld) iStartTaskByCallingObjectWithMethodWithTwoParameters(taskN
 		resolvedParam1 := pw.HandleResolve(param1)
 		resolvedParam2 := pw.HandleResolve(param2)
 		results := method.Call([]reflect.Value{reflect.ValueOf(resolvedParam1), reflect.ValueOf(resolvedParam2)})
-		if len(results) == 0 {
-			return nil, nil
-		}
-
-		result := results[0].Interface()
-		if err, ok := result.(error); ok {
-			return nil, err
-		}
-		return result, nil
+		return handleMethodResultsAsync(results)
 	})
 	return nil
 }
@@ -1120,15 +1197,7 @@ func (pw *PropsWorld) iStartTaskByCallingObjectWithMethodWithThreeParameters(tas
 		resolvedParam2 := pw.HandleResolve(param2)
 		resolvedParam3 := pw.HandleResolve(param3)
 		results := method.Call([]reflect.Value{reflect.ValueOf(resolvedParam1), reflect.ValueOf(resolvedParam2), reflect.ValueOf(resolvedParam3)})
-		if len(results) == 0 {
-			return nil, nil
-		}
-
-		result := results[0].Interface()
-		if err, ok := result.(error); ok {
-			return nil, err
-		}
-		return result, nil
+		return handleMethodResultsAsync(results)
 	})
 	return nil
 }
@@ -1220,14 +1289,17 @@ func (pw *PropsWorld) iWaitForTaskToComplete(taskName string) error {
 	err := pw.AsyncManager.WaitForTask(taskName, 30*time.Second)
 	if err != nil {
 		pw.Props["result"] = err
+		pw.Props[taskName] = err
 		return nil
 	}
 
 	result, err := pw.AsyncManager.GetTaskResult(taskName)
 	if err != nil {
 		pw.Props["result"] = err
+		pw.Props[taskName] = err
 	} else {
 		pw.Props["result"] = result
+		pw.Props[taskName] = result
 	}
 	return nil
 }
@@ -1243,14 +1315,17 @@ func (pw *PropsWorld) iWaitForTaskToCompleteWithinMs(taskName, timeoutMs string)
 	err = pw.AsyncManager.WaitForTask(taskName, timeout)
 	if err != nil {
 		pw.Props["result"] = err
+		pw.Props[taskName] = err
 		return nil
 	}
 
 	result, err := pw.AsyncManager.GetTaskResult(taskName)
 	if err != nil {
 		pw.Props["result"] = err
+		pw.Props[taskName] = err
 	} else {
 		pw.Props["result"] = result
+		pw.Props[taskName] = result
 	}
 	return nil
 }
@@ -1272,6 +1347,9 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^I call "([^"]*)" with parameters "([^"]*)" and "([^"]*)"$`, pw.iCallFunctionWithTwoParameters)
 	s.Step(`^I call "([^"]*)" with parameters "([^"]*)", "([^"]*)" and "([^"]*)"$`, pw.iCallFunctionWithThreeParameters)
 
+	// Attachment
+	s.Step(`^I attach "([^"]*)" to the test output$`, pw.iAttachToTestOutput)
+
 	// Variable management
 	s.Step(`^I refer to "([^"]*)" as "([^"]*)"$`, pw.IReferToAs)
 
@@ -1292,6 +1370,7 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^"([^"]*)" is "([^"]*)"$`, pw.fieldEquals)
 	s.Step(`^"([^"]*)" is an error with message "([^"]*)"$`, pw.fieldIsErrorWithMessage)
 	s.Step(`^"([^"]*)" is an error$`, pw.fieldIsError)
+	s.Step(`^"([^"]*)" contains "([^"]*)"$`, pw.fieldContains)
 
 	// Test setup patterns
 	s.Step(`^"([^"]*)" is a invocation counter into "([^"]*)"$`, pw.HandlerIsInvocationCounter)
