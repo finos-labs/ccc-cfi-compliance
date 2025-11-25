@@ -10,6 +10,7 @@ OUTPUT_DIR="output"
 SKIP_PORTS=""
 SKIP_SERVICES=""
 TIMEOUT="30m"
+SERVICE_FILTER=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -34,12 +35,17 @@ while [[ $# -gt 0 ]]; do
       TIMEOUT="$2"
       shift 2
       ;;
+    -s|--service)
+      SERVICE_FILTER="$2"
+      shift 2
+      ;;
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo ""
       echo "Options:"
       echo "  -p, --provider PROVIDER    Cloud provider (aws, azure, or gcp) [REQUIRED]"
       echo "  -o, --output DIR          Output directory for test reports (default: output)"
+      echo "  -s, --service SERVICE     Filter to a specific service resource name"
       echo "  --skip-ports              Skip port tests"
       echo "  --skip-services           Skip service tests"
       echo "  -t, --timeout DURATION    Timeout for all tests (default: 30m)"
@@ -49,6 +55,7 @@ while [[ $# -gt 0 ]]; do
       echo "  $0 --provider aws"
       echo "  $0 --provider azure --output results"
       echo "  $0 --provider gcp --skip-ports"
+      echo "  $0 --provider aws --service storage-lens/default-account-dashboard"
       exit 0
       ;;
     *)
@@ -86,6 +93,10 @@ fi
 
 if [ -n "$SKIP_SERVICES" ]; then
   TEST_CMD="$TEST_CMD -skip-services"
+fi
+
+if [ -n "$SERVICE_FILTER" ]; then
+  TEST_CMD="$TEST_CMD -service=\"$SERVICE_FILTER\""
 fi
 
 # Execute the command
