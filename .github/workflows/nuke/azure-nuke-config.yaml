@@ -3,8 +3,19 @@ blocklist:
 
 regions:
   - global
-  - us-east-1
+  - all
+
+resource-types:
+  excludes:
+    - Application
+    - ApplicationFederatedCredential
+    - ServicePrincipal
+    - SubscriptionRoleAssignment
 
 accounts:
-  "3bb71587-4549-4396-8898-9e15f062e665":
-   
+  "c1cedd8e-bf91-4d7d-a4cc-45700402a2a1":
+    filters:
+      ResourceGroup:
+        - property: tag:CCC_INFRA_DONT_DELETE
+          type: exact
+          value: "true"
