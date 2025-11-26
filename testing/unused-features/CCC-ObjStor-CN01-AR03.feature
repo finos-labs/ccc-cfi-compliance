@@ -15,6 +15,7 @@ Feature: CCC.ObjStor.CN01.AR03
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
+    And we wait for a period of "15000" ms
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-untrusted"

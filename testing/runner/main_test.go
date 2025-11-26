@@ -24,11 +24,12 @@ const (
 )
 
 var (
-	provider     = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
-	outputDir    = flag.String("output", "output", "Output directory for test reports")
-	timeout      = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
-	skipPorts    = flag.Bool("skip-ports", false, "Skip port tests")
-	skipServices = flag.Bool("skip-services", false, "Skip service tests")
+	provider      = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
+	outputDir     = flag.String("output", "output", "Output directory for test reports")
+	timeout       = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
+	skipPorts     = flag.Bool("skip-ports", false, "Skip port tests")
+	skipServices  = flag.Bool("skip-services", false, "Skip service tests")
+	serviceFilter = flag.String("service", "", "Filter tests to a specific service resource name (e.g., storage-lens/default-account-dashboard)")
 )
 
 func TestRunCompliance(t *testing.T) {
@@ -47,6 +48,9 @@ func TestRunCompliance(t *testing.T) {
 	log.Printf("   Output Directory: %s", *outputDir)
 	log.Printf("   Features Path: %s", featuresPath)
 	log.Printf("   Timeout: %s", *timeout)
+	if *serviceFilter != "" {
+		log.Printf("   Service Filter: %s", *serviceFilter)
+	}
 	log.Println()
 
 	// Clean and create output directory
@@ -117,6 +121,11 @@ func TestRunCompliance(t *testing.T) {
 			log.Printf("   Found %d service(s)", len(services))
 
 			for i, service := range services {
+				// Skip services that don't match the filter
+				if *serviceFilter != "" && service.ResourceName != *serviceFilter {
+					continue
+				}
+
 				// Skip services without a catalog type
 				if service.CatalogType == "" {
 					log.Printf("\n⏭️  Skipping service %d/%d (no catalog type mapping):", i+1, len(services))

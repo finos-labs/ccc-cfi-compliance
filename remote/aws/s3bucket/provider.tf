@@ -1,0 +1,48 @@
+# AWS Provider with default tags
+# All resources created will automatically inherit these tags
+# Note: Version constraint is intentionally omitted - let the module specify its required version
+
+provider "aws" {
+  region = var.aws_region
+
+  # Default tags applied to ALL AWS resources automatically
+  default_tags {
+    tags = {
+      Environment      = "cfi-test"
+      ManagedBy        = "Terraform"
+      Project          = "CCC-CFI-Compliance"
+      AutoCleanup      = "true"
+      CFITargetID      = var.target_id
+      GitHubWorkflow   = "CFI-Build"
+      # Optional: Add GitHub Action metadata for traceability
+      GitHubRunID      = var.github_run_id
+      GitHubRepository = var.github_repository
+    }
+  }
+}
+
+# Variables for CFI testing and GitHub metadata
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "target_id" {
+  description = "CFI Target ID (e.g., aws-s3-bucket)"
+  type        = string
+  default     = "local-test"
+}
+
+variable "github_run_id" {
+  description = "GitHub Actions run ID"
+  type        = string
+  default     = "local"
+}
+
+variable "github_repository" {
+  description = "GitHub repository"
+  type        = string
+  default     = "local"
+}
+

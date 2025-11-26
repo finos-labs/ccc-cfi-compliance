@@ -117,6 +117,7 @@ jobs:
               --config .github/workflows/nuke/${{ matrix.platform.config }} \
               --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
               --client-id ${{ secrets.AZURE_CLIENT_ID }} \
+              --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
               ${{ env.DRY_RUN_FLAG }} \
               --force || true
           else

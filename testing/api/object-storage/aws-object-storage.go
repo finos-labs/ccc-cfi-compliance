@@ -39,6 +39,12 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity)
 	secretAccessKey := identity.Credentials["secret_access_key"]
 	sessionToken := identity.Credentials["session_token"] // Optional, empty string if not present
 
+	// Debug logging
+	fmt.Printf("🔐 Creating S3 client with credentials:\n")
+	fmt.Printf("   Access Key ID: %s\n", accessKeyID)
+	fmt.Printf("   Secret Key Length: %d\n", len(secretAccessKey))
+	fmt.Printf("   Has Session Token: %v\n", sessionToken != "")
+
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKeyID,

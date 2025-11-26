@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -78,10 +77,13 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 		if err == nil {
 			for _, keyMetadata := range listKeysOutput.AccessKeyMetadata {
 				fmt.Printf("   🗑️  Deleting old access key: %s\n", aws.ToString(keyMetadata.AccessKeyId))
-				s.client.DeleteAccessKey(s.ctx, &iam.DeleteAccessKeyInput{
+				_, err := s.client.DeleteAccessKey(s.ctx, &iam.DeleteAccessKeyInput{
 					UserName:    aws.String(userName),
 					AccessKeyId: keyMetadata.AccessKeyId,
 				})
+				if err != nil {
+					fmt.Printf("   ⚠️  Failed to delete old access key %s: %v\n", aws.ToString(keyMetadata.AccessKeyId), err)
+				}
 			}
 		}
 	}
@@ -102,11 +104,6 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 	accessKeyId = aws.ToString(createKeyOutput.AccessKey.AccessKeyId)
 	secretAccessKey = aws.ToString(createKeyOutput.AccessKey.SecretAccessKey)
 	fmt.Printf("   🔑 Created new access key: %s\n", accessKeyId)
-
-	// Wait for IAM to propagate the new access key (eventual consistency)
-	// AWS recommends waiting a few seconds for IAM changes to become effective
-	fmt.Printf("   ⏳ Waiting 5s for access key to propagate across AWS...\n")
-	time.Sleep(5 * time.Second)
 
 	// Create identity with credentials in map
 	identity := &Identity{
@@ -137,6 +134,7 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   ARN: %s\n", identity.Credentials["arn"])
 	fmt.Printf("   User ID: %s\n", identity.Credentials["user_id"])
 	fmt.Printf("   Access Key: %s\n", identity.Credentials["access_key_id"])
+	fmt.Printf("   Secret Key Length: %d\n", len(identity.Credentials["secret_access_key"]))
 	if identity.Credentials["account_id"] != "" {
 		fmt.Printf("   Account ID: %s\n", identity.Credentials["account_id"])
 	}
@@ -166,10 +164,6 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 	}
 
 	fmt.Printf("📋 Attached policy '%s' to user %s\n", policyName, identity.UserName)
-	
-	// Wait for policy to propagate (eventual consistency)
-	fmt.Printf("   ⏳ Waiting 3s for policy to propagate...\n")
-	time.Sleep(3 * time.Second)
 
 	return nil
 }

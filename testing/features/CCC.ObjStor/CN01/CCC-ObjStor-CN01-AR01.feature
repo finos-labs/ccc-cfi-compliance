@@ -13,15 +13,18 @@ Feature: CCC.ObjStor.CN01.AR01
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
+    And we wait for a period of "15000" ms
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"
     And I refer to "{result}" as "testUserTrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "read"
+    And we wait for a period of "15000" ms
 
   Scenario: Service prevents reading bucket with untrusted KMS key
     Given I attach "{testUserUntrusted}" to the test output
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
+    And we wait for a period of "10000" ms
     When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
     Then "{result}" is an error
     And I attach "{result}" to the test output
@@ -32,6 +35,7 @@ Feature: CCC.ObjStor.CN01.AR01
     And "{result}" is not an error
     And I attach "{result}" to the test output
     And I refer to "{result}" as "userStorage"
+    And we wait for a period of "10000" ms
     When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
     Then "{result}" is not an error
     And I attach "{result}" to the test output
