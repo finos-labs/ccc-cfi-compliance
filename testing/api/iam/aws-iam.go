@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -144,9 +145,9 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 }
 
 // SetAccess grants an identity access to a specific AWS service/resource at the specified level
-func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level string) error {
+func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level string) (string, error) {
 	// Check current access level
-	currentLevel, err := s.GetAccess(identity, serviceID)
+	currentLevel, currentPolicy, err := s.GetAccess(identity, serviceID)
 	if err != nil {
 		fmt.Printf("⚠️  Warning: Could not retrieve current access level: %v\n", err)
 	} else {
@@ -154,14 +155,15 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 		if currentLevel == level {
 			fmt.Printf("ℹ️  Access level unchanged, skipping...\n")
-			return nil
+			// Return the existing policy document
+			return currentPolicy, nil
 		}
 	}
 
 	// Generate policy document based on access level and service ID
 	policyDocument, err := s.generatePolicyDocument(serviceID, level)
 	if err != nil {
-		return fmt.Errorf("failed to generate policy: %w", err)
+		return "", fmt.Errorf("failed to generate policy: %w", err)
 	}
 
 	// Create a unique policy name
@@ -174,7 +176,7 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 		PolicyDocument: aws.String(policyDocument),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to attach policy to user %s: %w", identity.UserName, err)
+		return "", fmt.Errorf("failed to attach policy to user %s: %w", identity.UserName, err)
 	}
 
 	fmt.Printf("📋 Attached policy '%s' to user %s\n", policyName, identity.UserName)
@@ -184,17 +186,17 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 	time.Sleep(15 * time.Second)
 	fmt.Printf("✅ IAM policy propagation wait complete\n")
 
-	return nil
+	return policyDocument, nil
 }
 
 // GetAccess retrieves the current access level for a user and service
-func (s *AWSIAMService) GetAccess(identity *Identity, serviceID string) (string, error) {
+func (s *AWSIAMService) GetAccess(identity *Identity, serviceID string) (string, string, error) {
 	// List all inline policies for the user
 	listPoliciesOutput, err := s.client.ListUserPolicies(s.ctx, &iam.ListUserPoliciesInput{
 		UserName: aws.String(identity.UserName),
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to list user policies: %w", err)
+		return "", "", fmt.Errorf("failed to list user policies: %w", err)
 	}
 
 	// Look for the specific policy we manage
@@ -203,27 +205,37 @@ func (s *AWSIAMService) GetAccess(identity *Identity, serviceID string) (string,
 	for _, policyName := range listPoliciesOutput.PolicyNames {
 		// Check if this policy matches our service
 		if len(policyName) >= len(policyPrefix) && policyName[:len(policyPrefix)] == policyPrefix {
-			// Get the policy document to verify it exists
-			_, err := s.client.GetUserPolicy(s.ctx, &iam.GetUserPolicyInput{
+			// Get the policy document
+			getPolicyOutput, err := s.client.GetUserPolicy(s.ctx, &iam.GetUserPolicyInput{
 				UserName:   aws.String(identity.UserName),
 				PolicyName: aws.String(policyName),
 			})
 			if err != nil {
-				return "", fmt.Errorf("failed to get policy %s: %w", policyName, err)
+				return "", "", fmt.Errorf("failed to get policy %s: %w", policyName, err)
 			}
 
 			// Extract access level from policy name
 			// Policy name format: "CCC-Test-{serviceID}-{level}"
 			level := policyName[len(policyPrefix):]
 
+			// Get the policy document (it's URL-encoded in the response)
+			policyDocument := aws.ToString(getPolicyOutput.PolicyDocument)
+
+			// Decode the URL-encoded policy document
+			decodedPolicy, err := url.QueryUnescape(policyDocument)
+			if err != nil {
+				fmt.Printf("⚠️  Warning: Failed to decode policy document: %v\n", err)
+				decodedPolicy = policyDocument
+			}
+
 			fmt.Printf("📋 Current policy '%s' grants '%s' access\n", policyName, level)
 
-			return level, nil
+			return level, decodedPolicy, nil
 		}
 	}
 
 	// No matching policy found
-	return "none", nil
+	return "none", "", nil
 }
 
 // DestroyUser removes an IAM user and all associated resources

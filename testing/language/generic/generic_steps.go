@@ -422,28 +422,24 @@ func handleMethodResultsAsync(results []reflect.Value) (interface{}, error) {
 
 // Step Definitions
 
-func (pw *PropsWorld) iAttachToTestOutput(content string) error {
+func (pw *PropsWorld) iAttachToTestOutput(content, name string) error {
 	resolved := pw.HandleResolve(content)
 
 	// Determine the media type and convert to bytes
 	var data []byte
 	var mediaType string
-	var name string
 
 	switch v := resolved.(type) {
 	case error:
 		// Handle errors specifically - convert to text
 		data = []byte(v.Error())
 		mediaType = "text/plain"
-		name = "error.txt"
 	case string:
 		data = []byte(v)
 		mediaType = "text/plain"
-		name = "attachment.txt"
 	case []byte:
 		data = v
 		mediaType = "application/octet-stream"
-		name = "attachment.bin"
 	default:
 		// Try to convert to JSON for complex objects
 		jsonData, err := json.Marshal(v)
@@ -452,7 +448,6 @@ func (pw *PropsWorld) iAttachToTestOutput(content string) error {
 		}
 		data = jsonData
 		mediaType = "application/json"
-		name = "attachment.json"
 	}
 
 	pw.Attach(name, mediaType, data)
@@ -1367,7 +1362,7 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^I call "([^"]*)" with parameters "([^"]*)", "([^"]*)" and "([^"]*)"$`, pw.iCallFunctionWithThreeParameters)
 
 	// Attachment
-	s.Step(`^I attach "([^"]*)" to the test output$`, pw.iAttachToTestOutput)
+	s.Step(`^I attach "([^"]*)" to the test output as "([^"]*)"$`, pw.iAttachToTestOutput)
 
 	// Variable management
 	s.Step(`^I refer to "([^"]*)" as "([^"]*)"$`, pw.IReferToAs)

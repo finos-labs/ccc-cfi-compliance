@@ -20,11 +20,12 @@ type IAMService interface {
 	// serviceID is the cloud service identifier (ARN, resource ID, etc.)
 	// level specifies the access level: "none", "read", "write", or "admin"
 	// makes no change if the level is already set.
-	SetAccess(identity *Identity, serviceID string, level string) error
+	// Returns the generated policy document JSON and any error
+	SetAccess(identity *Identity, serviceID string, level string) (string, error)
 
 	// GetAccess retrieves the current access level for a user and service
-	// Returns "none" if no access is granted, or the level: "read", "write", "admin"
-	GetAccess(identity *Identity, serviceID string) (string, error)
+	// Returns the access level ("none", "read", "write", "admin"), the policy document JSON, and any error
+	GetAccess(identity *Identity, serviceID string) (string, string, error)
 
 	// DestroyUser removes the identity and all associated access
 	// does nothing if the user does not exist

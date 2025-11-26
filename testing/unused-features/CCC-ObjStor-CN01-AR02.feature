@@ -15,6 +15,7 @@ Feature: CCC.ObjStor.CN01.AR02
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
+    And I attach "{result}" to the test output as "untrusted-user-policy.json"
     And we wait for a period of "15000" ms
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
     And I refer to "{result}" as "userStorage"
@@ -23,7 +24,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I call "{storage}" with "CreateObject" with parameters "{bucketUntrusted.ID}", "test-object.txt" and "test content"
     When I call "{userStorage}" with "ReadObject" with parameters "{bucketUntrusted.ID}" and "test-object.txt"
     Then "{result}" is an error
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "read-object-denied-error.txt"
     And I call "{storage}" with "DeleteObject" with parameters "{bucketUntrusted.ID}" and "test-object.txt"
     And I call "{storage}" with "DeleteBucket" with parameter "{bucketUntrusted.ID}"
 
@@ -31,6 +32,7 @@ Feature: CCC.ObjStor.CN01.AR02
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"
     And I refer to "{result}" as "testUserTrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "read"
+    And I attach "{result}" to the test output as "trusted-user-policy.json"
     And we wait for a period of "15000" ms
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserTrusted}"
     And I refer to "{result}" as "userStorage"

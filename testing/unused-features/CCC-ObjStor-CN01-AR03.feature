@@ -15,17 +15,19 @@ Feature: CCC.ObjStor.CN01.AR03
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-untrusted"
     And I refer to "{result}" as "testUserUntrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserUntrusted}", "{UID}" and "none"
+    And I attach "{result}" to the test output as "untrusted-user-policy.json"
     And we wait for a period of "15000" ms
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserUntrusted}"
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-untrusted"
     Then "{result}" is an error
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "create-bucket-denied-error.txt"
 
   Scenario: Service allows creating bucket with trusted KMS key
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-trusted"
     And I refer to "{result}" as "testUserTrusted"
     And I call "{iamService}" with "SetAccess" with parameters "{testUserTrusted}", "{UID}" and "write"
+    And I attach "{result}" to the test output as "trusted-user-policy.json"
     And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserTrusted}"
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-write-trusted"

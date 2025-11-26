@@ -24,20 +24,20 @@ Feature: Other test patterns
   Scenario: Attach string to test output
     Given "message" is a function which returns a value of "Hello, World!"
     When I call "{message}"
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "message.txt"
     Then "{result}" is "Hello, World!"
 
   @others @attach
   Scenario: Attach JSON data to test output
     Given I have test data in "users"
-    When I attach "{users}" to the test output
+    When I attach "{users}" to the test output as "users-data.json"
     Then "{users}" is not nil
 
   @others @attach
   Scenario: Attach API response to test output
     Given I have an API client configured in "apiClient"
     When I call "{apiClient}" with "Get" with parameter "/users"
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "api-response.json"
     Then "{result}" is not nil
     And "{result.status}" is "200"
 
@@ -46,14 +46,14 @@ Feature: Other test patterns
     Given "text1" is a function which returns a value of "First attachment"
     And "text2" is a function which returns a value of "Second attachment"
     When I call "{text1}"
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "first-text.txt"
     And I call "{text2}"
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "second-text.txt"
     Then "{result}" is "Second attachment"
 
   @others @attach
   Scenario: Attach error to test output
-    Given "errorFunction" is a function which throws an error
+    Given "errorFunction" is a function which returns a value of an error
     When I call "{errorFunction}"
     Then "{result}" is an error
-    And I attach "{result}" to the test output
+    And I attach "{result}" to the test output as "error.txt"
