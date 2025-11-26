@@ -22,6 +22,10 @@ type IAMService interface {
 	// makes no change if the level is already set.
 	SetAccess(identity *Identity, serviceID string, level string) error
 
+	// GetAccess retrieves the current access level for a user and service
+	// Returns "none" if no access is granted, or the level: "read", "write", "admin"
+	GetAccess(identity *Identity, serviceID string) (string, error)
+
 	// DestroyUser removes the identity and all associated access
 	// does nothing if the user does not exist
 	DestroyUser(identity *Identity) error

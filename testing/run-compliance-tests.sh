@@ -78,29 +78,38 @@ if [ "$PROVIDER" != "aws" ] && [ "$PROVIDER" != "azure" ] && [ "$PROVIDER" != "g
   exit 1
 fi
 
-# Run the tests
-echo "🚀 Running compliance tests..."
+# Build the binary if needed
+echo "🔨 Building compliance test runner..."
 cd "$(dirname "$0")"
+go build -o ccc-compliance ./runner/main.go
 
-# Build the command with proper flag handling
-# Note: -timeout is a go test flag and must come before ./runner
-TEST_CMD="go test -v -timeout=\"$TIMEOUT\" ./runner -provider=\"$PROVIDER\" -output=\"$OUTPUT_DIR\""
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed"
+  exit 1
+fi
+
+echo "✅ Build successful"
+echo ""
+
+# Build the command
+CMD="./ccc-compliance -provider=\"$PROVIDER\" -output=\"$OUTPUT_DIR\" -timeout=\"$TIMEOUT\""
 
 # Add optional flags only if set
 if [ -n "$SKIP_PORTS" ]; then
-  TEST_CMD="$TEST_CMD -skip-ports"
+  CMD="$CMD -skip-ports"
 fi
 
 if [ -n "$SKIP_SERVICES" ]; then
-  TEST_CMD="$TEST_CMD -skip-services"
+  CMD="$CMD -skip-services"
 fi
 
 if [ -n "$SERVICE_FILTER" ]; then
-  TEST_CMD="$TEST_CMD -service=\"$SERVICE_FILTER\""
+  CMD="$CMD -service=\"$SERVICE_FILTER\""
 fi
 
 # Execute the command
-eval $TEST_CMD
+echo "🚀 Running compliance tests..."
+eval $CMD
 
 exit $?
 

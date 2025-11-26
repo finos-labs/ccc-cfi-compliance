@@ -4,45 +4,47 @@ This directory contains the testing infrastructure for running CCC (Common Cloud
 
 ## Overview
 
-The testing system discovers cloud resources (ports and services) using Steampipe and runs appropriate Cucumber/Gherkin tests against them based on their catalog type.
+The testing system discovers cloud resources using native cloud provider APIs and runs appropriate Cucumber/Gherkin tests against them based on their catalog type.
 
-## Components
+## Architecture
 
-### 1. Service Mapping System (`inspection/`)
+### 1. Service Runners (`services/`)
 
-Maps cloud provider-specific service types to CCC catalog types:
+Each CCC catalog type has its own service runner:
 
-- **`types.go`**: Core data structures including `TestParams` with `ProviderServiceType` and `CatalogType`
-- **`aws-services.csv`**: AWS service type → CCC catalog type mappings (e.g., s3 → CCC.ObjStor)
-- **`azure-services.csv`**: Azure service type mappings (e.g., Microsoft.Storage/storageAccounts → CCC.ObjStor)
-- **`gcp-services.csv`**: GCP service type mappings (e.g., storage.googleapis.com/Bucket → CCC.ObjStor)
-- **`service_mappings.go`**: Registry for loading and looking up mappings
-- **`steampipe.go`**: Functions to discover ports and services from cloud providers
+- **`ServiceRunner.go`**: Interface that all service runners implement
+- **`AbstractServiceRunner.go`**: Base implementation with common test execution logic
+- **`CCC.ObjStor/`**: Object Storage service runner
+  - `CCCObjStorServiceRunner.go`: Implements resource discovery for object storage
+  - `features/`: Gherkin feature files for object storage tests
 
-### 2. Test Runners (`language/cloud/`)
+### 2. Cloud APIs (`api/`)
 
-- **`test_port.go`**: Runs `@PerPort` tests for discovered ports
-- **`test_service.go`**: Runs `@PerService` tests for discovered services
+Abstractions for interacting with cloud services:
 
-### 3. Test Orchestration
+- **`factory/`**: Factory pattern for creating cloud service clients
+- **`iam/`**: Identity and Access Management operations
+- **`object-storage/`**: Object storage operations (S3, Blob, GCS)
+- **`generic/`**: Base service interface
 
-- **`runner/main.go`**: Go CLI tool that discovers resources and orchestrates test execution
-- **`run-compliance-tests.sh`**: Shell wrapper with user-friendly interface
+### 3. Test Language (`language/`)
+
+- **`cloud/`**: Cloud-specific test steps and runners
+- **`generic/`**: Generic BDD steps for Gherkin tests
+- **`reporters/`**: HTML and OCSF formatters for test output
+
+### 4. Inspection (`inspection/`)
+
+- **`types.go`**: Core data structures (`TestParams`, `AllCatalogTypes`)
 
 ## Usage
 
 ### Prerequisites
 
-1. **Steampipe** must be installed and running:
-
-   ```bash
-   steampipe service start
-   ```
-
-2. **Cloud credentials** must be configured for the provider you're testing:
-   - AWS: `aws configure` or environment variables
-   - Azure: `az login`
-   - GCP: `gcloud auth login`
+**Cloud credentials** must be configured for the provider you're testing:
+- AWS: `aws configure` or environment variables
+- Azure: `az login`
+- GCP: `gcloud auth login`
 
 ### Running Tests
 
@@ -93,17 +95,9 @@ To add support for a new cloud service:
 
 ## Troubleshooting
 
-### Steampipe Not Running
+### Authentication Errors
 
-```
-Error: Steampipe is not running or not accessible
-```
-
-**Solution**: Start Steampipe:
-
-```bash
-steampipe service start
-```
+If you encounter authentication errors, ensure your cloud credentials are properly configured:
 
 ### No Resources Found
 
@@ -114,13 +108,12 @@ Warning: Found 0 service(s)
 
 **Solution**:
 
-1. Verify cloud credentials are configured
+1. Verify cloud credentials are configured correctly:
+   - AWS: `aws sts get-caller-identity`
+   - Azure: `az account show`
+   - GCP: `gcloud auth list`
 2. Ensure resources exist in the cloud provider
-3. Check Steampipe plugin installation:
-   ```bash
-   steampipe plugin list
-   steampipe plugin install aws azure gcp
-   ```
+3. Check that your IAM permissions allow listing resources
 
 ### No Catalog Type Mapping
 

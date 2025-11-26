@@ -1,0 +1,4 @@
+# github.com/finos-labs/ccc-cfi-compliance/testing/runner
+/opt/homebrew/Cellar/go/1.25.1/libexec/src/crypto/x509/cert_pool.go:10:2: package encoding/pem is not in std (/opt/homebrew/Cellar/go/1.25.1/libexec/src/encoding/pem)
+FAIL	github.com/finos-labs/ccc-cfi-compliance/testing/runner [setup failed]
+FAIL

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -144,6 +145,19 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 
 // SetAccess grants an identity access to a specific AWS service/resource at the specified level
 func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level string) error {
+	// Check current access level
+	currentLevel, err := s.GetAccess(identity, serviceID)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Could not retrieve current access level: %v\n", err)
+	} else {
+		fmt.Printf("📊 Current access level: %s → New access level: %s\n", currentLevel, level)
+
+		if currentLevel == level {
+			fmt.Printf("ℹ️  Access level unchanged, skipping...\n")
+			return nil
+		}
+	}
+
 	// Generate policy document based on access level and service ID
 	policyDocument, err := s.generatePolicyDocument(serviceID, level)
 	if err != nil {
@@ -165,7 +179,51 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 	fmt.Printf("📋 Attached policy '%s' to user %s\n", policyName, identity.UserName)
 
+	// Wait for IAM policy propagation
+	fmt.Printf("⏳ Waiting 15 seconds for IAM policy changes to propagate...\n")
+	time.Sleep(15 * time.Second)
+	fmt.Printf("✅ IAM policy propagation wait complete\n")
+
 	return nil
+}
+
+// GetAccess retrieves the current access level for a user and service
+func (s *AWSIAMService) GetAccess(identity *Identity, serviceID string) (string, error) {
+	// List all inline policies for the user
+	listPoliciesOutput, err := s.client.ListUserPolicies(s.ctx, &iam.ListUserPoliciesInput{
+		UserName: aws.String(identity.UserName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list user policies: %w", err)
+	}
+
+	// Look for the specific policy we manage
+	policyPrefix := fmt.Sprintf("CCC-Test-%s-", sanitizeForPolicyName(serviceID))
+
+	for _, policyName := range listPoliciesOutput.PolicyNames {
+		// Check if this policy matches our service
+		if len(policyName) >= len(policyPrefix) && policyName[:len(policyPrefix)] == policyPrefix {
+			// Get the policy document to verify it exists
+			_, err := s.client.GetUserPolicy(s.ctx, &iam.GetUserPolicyInput{
+				UserName:   aws.String(identity.UserName),
+				PolicyName: aws.String(policyName),
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to get policy %s: %w", policyName, err)
+			}
+
+			// Extract access level from policy name
+			// Policy name format: "CCC-Test-{serviceID}-{level}"
+			level := policyName[len(policyPrefix):]
+
+			fmt.Printf("📋 Current policy '%s' grants '%s' access\n", policyName, level)
+
+			return level, nil
+		}
+	}
+
+	// No matching policy found
+	return "none", nil
 }
 
 // DestroyUser removes an IAM user and all associated resources
