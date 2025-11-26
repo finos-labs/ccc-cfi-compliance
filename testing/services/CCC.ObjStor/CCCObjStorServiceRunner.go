@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"path/filepath"
+	"runtime"
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
@@ -18,12 +20,17 @@ type CCCObjStorServiceRunner struct {
 
 // NewCCCObjStorServiceRunner creates a new object storage service runner
 func NewCCCObjStorServiceRunner(config services.RunConfig) *CCCObjStorServiceRunner {
+	// Get the path to this source file, then navigate to the features directory
+	_, filename, _, _ := runtime.Caller(0)
+	serviceDir := filepath.Dir(filename)
+	featuresPath := filepath.Join(serviceDir, "features")
+
 	runner := &CCCObjStorServiceRunner{}
 	runner.AbstractServiceRunner = services.NewAbstractServiceRunner(
 		"CCC.ObjStor",
 		runner.GetTestResources,
 		config,
-		"features", // Features path relative to this service's directory
+		featuresPath,
 	)
 	return runner
 }
