@@ -3,7 +3,6 @@ package objstor
 import (
 	"context"
 	"fmt"
-	"log"
 	"path/filepath"
 	"runtime"
 
@@ -48,22 +47,10 @@ func (r *CCCObjStorServiceRunner) GetTestResources(ctx context.Context, provider
 		return nil, fmt.Errorf("service does not implement object storage interface")
 	}
 
-	// List all buckets
+	// List all buckets (already includes region information)
 	buckets, err := storageService.ListBuckets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
-	}
-
-	// Enrich buckets with region information
-	for i := range buckets {
-		if buckets[i].Region == "" {
-			region, err := storageService.GetBucketRegion(buckets[i].ID)
-			if err != nil {
-				log.Printf("⚠️  Warning: Failed to get region for bucket %s: %v", buckets[i].ID, err)
-			} else {
-				buckets[i].Region = region
-			}
-		}
 	}
 
 	// Convert buckets to TestParams

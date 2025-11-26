@@ -16,6 +16,7 @@ import (
 // AWSS3Service implements Service for AWS S3
 type AWSS3Service struct {
 	client *s3.Client
+	config aws.Config
 	ctx    context.Context
 }
 
@@ -28,6 +29,7 @@ func NewAWSS3Service(ctx context.Context) (*AWSS3Service, error) {
 
 	return &AWSS3Service{
 		client: s3.NewFromConfig(cfg),
+		config: cfg,
 		ctx:    ctx,
 	}, nil
 }
@@ -58,6 +60,7 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity)
 
 	return &AWSS3Service{
 		client: s3.NewFromConfig(cfg),
+		config: cfg,
 		ctx:    ctx,
 	}, nil
 }
@@ -71,32 +74,40 @@ func (s *AWSS3Service) ListBuckets() ([]Bucket, error) {
 
 	buckets := make([]Bucket, 0, len(output.Buckets))
 	for _, b := range output.Buckets {
+		bucketName := aws.ToString(b.Name)
+
+		// Get the region for this bucket
+		region, err := s.GetBucketRegion(bucketName)
+		if err != nil {
+			// If we can't get the region, log a warning but continue
+			fmt.Printf("⚠️  Warning: Failed to get region for bucket %s: %v\n", bucketName, err)
+			region = ""
+		}
+
 		buckets = append(buckets, Bucket{
-			ID:     aws.ToString(b.Name),
-			Name:   aws.ToString(b.Name),
-			Region: "", // Region not included in list, use GetBucketRegion for specific bucket
+			ID:     bucketName,
+			Name:   bucketName,
+			Region: region,
 		})
 	}
 
 	return buckets, nil
 }
 
-// CreateBucket creates a new S3 bucket in the default region
-func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
+// CreateBucket creates a new S3 bucket in the specified region
+func (s *AWSS3Service) CreateBucket(bucketID string, region string) (*Bucket, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(bucketID),
 	}
 
-	_, err := s.client.CreateBucket(s.ctx, input)
+	_, err := regionalClient.CreateBucket(s.ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bucket %s: %w", bucketID, err)
-	}
-
-	// Get the actual region where the bucket was created
-	region, err := s.GetBucketRegion(bucketID)
-	if err != nil {
-		// If we can't get region, just return without it
-		region = ""
 	}
 
 	return &Bucket{
@@ -107,8 +118,13 @@ func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 }
 
 // DeleteBucket deletes an S3 bucket
-func (s *AWSS3Service) DeleteBucket(bucketID string) error {
-	_, err := s.client.DeleteBucket(s.ctx, &s3.DeleteBucketInput{
+func (s *AWSS3Service) DeleteBucket(bucketID string, region string) error {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	_, err := regionalClient.DeleteBucket(s.ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(bucketID),
 	})
 	if err != nil {
@@ -119,8 +135,13 @@ func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 }
 
 // ListObjects lists all objects in a bucket
-func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
-	output, err := s.client.ListObjectsV2(s.ctx, &s3.ListObjectsV2Input{
+func (s *AWSS3Service) ListObjects(bucketID string, region string) ([]Object, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	output, err := regionalClient.ListObjectsV2(s.ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucketID),
 	})
 	if err != nil {
@@ -142,14 +163,19 @@ func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 }
 
 // CreateObject creates a new object in a bucket
-func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data []string) (*Object, error) {
+func (s *AWSS3Service) CreateObject(bucketID string, region string, objectID string, data []string) (*Object, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
 	// Convert []string to []byte
 	var content bytes.Buffer
 	for _, line := range data {
 		content.WriteString(line)
 	}
 
-	_, err := s.client.PutObject(s.ctx, &s3.PutObjectInput{
+	_, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 		Body:   bytes.NewReader(content.Bytes()),
@@ -168,8 +194,13 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data []str
 }
 
 // ReadObject reads an object from a bucket
-func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, error) {
-	output, err := s.client.GetObject(s.ctx, &s3.GetObjectInput{
+func (s *AWSS3Service) ReadObject(bucketID string, region string, objectID string) (*Object, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 	})
@@ -194,8 +225,13 @@ func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, er
 }
 
 // DeleteObject deletes an object from a bucket
-func (s *AWSS3Service) DeleteObject(bucketID string, objectID string) error {
-	_, err := s.client.DeleteObject(s.ctx, &s3.DeleteObjectInput{
+func (s *AWSS3Service) DeleteObject(bucketID string, region string, objectID string) error {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	_, err := regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 	})

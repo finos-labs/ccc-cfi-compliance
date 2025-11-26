@@ -23,7 +23,7 @@ Feature: CCC.ObjStor.CN01.AR01
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     And we wait for a period of "10000" ms
-    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
+    When I call "{userStorage}" with "ListObjects" with parameters "{ResourceName}" and "{Region}"
     Then "{result}" is an error
     And I attach "{result}" to the test output
 
@@ -34,6 +34,6 @@ Feature: CCC.ObjStor.CN01.AR01
     And I attach "{result}" to the test output
     And I refer to "{result}" as "userStorage"
     And we wait for a period of "10000" ms
-    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
+    When I call "{userStorage}" with "ListObjects" with parameters "{ResourceName}" and "{Region}"
     Then "{result}" is not an error
     And I attach "{result}" to the test output

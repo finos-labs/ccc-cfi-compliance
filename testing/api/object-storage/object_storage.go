@@ -27,13 +27,13 @@ type Service interface {
 
 	// Bucket operations
 	ListBuckets() ([]Bucket, error)
-	CreateBucket(bucketID string) (*Bucket, error)
-	DeleteBucket(bucketID string) error
+	CreateBucket(bucketID string, region string) (*Bucket, error)
+	DeleteBucket(bucketID string, region string) error
 	GetBucketRegion(bucketID string) (string, error)
 
 	// Object operations
-	ListObjects(bucketID string) ([]Object, error)
-	CreateObject(bucketID string, objectID string, data []string) (*Object, error)
-	ReadObject(bucketID string, objectID string) (*Object, error)
-	DeleteObject(bucketID string, objectID string) error
+	ListObjects(bucketID string, region string) ([]Object, error)
+	CreateObject(bucketID string, region string, objectID string, data []string) (*Object, error)
+	ReadObject(bucketID string, region string, objectID string) (*Object, error)
+	DeleteObject(bucketID string, region string, objectID string) error
 }

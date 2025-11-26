@@ -296,48 +296,79 @@ func (s *AWSIAMService) DestroyUser(identity *Identity) error {
 }
 
 // generatePolicyDocument creates an IAM policy document for the given resource and access level
-func (s *AWSIAMService) generatePolicyDocument(resourceARN string, level string) (string, error) {
-	var actions []string
+func (s *AWSIAMService) generatePolicyDocument(resourceIdentifier string, level string) (string, error) {
+	var statements []map[string]interface{}
 
 	// Determine actions based on service type and access level
-	// This is a simplified version - in production, you'd want more sophisticated logic
 	switch level {
 	case "none":
-		// No permissions granted
-		actions = []string{}
+		// No permissions granted - return empty policy
+		policy := map[string]interface{}{
+			"Version":   "2012-10-17",
+			"Statement": []map[string]interface{}{},
+		}
+		policyJSON, err := json.Marshal(policy)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal policy: %w", err)
+		}
+		return string(policyJSON), nil
+
 	case "read":
-		actions = []string{
-			"s3:GetObject",
-			"s3:ListBucket",
-			"rds:DescribeDBInstances",
-			"ec2:Describe*",
-		}
+		// S3 bucket-level permissions (ListBucket requires the bucket ARN)
+		statements = append(statements, map[string]interface{}{
+			"Effect": "Allow",
+			"Action": []string{
+				"s3:ListBucket",
+				"s3:GetBucketLocation",
+			},
+			"Resource": fmt.Sprintf("arn:aws:s3:::%s", resourceIdentifier),
+		})
+		// S3 object-level permissions (GetObject requires bucket/* ARN)
+		statements = append(statements, map[string]interface{}{
+			"Effect": "Allow",
+			"Action": []string{
+				"s3:GetObject",
+			},
+			"Resource": fmt.Sprintf("arn:aws:s3:::%s/*", resourceIdentifier),
+		})
+
 	case "write":
-		actions = []string{
-			"s3:GetObject",
-			"s3:PutObject",
-			"s3:DeleteObject",
-			"s3:ListBucket",
-			"rds:DescribeDBInstances",
-			"rds:ModifyDBInstance",
-			"ec2:Describe*",
-		}
+		// S3 bucket-level permissions
+		statements = append(statements, map[string]interface{}{
+			"Effect": "Allow",
+			"Action": []string{
+				"s3:ListBucket",
+				"s3:GetBucketLocation",
+			},
+			"Resource": fmt.Sprintf("arn:aws:s3:::%s", resourceIdentifier),
+		})
+		// S3 object-level permissions
+		statements = append(statements, map[string]interface{}{
+			"Effect": "Allow",
+			"Action": []string{
+				"s3:GetObject",
+				"s3:PutObject",
+				"s3:DeleteObject",
+			},
+			"Resource": fmt.Sprintf("arn:aws:s3:::%s/*", resourceIdentifier),
+		})
+
 	case "admin":
-		actions = []string{"*"}
+		// Full S3 permissions
+		statements = append(statements, map[string]interface{}{
+			"Effect":   "Allow",
+			"Action":   "*",
+			"Resource": "*",
+		})
+
 	default:
 		return "", fmt.Errorf("unsupported access level: %s", level)
 	}
 
 	// Build policy document
 	policy := map[string]interface{}{
-		"Version": "2012-10-17",
-		"Statement": []map[string]interface{}{
-			{
-				"Effect":   "Allow",
-				"Action":   actions,
-				"Resource": resourceARN,
-			},
-		},
+		"Version":   "2012-10-17",
+		"Statement": statements,
 	}
 
 	policyJSON, err := json.Marshal(policy)
