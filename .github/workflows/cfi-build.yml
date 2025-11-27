@@ -351,11 +351,13 @@ jobs:
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
 
           if [ "$TARGET_PROVIDER" = "aws" ]; then
-            terraform destroy -auto-approve -input=false || true
+            terraform destroy -auto-approve -input=false
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
-            terraform destroy -auto-approve -input=false || true
+            export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            terraform destroy -auto-approve -input=false
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-            terraform destroy -auto-approve -input=false || true
+            export TF_VAR_project_id="${{ secrets.GCP_PROJECT_ID }}"
+            terraform destroy -auto-approve -input=false
           fi
 
           echo "✅ Terraform destroy completed for $TARGET_ID"
