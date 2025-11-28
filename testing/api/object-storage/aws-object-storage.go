@@ -11,31 +11,34 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AWSS3Service implements Service for AWS S3
 type AWSS3Service struct {
-	client *s3.Client
-	config aws.Config
-	ctx    context.Context
+	client      *s3.Client
+	config      aws.Config
+	ctx         context.Context
+	cloudParams environment.CloudParams
 }
 
 // NewAWSS3Service creates a new AWS S3 service using default credentials
-func NewAWSS3Service(ctx context.Context) (*AWSS3Service, error) {
-	cfg, err := config.LoadDefaultConfig(ctx)
+func NewAWSS3Service(ctx context.Context, cloudParams environment.CloudParams) (*AWSS3Service, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	return &AWSS3Service{
-		client: s3.NewFromConfig(cfg),
-		config: cfg,
-		ctx:    ctx,
+		client:      s3.NewFromConfig(cfg),
+		config:      cfg,
+		ctx:         ctx,
+		cloudParams: cloudParams,
 	}, nil
 }
 
 // NewAWSS3ServiceWithCredentials creates a new AWS S3 service with specific credentials from an Identity
-func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity) (*AWSS3Service, error) {
+func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, identity *iam.Identity) (*AWSS3Service, error) {
 	// Extract credentials from the map
 	accessKeyID := identity.Credentials["access_key_id"]
 	secretAccessKey := identity.Credentials["secret_access_key"]
@@ -48,6 +51,7 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity)
 	fmt.Printf("   Has Session Token: %v\n", sessionToken != "")
 
 	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(cloudParams.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKeyID,
 			secretAccessKey,
@@ -59,9 +63,10 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, identity *iam.Identity)
 	}
 
 	return &AWSS3Service{
-		client: s3.NewFromConfig(cfg),
-		config: cfg,
-		ctx:    ctx,
+		client:      s3.NewFromConfig(cfg),
+		config:      cfg,
+		ctx:         ctx,
+		cloudParams: cloudParams,
 	}, nil
 }
 
@@ -94,11 +99,11 @@ func (s *AWSS3Service) ListBuckets() ([]Bucket, error) {
 	return buckets, nil
 }
 
-// CreateBucket creates a new S3 bucket in the specified region
-func (s *AWSS3Service) CreateBucket(bucketID string, region string) (*Bucket, error) {
+// CreateBucket creates a new S3 bucket in the configured region
+func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	input := &s3.CreateBucketInput{
@@ -113,15 +118,15 @@ func (s *AWSS3Service) CreateBucket(bucketID string, region string) (*Bucket, er
 	return &Bucket{
 		ID:     bucketID,
 		Name:   bucketID,
-		Region: region,
+		Region: s.cloudParams.Region,
 	}, nil
 }
 
 // DeleteBucket deletes an S3 bucket
-func (s *AWSS3Service) DeleteBucket(bucketID string, region string) error {
+func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	_, err := regionalClient.DeleteBucket(s.ctx, &s3.DeleteBucketInput{
@@ -135,10 +140,10 @@ func (s *AWSS3Service) DeleteBucket(bucketID string, region string) error {
 }
 
 // ListObjects lists all objects in a bucket
-func (s *AWSS3Service) ListObjects(bucketID string, region string) ([]Object, error) {
+func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.ListObjectsV2(s.ctx, &s3.ListObjectsV2Input{
@@ -163,10 +168,10 @@ func (s *AWSS3Service) ListObjects(bucketID string, region string) ([]Object, er
 }
 
 // CreateObject creates a new object in a bucket
-func (s *AWSS3Service) CreateObject(bucketID string, region string, objectID string, data []string) (*Object, error) {
+func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data []string) (*Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Convert []string to []byte
@@ -194,10 +199,10 @@ func (s *AWSS3Service) CreateObject(bucketID string, region string, objectID str
 }
 
 // ReadObject reads an object from a bucket
-func (s *AWSS3Service) ReadObject(bucketID string, region string, objectID string) (*Object, error) {
+func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
@@ -225,10 +230,10 @@ func (s *AWSS3Service) ReadObject(bucketID string, region string, objectID strin
 }
 
 // DeleteObject deletes an object from a bucket
-func (s *AWSS3Service) DeleteObject(bucketID string, region string, objectID string) error {
+func (s *AWSS3Service) DeleteObject(bucketID string, objectID string) error {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = region
+	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	_, err := regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
@@ -258,4 +263,27 @@ func (s *AWSS3Service) GetBucketRegion(bucketID string) (string, error) {
 	}
 
 	return region, nil
+}
+
+// GetTestableResources returns all S3 buckets as testable resources
+func (s *AWSS3Service) GetTestableResources() ([]environment.TestParams, error) {
+	// List all buckets
+	buckets, err := s.ListBuckets()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list buckets: %w", err)
+	}
+
+	// Convert buckets to TestParams
+	resources := make([]environment.TestParams, 0, len(buckets))
+	for _, bucket := range buckets {
+		resources = append(resources, environment.TestParams{
+			ResourceName:        bucket.Name,
+			UID:                 bucket.ID,
+			ProviderServiceType: "s3",
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			CloudParams:         s.cloudParams,
+		})
+	}
+
+	return resources, nil
 }

@@ -8,6 +8,7 @@ import (
 
 	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"google.golang.org/api/option"
 	iampb "google.golang.org/genproto/googleapis/iam/v1"
 )
@@ -400,4 +401,9 @@ func sanitizeServiceAccountID(userName string) string {
 	sanitized = strings.TrimRight(sanitized, "-")
 
 	return sanitized
+}
+
+// Fill this later when we are writing tests for IAM
+func (s *GCPIAMService) GetTestableResources() ([]environment.TestParams, error) {
+	return []environment.TestParams{}, nil
 }

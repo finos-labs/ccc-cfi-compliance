@@ -5,6 +5,7 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // CloudProvider represents the supported cloud providers
@@ -28,13 +29,13 @@ type Factory interface {
 	GetProvider() CloudProvider
 }
 
-// NewFactory creates a new factory for the specified cloud provider
-func NewFactory(provider CloudProvider) (Factory, error) {
+// NewFactory creates a new factory for the specified cloud provider using cloud-specific configuration
+func NewFactory(provider CloudProvider, cloudParams environment.CloudParams) (Factory, error) {
 	switch provider {
 	case ProviderAWS:
-		return NewAWSFactory(), nil
+		return NewAWSFactory(cloudParams), nil
 	case ProviderAzure:
-		return NewAzureFactory(), nil
+		return NewAzureFactory(cloudParams), nil
 	case ProviderGCP:
 		return NewGCPFactory(), nil
 	default:

@@ -10,7 +10,7 @@ The factory pattern provides a consistent way to create cloud service clients:
 
 ```go
 // Create a factory for a specific cloud provider
-factory, err := factory.NewFactory(factory.ProviderAWS)
+factory, err := factory.NewFactory(factory.ProviderAWS, cloudProps)
 
 // Get a service API client
 service, err := factory.GetServiceAPI("object-storage")

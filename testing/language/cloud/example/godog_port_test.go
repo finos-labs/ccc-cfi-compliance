@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 )
@@ -29,10 +30,12 @@ var portTestMatrix = []struct {
 			HostName:    "robmoff.at",
 			Protocol:    "http",
 			ServiceType: "web",
-			Region:      "eu-west-1",
-			Provider:    "aws",
-			Labels:      []string{"https", "tls", "tlp-amber"},
-			UID:         "https-443",
+			CloudParams: environment.CloudParams{
+				Provider: "aws",
+				Region:   "eu-west-1",
+			},
+			Labels: []string{"https", "tls", "tlp-amber"},
+			UID:    "https-443",
 		},
 		description: "HTTPS on port 443 (TLS)",
 	},
@@ -44,10 +47,12 @@ var portTestMatrix = []struct {
 			HostName:    "robmoff.at",
 			Protocol:    "http",
 			ServiceType: "web",
-			Region:      "eu-west-1",
-			Provider:    "aws",
-			Labels:      []string{"http", "plaintext", "tlp-amber"},
-			UID:         "http-80",
+			CloudParams: environment.CloudParams{
+				Provider: "aws",
+				Region:   "eu-west-1",
+			},
+			Labels: []string{"http", "plaintext", "tlp-amber"},
+			UID:    "http-80",
 		},
 		description: "HTTP on port 80 (plaintext)",
 	},
@@ -59,10 +64,12 @@ var portTestMatrix = []struct {
 			HostName:    "172.104.252.249", // automation.risk-first.org, change later.
 			Protocol:    "ssh",
 			ServiceType: "ssh",
-			Region:      "eu-west-1",
-			Provider:    "aws",
-			Labels:      []string{"ssh", "encrypted", "tlp-amber"},
-			UID:         "ssh-22",
+			CloudParams: environment.CloudParams{
+				Provider: "aws",
+				Region:   "eu-west-1",
+			},
+			Labels: []string{"ssh", "encrypted", "tlp-amber"},
+			UID:    "ssh-22",
 		},
 		description: "SSH on port 22 (encrypted)",
 	},
@@ -74,10 +81,12 @@ var portTestMatrix = []struct {
 			HostName:    "secure.emailsrvr.com",
 			Protocol:    "smtp",
 			ServiceType: "mail",
-			Region:      "eu-west-1",
-			Provider:    "aws",
-			Labels:      []string{"smtp", "tls", "tlp-amber"},
-			UID:         "smtp-465",
+			CloudParams: environment.CloudParams{
+				Provider: "aws",
+				Region:   "eu-west-1",
+			},
+			Labels: []string{"smtp", "tls", "tlp-amber"},
+			UID:    "smtp-465",
 		},
 		description: "SMTPS on port 465 (TLS)",
 	},
@@ -89,10 +98,12 @@ var portTestMatrix = []struct {
 			HostName:    "secure.emailsrvr.com",
 			Protocol:    "smtp",
 			ServiceType: "mail",
-			Region:      "eu-west-1",
-			Provider:    "aws",
-			Labels:      []string{"smtp", "tls", "tlp-amber"},
-			UID:         "smtp-587",
+			CloudParams: environment.CloudParams{
+				Provider: "aws",
+				Region:   "eu-west-1",
+			},
+			Labels: []string{"smtp", "tls", "tlp-amber"},
+			UID:    "smtp-587",
 		},
 		description: "SMTP on port 587 (STARTTLS)",
 	},

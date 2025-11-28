@@ -4,12 +4,12 @@ import (
 	"io"
 
 	"github.com/cucumber/godog/formatters"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
 )
 
-// TestParams is an alias to inspection.TestParams for backward compatibility
-type TestParams = inspection.TestParams
+// TestParams is an alias to environment.TestParams for backward compatibility
+type TestParams = environment.TestParams
 
 // FormatterFactory creates formatters with embedded test parameters
 type FormatterFactory struct {

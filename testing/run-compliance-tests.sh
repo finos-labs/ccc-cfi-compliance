@@ -9,6 +9,10 @@ PROVIDER=""
 OUTPUT_DIR="output"
 TIMEOUT="30m"
 RESOURCE_FILTER=""
+REGION=""
+AZURE_SUBSCRIPTION_ID_FLAG=""
+AZURE_RESOURCE_GROUP_FLAG=""
+GCP_PROJECT_ID_FLAG=""
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -29,20 +33,58 @@ while [[ $# -gt 0 ]]; do
       RESOURCE_FILTER="$2"
       shift 2
       ;;
+    --region)
+      REGION="$2"
+      shift 2
+      ;;
+    --azure-subscription-id)
+      AZURE_SUBSCRIPTION_ID_FLAG="$2"
+      shift 2
+      ;;
+    --azure-resource-group)
+      AZURE_RESOURCE_GROUP_FLAG="$2"
+      shift 2
+      ;;
+    --gcp-project-id)
+      GCP_PROJECT_ID_FLAG="$2"
+      shift 2
+      ;;
     -h|--help)
       echo "Usage: $0 [OPTIONS]"
       echo ""
-      echo "Options:"
-      echo "  -p, --provider PROVIDER    Cloud provider (aws, azure, or gcp) [REQUIRED]"
-      echo "  -o, --output DIR          Output directory for test reports (default: output)"
-      echo "  -r, --resource RESOURCE   Filter to a specific resource name"
-      echo "  -t, --timeout DURATION    Timeout for all tests (default: 30m)"
-      echo "  -h, --help                Show this help message"
+      echo "Required Options:"
+      echo "  -p, --provider PROVIDER              Cloud provider (aws, azure, or gcp)"
+      echo ""
+      echo "Optional Options:"
+      echo "  -o, --output DIR                     Output directory (default: output)"
+      echo "  -r, --resource RESOURCE              Filter to specific resource name"
+      echo "  -t, --timeout DURATION               Timeout for all tests (default: 30m)"
+      echo "  --region REGION                      Cloud region"
+      echo ""
+      echo "Azure-specific Options (required for Azure):"
+      echo "  --azure-subscription-id ID           Azure subscription ID"
+      echo "  --azure-resource-group RG            Azure resource group"
+      echo ""
+      echo "GCP-specific Options (required for GCP):"
+      echo "  --gcp-project-id PROJECT             GCP project ID"
+      echo ""
+      echo "  -h, --help                           Show this help message"
+      echo ""
+      echo "Note: All flags can also be provided via environment variables:"
+      echo "  --region                 → AWS_REGION, AZURE_LOCATION, or GCP_REGION"
+      echo "  --azure-subscription-id  → AZURE_SUBSCRIPTION_ID"
+      echo "  --azure-resource-group   → AZURE_RESOURCE_GROUP"
+      echo "  --gcp-project-id         → GCP_PROJECT_ID"
       echo ""
       echo "Examples:"
-      echo "  $0 --provider aws"
-      echo "  $0 --provider azure --output results"
-      echo "  $0 --provider aws --resource simple-inviting-kite"
+      echo "  $0 --provider aws --region us-east-1"
+      echo "  $0 --provider azure --azure-subscription-id xxx --azure-resource-group cfi_test --region eastus"
+      echo "  $0 --provider gcp --gcp-project-id my-project --region us-central1"
+      echo ""
+      echo "  # Using environment variables:"
+      echo "  export AZURE_SUBSCRIPTION_ID=xxx"
+      echo "  export AZURE_RESOURCE_GROUP=cfi_test"
+      echo "  $0 --provider azure"
       exit 0
       ;;
     *)
@@ -53,22 +95,30 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Validate required parameters
-if [ -z "$PROVIDER" ]; then
-  echo "Error: --provider is required"
-  echo "Use -h or --help for usage information"
-  exit 1
-fi
+# Fall back to environment variables if flags not provided
+[ -z "$AZURE_SUBSCRIPTION_ID_FLAG" ] && AZURE_SUBSCRIPTION_ID_FLAG="${AZURE_SUBSCRIPTION_ID:-}"
+[ -z "$AZURE_RESOURCE_GROUP_FLAG" ] && AZURE_RESOURCE_GROUP_FLAG="${AZURE_RESOURCE_GROUP:-}"
+[ -z "$GCP_PROJECT_ID_FLAG" ] && GCP_PROJECT_ID_FLAG="${GCP_PROJECT_ID:-}"
 
-if [ "$PROVIDER" != "aws" ] && [ "$PROVIDER" != "azure" ] && [ "$PROVIDER" != "gcp" ]; then
-  echo "Error: provider must be 'aws', 'azure', or 'gcp'"
-  exit 1
+# Set region from flag or environment based on provider
+if [ -z "$REGION" ]; then
+  case "$PROVIDER" in
+    aws)
+      REGION="${AWS_REGION:-}"
+      ;;
+    azure)
+      REGION="${AZURE_LOCATION:-}"
+      ;;
+    gcp)
+      REGION="${GCP_REGION:-}"
+      ;;
+  esac
 fi
 
 # Build the binary if needed
 echo "🔨 Building compliance test runner..."
 cd "$(dirname "$0")"
-go build -o ccc-compliance ./runner/main.go
+go build -o ccc-compliance ./runner/
 
 if [ $? -ne 0 ]; then
   echo "❌ Build failed"
@@ -84,6 +134,22 @@ CMD="./ccc-compliance -provider=\"$PROVIDER\" -output=\"$OUTPUT_DIR\" -timeout=\
 # Add optional flags only if set
 if [ -n "$RESOURCE_FILTER" ]; then
   CMD="$CMD -resource=\"$RESOURCE_FILTER\""
+fi
+
+if [ -n "$REGION" ]; then
+  CMD="$CMD -region=\"$REGION\""
+fi
+
+if [ -n "$AZURE_SUBSCRIPTION_ID_FLAG" ]; then
+  CMD="$CMD -azure-subscription-id=\"$AZURE_SUBSCRIPTION_ID_FLAG\""
+fi
+
+if [ -n "$AZURE_RESOURCE_GROUP_FLAG" ]; then
+  CMD="$CMD -azure-resource-group=\"$AZURE_RESOURCE_GROUP_FLAG\""
+fi
+
+if [ -n "$GCP_PROJECT_ID_FLAG" ]; then
+  CMD="$CMD -gcp-project-id=\"$GCP_PROJECT_ID_FLAG\""
 fi
 
 # Execute the command

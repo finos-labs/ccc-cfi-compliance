@@ -10,65 +10,63 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/google/uuid"
 )
 
 // AzureIAMService implements IAMService for Azure
 type AzureIAMService struct {
-	msiClient      *armmsi.UserAssignedIdentitiesClient
-	authClient     *armauthorization.RoleAssignmentsClient
-	ctx            context.Context
-	credential     azcore.TokenCredential
-	subscriptionID string
-	resourceGroup  string
+	msiClient   *armmsi.UserAssignedIdentitiesClient
+	authClient  *armauthorization.RoleAssignmentsClient
+	ctx         context.Context
+	credential  azcore.TokenCredential
+	cloudParams environment.CloudParams
 }
 
 // NewAzureIAMService creates a new Azure IAM service using default credentials
-func NewAzureIAMService(ctx context.Context, subscriptionID, resourceGroup string) (*AzureIAMService, error) {
+func NewAzureIAMService(ctx context.Context, cloudParams environment.CloudParams) (*AzureIAMService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
-	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(subscriptionID, cred, nil)
+	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MSI client: %w", err)
 	}
 
-	authClient, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, cred, nil)
+	authClient, err := armauthorization.NewRoleAssignmentsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization client: %w", err)
 	}
 
 	return &AzureIAMService{
-		msiClient:      msiClient,
-		authClient:     authClient,
-		ctx:            ctx,
-		credential:     cred,
-		subscriptionID: subscriptionID,
-		resourceGroup:  resourceGroup,
+		msiClient:   msiClient,
+		authClient:  authClient,
+		ctx:         ctx,
+		credential:  cred,
+		cloudParams: cloudParams,
 	}, nil
 }
 
 // NewAzureIAMServiceWithCredentials creates a new Azure IAM service with specific credentials
-func NewAzureIAMServiceWithCredentials(ctx context.Context, subscriptionID, resourceGroup string, cred azcore.TokenCredential) (*AzureIAMService, error) {
-	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(subscriptionID, cred, nil)
+func NewAzureIAMServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, cred azcore.TokenCredential) (*AzureIAMService, error) {
+	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MSI client: %w", err)
 	}
 
-	authClient, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, cred, nil)
+	authClient, err := armauthorization.NewRoleAssignmentsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization client: %w", err)
 	}
 
 	return &AzureIAMService{
-		msiClient:      msiClient,
-		authClient:     authClient,
-		ctx:            ctx,
-		credential:     cred,
-		subscriptionID: subscriptionID,
-		resourceGroup:  resourceGroup,
+		msiClient:   msiClient,
+		authClient:  authClient,
+		ctx:         ctx,
+		credential:  cred,
+		cloudParams: cloudParams,
 	}, nil
 }
 
@@ -82,7 +80,7 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	var identityAlreadyExists bool
 
 	// Check if managed identity already exists
-	getResp, err := s.msiClient.Get(s.ctx, s.resourceGroup, identityName, nil)
+	getResp, err := s.msiClient.Get(s.ctx, s.cloudParams.AzureResourceGroup, identityName, nil)
 	if err == nil {
 		// Identity exists - reuse it
 		fmt.Printf("🔷 Managed identity %s already exists, reusing...\n", identityName)
@@ -97,7 +95,7 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 			"ManagedBy": toPtr("CCC-CFI-Compliance-Framework"),
 		}
 
-		createResp, err := s.msiClient.CreateOrUpdate(s.ctx, s.resourceGroup, identityName, armmsi.Identity{
+		createResp, err := s.msiClient.CreateOrUpdate(s.ctx, s.cloudParams.AzureResourceGroup, identityName, armmsi.Identity{
 			Location: &location,
 			Tags:     tags,
 		}, nil)
@@ -142,8 +140,8 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	identity.Credentials["client_id"] = clientID
 	identity.Credentials["tenant_id"] = tenantID
 	identity.Credentials["resource_id"] = resourceID
-	identity.Credentials["subscription_id"] = s.subscriptionID
-	identity.Credentials["resource_group"] = s.resourceGroup
+	identity.Credentials["subscription_id"] = s.cloudParams.AzureSubscriptionID
+	identity.Credentials["resource_group"] = s.cloudParams.AzureResourceGroup
 	identity.Credentials["identity_name"] = identityName
 
 	// For Azure managed identities, we don't have a secret key
@@ -267,7 +265,7 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 	}
 
 	// Delete the managed identity
-	_, err := s.msiClient.Delete(s.ctx, s.resourceGroup, identityName, nil)
+	_, err := s.msiClient.Delete(s.ctx, s.cloudParams.AzureResourceGroup, identityName, nil)
 	if err != nil {
 		// Check if identity doesn't exist
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "NotFound") {
@@ -287,7 +285,7 @@ func (s *AzureIAMService) getRoleDefinitionForLevel(serviceID string, level stri
 	// Azure built-in role definition IDs
 	// Format: /subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/{roleId}
 
-	baseRolePath := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions", s.subscriptionID)
+	baseRolePath := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions", s.cloudParams.AzureSubscriptionID)
 
 	switch level {
 	case "none":
@@ -332,12 +330,12 @@ func (s *AzureIAMService) parseScope(serviceID string) string {
 		if len(parts) > 0 {
 			accountName := parts[len(parts)-1]
 			return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
-				s.subscriptionID, s.resourceGroup, accountName)
+				s.cloudParams.AzureSubscriptionID, s.cloudParams.AzureResourceGroup, accountName)
 		}
 	}
 
 	// Default: use resource group scope
-	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", s.subscriptionID, s.resourceGroup)
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", s.cloudParams.AzureSubscriptionID, s.cloudParams.AzureResourceGroup)
 }
 
 func extractScopeFromAssignmentID(assignmentID string) string {
@@ -380,4 +378,9 @@ func sanitizeManagedIdentityName(userName string) string {
 
 func toPtr(s string) *string {
 	return &s
+}
+
+// Fill this later when we are writing tests for IAM
+func (s *AzureIAMService) GetTestableResources() ([]environment.TestParams, error) {
+	return []environment.TestParams{}, nil
 }

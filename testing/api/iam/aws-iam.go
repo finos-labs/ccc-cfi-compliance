@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AWSIAMService implements IAMService for AWS
@@ -425,4 +426,9 @@ func sanitizeForPolicyName(s string) string {
 		result = result[:64]
 	}
 	return result
+}
+
+// Fill this later when we are writing tests for IAM
+func (s *AWSIAMService) GetTestableResources() ([]environment.TestParams, error) {
+	return []environment.TestParams{}, nil
 }

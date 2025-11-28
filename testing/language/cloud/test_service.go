@@ -10,27 +10,21 @@ import (
 	"testing"
 
 	"github.com/cucumber/godog"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/inspection"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 )
 
 // buildServiceTagFilter builds the tag expression for filtering tests based on catalog type
-func buildServiceTagFilter(catalogType string) string {
-	// Start with @PerService requirement
-	tags := []string{"@PerService"}
-
-	// Build exclusion list for all other catalog types (but not the current one)
-	var exclusions []string
-	for _, ct := range inspection.AllCatalogTypes {
-		if ct != catalogType {
-			exclusions = append(exclusions, "~@"+ct)
-		}
+func buildServiceTagFilter(catalogTypes []string) string {
+	// Build OR expression for catalog types: @CCC.ObjStor || @CCC.Core
+	var catalogTags []string
+	for _, ct := range catalogTypes {
+		catalogTags = append(catalogTags, "@"+ct)
 	}
+	catalogExpr := strings.Join(catalogTags, " || ")
 
-	// Combine: @PerService && ~@otherCatalogType1 && ~@otherCatalogType2 ...
-	// This means: run @PerService tests that are NOT tagged with other catalog types
-	return strings.Join(append(tags, exclusions...), " && ")
+	// Require @PerService AND one of the catalog types
+	return fmt.Sprintf("@PerService && (%s)", catalogExpr)
 }
 
 // setupServiceParams sets up parameters for @PerService tests
@@ -87,12 +81,13 @@ func RunServiceTests(t *testing.T, params reporters.TestParams, featuresPath, re
 	godog.Format(htmlFormat, "HTML report for service tests", factory.GetHTMLFormatterFunc())
 	godog.Format(ocsfFormat, "OCSF report for service tests", factory.GetOCSFFormatterFunc())
 
-	// Build tag filter based on catalog type
-	tagFilter := buildServiceTagFilter(params.CatalogType)
+	// Build tag filter based on catalog types
+	tagFilter := buildServiceTagFilter(params.CatalogTypes)
 	t.Logf("Using tag filter: %s", tagFilter)
 
 	// Create report title
-	reportTitle := "Service Test Report: " + params.ResourceName + " (" + params.CatalogType + " / " + params.ProviderServiceType + ")"
+	catalogTypesStr := strings.Join(params.CatalogTypes, "/")
+	reportTitle := "Service Test Report: " + params.ResourceName + " (" + catalogTypesStr + " / " + params.ProviderServiceType + ")"
 
 	opts := godog.Options{
 		Format:   fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),

@@ -14,6 +14,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 )
 
@@ -374,8 +375,23 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 		return fmt.Errorf("unsupported cloud provider: %s (must be aws, azure, or gcp)", providerStr)
 	}
 
+	// Get CloudParams from Props (populated by setupWithParams)
+	var cloudParams environment.CloudParams
+	if cp, ok := cw.Props["CloudParams"].(environment.CloudParams); ok {
+		cloudParams = cp
+	} else {
+		// If CloudParams not in Props, construct from individual fields
+		cloudParams = environment.CloudParams{
+			Provider:            providerStr,
+			Region:              fmt.Sprintf("%v", cw.Props["Region"]),
+			AzureSubscriptionID: fmt.Sprintf("%v", cw.Props["AzureSubscriptionID"]),
+			AzureResourceGroup:  fmt.Sprintf("%v", cw.Props["AzureResourceGroup"]),
+			GCPProjectID:        fmt.Sprintf("%v", cw.Props["GCPProjectID"]),
+		}
+	}
+
 	// Create the factory
-	f, err := factory.NewFactory(provider)
+	f, err := factory.NewFactory(provider, cloudParams)
 	if err != nil {
 		return fmt.Errorf("failed to create factory for provider %s: %w", providerStr, err)
 	}

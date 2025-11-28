@@ -10,8 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/services"
-	objstor "github.com/finos-labs/ccc-cfi-compliance/testing/services/CCC.ObjStor"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 var (
@@ -19,6 +18,12 @@ var (
 	outputDir      = flag.String("output", "output", "Output directory for test reports")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
+
+	// Cloud configuration flags
+	region              = flag.String("region", "", "Cloud region")
+	azureSubscriptionID = flag.String("azure-subscription-id", "", "Azure subscription ID (required for Azure)")
+	azureResourceGroup  = flag.String("azure-resource-group", "", "Azure resource group (required for Azure)")
+	gcpProjectID        = flag.String("gcp-project-id", "", "GCP project ID (required for GCP)")
 )
 
 func main() {
@@ -33,26 +38,30 @@ func main() {
 		log.Fatalf("Error: invalid provider '%s' (must be aws, azure, or gcp)", *provider)
 	}
 
-	log.Printf("🚀 Starting CCC CFI Compliance Tests")
-	log.Printf("   Provider: %s", *provider)
-	log.Printf("   Output Directory: %s", *outputDir)
-	log.Printf("   Timeout: %s", *timeout)
-	if *resourceFilter != "" {
-		log.Printf("   Resource Filter: %s", *resourceFilter)
+	// Build CloudParams from flags (priority) or environment variables (fallback)
+	cloudParams := buildCloudParams(*provider, *region, *azureSubscriptionID, *azureResourceGroup, *gcpProjectID)
+
+	// Validate provider-specific requirements
+	if err := validateCloudParams(*provider, cloudParams); err != nil {
+		log.Fatalf("Error: %v", err)
 	}
+
+	// Log configuration
+	log.Printf("🚀 Starting CCC CFI Compliance Tests")
+	log.Printf("   Provider: %s", cloudParams.Provider)
+	log.Printf("   Region: %s", cloudParams.Region)
 	log.Println()
 
-	// Build shared configuration
-	baseConfig := services.RunConfig{
-		Provider:       *provider,
-		OutputDir:      *outputDir,
-		Timeout:        *timeout,
-		ResourceFilter: *resourceFilter,
-	}
-
-	// Assemble list of service runners
-	runners := []services.ServiceRunner{
-		objstor.NewCCCObjStorServiceRunner(baseConfig),
+	// Assemble list of service runners - one for each service type
+	var runners []ServiceRunner
+	for _, serviceName := range environment.ServiceTypes {
+		runners = append(runners, NewBasicServiceRunner(RunConfig{
+			ServiceName:    serviceName,
+			CloudParams:    cloudParams,
+			OutputDir:      *outputDir,
+			Timeout:        *timeout,
+			ResourceFilter: *resourceFilter,
+		}))
 	}
 
 	log.Printf("📋 Running %d service runner(s)", len(runners))
@@ -153,6 +162,37 @@ func combineOCSFFiles(outputDir string) error {
 	}
 
 	log.Printf("   Total items in combined file: %d", len(combined))
+
+	return nil
+}
+
+// buildCloudParams constructs CloudParams from command-line flags
+func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup, gcpProjectID string) environment.CloudParams {
+	return environment.CloudParams{
+		Provider:            provider,
+		Region:              region,
+		AzureSubscriptionID: azureSubscriptionID,
+		AzureResourceGroup:  azureResourceGroup,
+		GCPProjectID:        gcpProjectID,
+	}
+}
+
+// validateCloudParams validates that required parameters are set for the provider
+func validateCloudParams(provider string, cloudParams environment.CloudParams) error {
+	switch provider {
+	case "azure":
+		if cloudParams.AzureSubscriptionID == "" {
+			return fmt.Errorf("azure subscription ID is required (use --azure-subscription-id flag)")
+		}
+		if cloudParams.AzureResourceGroup == "" {
+			return fmt.Errorf("azure resource group is required (use --azure-resource-group flag)")
+		}
+
+	case "gcp":
+		if cloudParams.GCPProjectID == "" {
+			return fmt.Errorf("GCP project ID is required (use --gcp-project-id flag)")
+		}
+	}
 
 	return nil
 }

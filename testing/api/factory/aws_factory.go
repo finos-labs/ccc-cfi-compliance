@@ -7,17 +7,20 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AWSFactory implements the Factory interface for AWS
 type AWSFactory struct {
-	ctx context.Context
+	ctx         context.Context
+	cloudParams environment.CloudParams
 }
 
 // NewAWSFactory creates a new AWS factory
-func NewAWSFactory() *AWSFactory {
+func NewAWSFactory(cloudParams environment.CloudParams) *AWSFactory {
 	return &AWSFactory{
-		ctx: context.Background(),
+		ctx:         context.Background(),
+		cloudParams: cloudParams,
 	}
 }
 
@@ -30,7 +33,7 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 	case "iam":
 		service, err = iam.NewAWSIAMService(f.ctx)
 	case "object-storage":
-		service, err = objstorage.NewAWSS3Service(f.ctx)
+		service, err = objstorage.NewAWSS3Service(f.ctx, f.cloudParams)
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)
 	}
@@ -51,13 +54,16 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 	var service generic.Service
 	var err error
 
+	// Create a copy of cloud params with identity-specific overrides if any
+	cloudParams := f.cloudParams
+
 	switch serviceID {
 	case "iam":
 		// IAM service doesn't typically use per-identity clients, return the standard IAM service
 		service, err = iam.NewAWSIAMService(f.ctx)
 
 	case "object-storage":
-		service, err = objstorage.NewAWSS3ServiceWithCredentials(f.ctx, identity)
+		service, err = objstorage.NewAWSS3ServiceWithCredentials(f.ctx, cloudParams, identity)
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)
