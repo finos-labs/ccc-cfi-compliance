@@ -280,6 +280,7 @@ func (s *AWSS3Service) GetTestableResources() ([]environment.TestParams, error) 
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ProviderServiceType: "s3",
+			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			CloudParams:         s.cloudParams,
 		})

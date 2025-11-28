@@ -1,4 +1,4 @@
-@PerService @CCC.ObjStor @tlp-amber @tlp-red
+@CCC.ObjStor @tlp-amber @tlp-red
 Feature: CCC.ObjStor.CN01.AR01
   As a security administrator
   I want to prevent any requests to read protected buckets using untrusted KMS keys

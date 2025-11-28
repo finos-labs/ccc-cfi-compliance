@@ -554,6 +554,7 @@ func (s *AzureBlobService) GetTestableResources() ([]environment.TestParams, err
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
+			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			CloudParams:         s.cloudParams,

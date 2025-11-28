@@ -1,4 +1,4 @@
-@PerPort @tlp-green @tlp-amber @tlp-red
+@CCC.Core @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN01.AR01
   As a security administrator
   I want to ensure all non-SSH network traffic uses TLS 1.3 or higher

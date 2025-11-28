@@ -376,19 +376,7 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 	}
 
 	// Get CloudParams from Props (populated by setupWithParams)
-	var cloudParams environment.CloudParams
-	if cp, ok := cw.Props["CloudParams"].(environment.CloudParams); ok {
-		cloudParams = cp
-	} else {
-		// If CloudParams not in Props, construct from individual fields
-		cloudParams = environment.CloudParams{
-			Provider:            providerStr,
-			Region:              fmt.Sprintf("%v", cw.Props["Region"]),
-			AzureSubscriptionID: fmt.Sprintf("%v", cw.Props["AzureSubscriptionID"]),
-			AzureResourceGroup:  fmt.Sprintf("%v", cw.Props["AzureResourceGroup"]),
-			GCPProjectID:        fmt.Sprintf("%v", cw.Props["GCPProjectID"]),
-		}
-	}
+	var cloudParams = cw.Props["CloudParams"].(environment.CloudParams)
 
 	// Create the factory
 	f, err := factory.NewFactory(provider, cloudParams)

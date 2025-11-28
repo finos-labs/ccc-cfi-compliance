@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 
@@ -14,8 +15,52 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 )
+
+// TestSuite for running cloud tests
+type TestSuite struct {
+	*cloud.CloudWorld
+}
+
+// NewTestSuite creates a new test suite
+func NewTestSuite() *TestSuite {
+	world := cloud.NewCloudWorld()
+	return &TestSuite{
+		CloudWorld: world,
+	}
+}
+
+// setupServiceParams sets up parameters for service tests
+func (suite *TestSuite) setupServiceParams(params environment.TestParams) {
+	// Reset Props and AsyncManager, but keep the same CloudWorld instance
+	// so the formatter can access attachments from the previous scenario
+	suite.Props = make(map[string]interface{})
+	suite.AsyncManager = generic.NewAsyncTaskManager()
+
+	// Use reflection to automatically populate all fields from TestParams
+	v := reflect.ValueOf(params)
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+		suite.Props[field.Name] = value.Interface()
+	}
+}
+
+// InitializeServiceScenario initializes the scenario context for service testing
+func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, params environment.TestParams) {
+	// Setup before each scenario
+	sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
+		suite.setupServiceParams(params)
+		return ctx, nil
+	})
+
+	// Register all cloud steps (which includes generic steps)
+	suite.RegisterSteps(sc)
+}
 
 // BasicServiceRunner provides functionality for running service-specific compliance tests
 type BasicServiceRunner struct {
@@ -168,7 +213,7 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	}
 
 	// Run the godog tests
-	suite := cloud.NewTestSuite()
+	suite := NewTestSuite()
 
 	// Create HTML and OCSF output files
 	htmlReportPath := reportPath + ".html"
@@ -186,6 +231,7 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 
 	// Build tag filter
 	tagFilter := buildTagFilter(params.CatalogTypes)
+	log.Printf("   Tag Filter: %s", tagFilter)
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
@@ -215,15 +261,7 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 
 // buildTagFilter builds tag expression for filtering tests
 func buildTagFilter(catalogTypes []string) string {
-	// Build OR expression for catalog types: @CCC.ObjStor || @CCC.Core
-	var catalogTags []string
-	for _, ct := range catalogTypes {
-		catalogTags = append(catalogTags, "@"+ct)
-	}
-	catalogExpr := strings.Join(catalogTags, " || ")
-
-	// Require @PerService AND one of the catalog types
-	return fmt.Sprintf("@PerService && (%s)", catalogExpr)
+	return strings.Join(catalogTypes, ",")
 }
 
 // printSummary prints test execution summary
