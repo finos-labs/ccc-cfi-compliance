@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Default values
 PROVIDER=""
-OUTPUT_DIR="output"
+OUTPUT_DIR=""
 TIMEOUT="30m"
 RESOURCE_FILTER=""
 REGION=""
@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
       echo "  -p, --provider PROVIDER              Cloud provider (aws, azure, or gcp)"
       echo ""
       echo "Optional Options:"
-      echo "  -o, --output DIR                     Output directory (default: output)"
+      echo "  -o, --output DIR                     Output directory (default: testing/output)"
       echo "  -r, --resource RESOURCE              Filter to specific resource name"
       echo "  -t, --timeout DURATION               Timeout for all tests (default: 30m)"
       echo "  --region REGION                      Cloud region"
@@ -129,9 +129,13 @@ echo "✅ Build successful"
 echo ""
 
 # Build the command
-CMD="./ccc-compliance -provider=\"$PROVIDER\" -output=\"$OUTPUT_DIR\" -timeout=\"$TIMEOUT\""
+CMD="./ccc-compliance -provider=\"$PROVIDER\" -timeout=\"$TIMEOUT\""
 
 # Add optional flags only if set
+if [ -n "$OUTPUT_DIR" ]; then
+  CMD="$CMD -output=\"$OUTPUT_DIR\""
+fi
+
 if [ -n "$RESOURCE_FILTER" ]; then
   CMD="$CMD -resource=\"$RESOURCE_FILTER\""
 fi

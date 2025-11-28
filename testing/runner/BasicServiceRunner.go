@@ -43,19 +43,6 @@ func (r *BasicServiceRunner) Run() int {
 	log.Printf("   Provider: %s", config.CloudParams.Provider)
 	log.Println()
 
-	// Discover features path based on service name
-	featuresPath, err := r.discoverFeaturesPath(config.ServiceName)
-	if err != nil {
-		log.Fatalf("Failed to discover features path for service '%s': %v", config.ServiceName, err)
-	}
-	log.Printf("📁 Features Path: %s", featuresPath)
-	log.Println()
-
-	// Clean and create output directory
-	if err := r.prepareOutputDirectory(config.OutputDir); err != nil {
-		log.Fatalf("Failed to prepare output directory: %v", err)
-	}
-
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
@@ -80,10 +67,36 @@ func (r *BasicServiceRunner) Run() int {
 		log.Fatalf("Failed to discover resources: %v", err)
 	}
 
-	log.Printf("   Found %d resource(s)", len(resources))
+	if len(resources) > 0 {
+		if resourcesJSON, err := json.MarshalIndent(resources, "   ", "  "); err == nil {
+			log.Printf("   Resources:\n   %s", string(resourcesJSON))
+		}
+	}
+	log.Println()
+
+	// Get features directory path and collect all subdirectories
+	_, filename, _, _ := runtime.Caller(0)
+	runnerDir := filepath.Dir(filename)
+	testingDir := filepath.Dir(runnerDir)
+	featuresBaseDir := filepath.Join(testingDir, "features")
+
+	// Collect all catalog subdirectories (CCC.ObjStor, CCC.Core, etc.)
+	featuresPaths := []string{}
+	entries, err := os.ReadDir(featuresBaseDir)
+	if err != nil {
+		log.Fatalf("Failed to read features directory: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			featuresPaths = append(featuresPaths, filepath.Join(featuresBaseDir, entry.Name()))
+		}
+	}
+
+	log.Printf("📂 Features Paths: %s", strings.Join(featuresPaths, ", "))
+	log.Println()
 
 	// Run tests for each resource
-	stats := r.runTests(ctx, resources, featuresPath)
+	stats := r.runTests(ctx, resources, featuresPaths)
 
 	// Print summary
 	r.printSummary(stats)
@@ -105,66 +118,8 @@ type TestStats struct {
 	Skipped int
 }
 
-// discoverFeaturesPath discovers the features directory for a service
-func (r *BasicServiceRunner) discoverFeaturesPath(serviceName string) (string, error) {
-	// Map service names to CCC catalog directories
-	serviceMap := map[string]string{
-		"object-storage": "CCC.ObjStor",
-		"iam":            "CCC.IAM",
-	}
-
-	catalogDir, ok := serviceMap[serviceName]
-	if !ok {
-		return "", fmt.Errorf("unknown service name: %s", serviceName)
-	}
-
-	// Get the path relative to this file
-	_, filename, _, _ := runtime.Caller(0)
-	runnerDir := filepath.Dir(filename)                                           // testing/runner/
-	testingDir := filepath.Dir(runnerDir)                                         // testing/
-	featuresPath := filepath.Join(testingDir, "services", catalogDir, "features") // testing/services/CCC.ObjStor/features/
-
-	// Check if directory exists
-	if _, err := os.Stat(featuresPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("features directory does not exist: %s", featuresPath)
-	}
-
-	return featuresPath, nil
-}
-
-// prepareOutputDirectory cleans and creates the output directory
-func (r *BasicServiceRunner) prepareOutputDirectory(outputDir string) error {
-	log.Printf("🧹 Cleaning output directory: %s", outputDir)
-	if err := os.RemoveAll(outputDir); err != nil && !os.IsNotExist(err) {
-		log.Printf("⚠️  Warning: Failed to clean output directory: %v", err)
-	}
-
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-	log.Printf("✅ Output directory ready")
-	log.Println()
-	return nil
-}
-
-// displayResourcesCSV prints resources in CSV format
-func (r *BasicServiceRunner) displayResourcesCSV(resources []environment.TestParams) {
-	log.Println("\n# Resources:")
-	log.Println("Provider,ResourceName,UID,ProviderServiceType,CatalogTypes,Region")
-	for _, res := range resources {
-		log.Printf("%s,%s,%s,%s,%s,%s",
-			res.CloudParams.Provider,
-			res.ResourceName,
-			res.UID,
-			res.ProviderServiceType,
-			strings.Join(res.CatalogTypes, "|"),
-			res.CloudParams.Region)
-	}
-	log.Println()
-}
-
 // runTests executes tests for all resources
-func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environment.TestParams, featuresPath string) TestStats {
+func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environment.TestParams, featuresPaths []string) TestStats {
 	stats := TestStats{}
 
 	for i, resource := range resources {
@@ -181,7 +136,7 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 		}
 
 		stats.Total++
-		result := r.runResourceTest(ctx, resource, featuresPath, resource.CatalogTypes)
+		result := r.runResourceTest(ctx, resource, featuresPaths, resource.CatalogTypes)
 
 		switch result {
 		case "passed":
@@ -200,7 +155,7 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 }
 
 // runResourceTest runs tests for a single resource
-func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environment.TestParams, featuresPath string, catalogTypes []string) string {
+func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environment.TestParams, featuresPaths []string, catalogTypes []string) string {
 	// Create a safe filename from the resource name
 	filename := fmt.Sprintf("resource-%s", sanitizeFilename(params.ResourceName))
 	reportPath := filepath.Join(r.Config.OutputDir, filename)
@@ -234,7 +189,7 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
-		Paths:       []string{featuresPath},
+		Paths:       featuresPaths,
 		Tags:        tagFilter,
 		Concurrency: 1,
 		Strict:      true,

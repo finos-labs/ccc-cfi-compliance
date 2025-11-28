@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 
 var (
 	provider       = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
-	outputDir      = flag.String("output", "output", "Output directory for test reports")
+	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
 
@@ -28,6 +29,15 @@ var (
 
 func main() {
 	flag.Parse()
+
+	// Set default output directory if not specified
+	if *outputDir == "" {
+		// Get the testing directory (parent of runner directory)
+		_, filename, _, _ := runtime.Caller(0)
+		runnerDir := filepath.Dir(filename)
+		testingDir := filepath.Dir(runnerDir)
+		*outputDir = filepath.Join(testingDir, "output")
+	}
 
 	// Validate required flags
 	if *provider == "" {
@@ -50,6 +60,17 @@ func main() {
 	log.Printf("🚀 Starting CCC CFI Compliance Tests")
 	log.Printf("   Provider: %s", cloudParams.Provider)
 	log.Printf("   Region: %s", cloudParams.Region)
+	log.Println()
+
+	// Prepare output directory
+	log.Printf("🧹 Cleaning output directory: %s", *outputDir)
+	if err := os.RemoveAll(*outputDir); err != nil && !os.IsNotExist(err) {
+		log.Printf("⚠️  Warning: Failed to clean output directory: %v", err)
+	}
+	if err := os.MkdirAll(*outputDir, 0755); err != nil {
+		log.Fatalf("Failed to create output directory: %v", err)
+	}
+	log.Printf("✅ Output directory ready")
 	log.Println()
 
 	// Assemble list of service runners - one for each service type
