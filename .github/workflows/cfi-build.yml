@@ -59,7 +59,10 @@ jobs:
       TARGET_PATH: ${{ matrix.target.path }}
       TARGET_PROVIDER: ${{ matrix.target.provider }}
       TARGET_SERVICE: ${{ matrix.target.service }}
+      # Azure configuration
+      AZURE_STORAGE_ACCOUNT: storagecfitesting2025
       # Terraform variables
+      TF_VAR_storage_account_name: storagecfitesting2025
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_target_id: ${{ matrix.target.id }}
       TF_VAR_github_run_id: ${{ github.run_id }}
@@ -298,7 +301,21 @@ jobs:
           cd "$GITHUB_WORKSPACE/testing"
 
           chmod +x run-compliance-tests.sh
-          ./run-compliance-tests.sh --provider "$TARGET_PROVIDER" --output "output"
+          
+          # Build command with provider-specific parameters
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            ./run-compliance-tests.sh --provider azure --output "output" \
+              --region "eastus" \
+              --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              --azure-resource-group "cfi_test" \
+              --azure-storage-account "$AZURE_STORAGE_ACCOUNT"
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            ./run-compliance-tests.sh --provider gcp --output "output" \
+              --region "us-central1" \
+              --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
+          fi
 
           echo "✅ Compliance tests completed for $TARGET_ID"
 
@@ -337,8 +354,8 @@ jobs:
 
           # Copy combined OCSF results from compliance tests
           cd "$GITHUB_WORKSPACE/testing"
-          if [ -f "runner/output/combined.ocsf.json" ]; then
-            cp "runner/output/combined.ocsf.json" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}-combined.ocsf.json"
+          if [ -f "output/combined.ocsf.json" ]; then
+            cp "output/combined.ocsf.json" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}-combined.ocsf.json"
             echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
           else
             echo "⚠️  No combined OCSF file found for $TARGET_ID"

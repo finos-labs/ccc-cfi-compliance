@@ -24,6 +24,7 @@ var (
 	region              = flag.String("region", "", "Cloud region")
 	azureSubscriptionID = flag.String("azure-subscription-id", "", "Azure subscription ID (required for Azure)")
 	azureResourceGroup  = flag.String("azure-resource-group", "", "Azure resource group (required for Azure)")
+	azureStorageAccount = flag.String("azure-storage-account", "", "Azure storage account name (required for Azure)")
 	gcpProjectID        = flag.String("gcp-project-id", "", "GCP project ID (required for GCP)")
 )
 
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// Build CloudParams from flags (priority) or environment variables (fallback)
-	cloudParams := buildCloudParams(*provider, *region, *azureSubscriptionID, *azureResourceGroup, *gcpProjectID)
+	cloudParams := buildCloudParams(*provider, *region, *azureSubscriptionID, *azureResourceGroup, *azureStorageAccount, *gcpProjectID)
 
 	// Validate provider-specific requirements
 	if err := validateCloudParams(*provider, cloudParams); err != nil {
@@ -188,7 +189,7 @@ func combineOCSFFiles(outputDir string) error {
 }
 
 // buildCloudParams constructs CloudParams from command-line flags
-func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup, gcpProjectID string) environment.CloudParams {
+func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup, azureStorageAccount, gcpProjectID string) environment.CloudParams {
 	params := environment.CloudParams{
 		Provider: provider,
 		Region:   region,
@@ -199,6 +200,7 @@ func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup,
 	case "azure":
 		params.AzureSubscriptionID = azureSubscriptionID
 		params.AzureResourceGroup = azureResourceGroup
+		params.AzureStorageAccount = azureStorageAccount
 	case "gcp":
 		params.GCPProjectID = gcpProjectID
 	case "aws":
@@ -224,7 +226,6 @@ func validateCloudParams(provider string, cloudParams environment.CloudParams) e
 		if cloudParams.AzureResourceGroup == "" {
 			return fmt.Errorf("azure resource group is required (use --azure-resource-group flag)")
 		}
-
 	case "gcp":
 		if cloudParams.GCPProjectID == "" {
 			return fmt.Errorf("GCP project ID is required (use --gcp-project-id flag)")

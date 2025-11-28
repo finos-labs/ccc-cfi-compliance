@@ -12,6 +12,7 @@ RESOURCE_FILTER=""
 REGION=""
 AZURE_SUBSCRIPTION_ID_FLAG=""
 AZURE_RESOURCE_GROUP_FLAG=""
+AZURE_STORAGE_ACCOUNT_FLAG=""
 GCP_PROJECT_ID_FLAG=""
 
 # Parse command line arguments
@@ -45,6 +46,10 @@ while [[ $# -gt 0 ]]; do
       AZURE_RESOURCE_GROUP_FLAG="$2"
       shift 2
       ;;
+    --azure-storage-account)
+      AZURE_STORAGE_ACCOUNT_FLAG="$2"
+      shift 2
+      ;;
     --gcp-project-id)
       GCP_PROJECT_ID_FLAG="$2"
       shift 2
@@ -64,6 +69,7 @@ while [[ $# -gt 0 ]]; do
       echo "Azure-specific Options (required for Azure):"
       echo "  --azure-subscription-id ID           Azure subscription ID"
       echo "  --azure-resource-group RG            Azure resource group"
+      echo "  --azure-storage-account NAME         Azure storage account name"
       echo ""
       echo "GCP-specific Options (required for GCP):"
       echo "  --gcp-project-id PROJECT             GCP project ID"
@@ -71,10 +77,11 @@ while [[ $# -gt 0 ]]; do
       echo "  -h, --help                           Show this help message"
       echo ""
       echo "Note: All flags can also be provided via environment variables:"
-      echo "  --region                 → AWS_REGION, AZURE_LOCATION, or GCP_REGION"
-      echo "  --azure-subscription-id  → AZURE_SUBSCRIPTION_ID"
-      echo "  --azure-resource-group   → AZURE_RESOURCE_GROUP"
-      echo "  --gcp-project-id         → GCP_PROJECT_ID"
+      echo "  --region                  → AWS_REGION, AZURE_LOCATION, or GCP_REGION"
+      echo "  --azure-subscription-id   → AZURE_SUBSCRIPTION_ID"
+      echo "  --azure-resource-group    → AZURE_RESOURCE_GROUP"
+      echo "  --azure-storage-account   → AZURE_STORAGE_ACCOUNT"
+      echo "  --gcp-project-id          → GCP_PROJECT_ID"
       echo ""
       echo "Examples:"
       echo "  $0 --provider aws --region us-east-1"
@@ -98,6 +105,7 @@ done
 # Fall back to environment variables if flags not provided
 [ -z "$AZURE_SUBSCRIPTION_ID_FLAG" ] && AZURE_SUBSCRIPTION_ID_FLAG="${AZURE_SUBSCRIPTION_ID:-}"
 [ -z "$AZURE_RESOURCE_GROUP_FLAG" ] && AZURE_RESOURCE_GROUP_FLAG="${AZURE_RESOURCE_GROUP:-}"
+[ -z "$AZURE_STORAGE_ACCOUNT_FLAG" ] && AZURE_STORAGE_ACCOUNT_FLAG="${AZURE_STORAGE_ACCOUNT:-}"
 [ -z "$GCP_PROJECT_ID_FLAG" ] && GCP_PROJECT_ID_FLAG="${GCP_PROJECT_ID:-}"
 
 # Set region from flag or environment based on provider
@@ -150,6 +158,10 @@ fi
 
 if [ -n "$AZURE_RESOURCE_GROUP_FLAG" ]; then
   CMD="$CMD -azure-resource-group=\"$AZURE_RESOURCE_GROUP_FLAG\""
+fi
+
+if [ -n "$AZURE_STORAGE_ACCOUNT_FLAG" ]; then
+  CMD="$CMD -azure-storage-account=\"$AZURE_STORAGE_ACCOUNT_FLAG\""
 fi
 
 if [ -n "$GCP_PROJECT_ID_FLAG" ]; then

@@ -85,41 +85,10 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environ
 	}, nil
 }
 
-// getStorageAccountName gets the storage account to work with
-// Uses the first storage account found in the resource group, or returns an error if none exist
-func (s *AzureBlobService) getStorageAccountName() (string, error) {
-	pager := s.storageClient.NewListByResourceGroupPager(s.cloudParams.AzureResourceGroup, nil)
-
-	// Get the first page
-	if !pager.More() {
-		return "", fmt.Errorf("no storage accounts found in resource group %s", s.cloudParams.AzureResourceGroup)
-	}
-
-	page, err := pager.NextPage(s.ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to list storage accounts: %w", err)
-	}
-
-	// Use the first storage account
-	if len(page.Value) == 0 {
-		return "", fmt.Errorf("no storage accounts found in resource group %s", s.cloudParams.AzureResourceGroup)
-	}
-
-	account := page.Value[0]
-	if account.Name == nil {
-		return "", fmt.Errorf("storage account name is nil")
-	}
-
-	return *account.Name, nil
-}
-
 // ListBuckets lists all containers in the identified storage account
 // In Azure, a "bucket" is represented as "resourceGroup/storageAccount/containerName"
 func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage account: %w", err)
-	}
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	fmt.Printf("📦 Using storage account: %s\n", storageAccountName)
 
 	buckets := []Bucket{}
@@ -157,16 +126,12 @@ func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
 // CreateBucket creates a new container in the storage account
 // bucketID is the container name
 func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 	fmt.Printf("📦 Creating container %s in storage account %s...\n", containerName, storageAccountName)
 
 	// Create container in the existing storage account
-	err = s.createContainer(storageAccountName, containerName)
+	err := s.createContainer(storageAccountName, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container: %w", err)
 	}
@@ -183,11 +148,7 @@ func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
 // DeleteBucket deletes a container from the storage account
 // bucketID is the container name
 func (s *AzureBlobService) DeleteBucket(bucketID string) error {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 	fmt.Printf("🗑️  Deleting container %s from storage account %s...\n", containerName, storageAccountName)
 	return s.deleteContainer(storageAccountName, containerName)
@@ -195,11 +156,7 @@ func (s *AzureBlobService) DeleteBucket(bucketID string) error {
 
 // GetBucketRegion returns the region where the storage account is located
 func (s *AzureBlobService) GetBucketRegion(bucketID string) (string, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return "", fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	account, err := s.storageClient.GetProperties(s.ctx, s.cloudParams.AzureResourceGroup, storageAccountName, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get storage account properties: %w", err)
@@ -215,11 +172,7 @@ func (s *AzureBlobService) GetBucketRegion(bucketID string) (string, error) {
 // ListObjects lists all blobs in a container
 // bucketID is the container name
 func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 
 	// Get blob service client
@@ -264,11 +217,7 @@ func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
 // CreateObject creates a new blob in a container
 // bucketID is the container name
 func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data []string) (*Object, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 
 	// Convert []string to []byte
@@ -304,11 +253,7 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data [
 // ReadObject reads a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object, error) {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 
 	// Get blob client
@@ -350,11 +295,7 @@ func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object
 // DeleteObject deletes a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) DeleteObject(bucketID string, objectID string) error {
-	storageAccountName, err := s.getStorageAccountName()
-	if err != nil {
-		return fmt.Errorf("failed to get storage account: %w", err)
-	}
-
+	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 
 	// Get blob client
@@ -486,6 +427,12 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 
 // GetOrProvisionTestableResources returns all Azure storage containers as testable resources
 func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+	// Build the storage account resource ID for RBAC
+	storageAccountResourceID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
+		s.cloudParams.AzureSubscriptionID,
+		s.cloudParams.AzureResourceGroup,
+		s.cloudParams.AzureStorageAccount)
+
 	// List all buckets and ensure at least one container exists per storage account
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
@@ -493,11 +440,13 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 	}
 
 	// Convert containers to TestParams
+	// UID is the storage account resource ID (for RBAC scope)
+	// ResourceName is the container name (for test identification)
 	resources := make([]environment.TestParams, 0, len(buckets))
 	for _, bucket := range buckets {
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
-			UID:                 bucket.ID,
+			UID:                 storageAccountResourceID, // Use storage account resource ID for RBAC
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor"},

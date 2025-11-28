@@ -20,6 +20,7 @@ type CloudParams struct {
 	Region              string // Cloud region
 	AzureResourceGroup  string // Azure resource group name
 	AzureSubscriptionID string // Azure subscription ID
+	AzureStorageAccount string // Azure storage account name
 	GCPProjectID        string // GCP Project ID
 }
 

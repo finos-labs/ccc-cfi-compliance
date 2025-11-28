@@ -188,15 +188,8 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   Tenant ID: %s\n", identity.Credentials["tenant_id"])
 	fmt.Printf("   💡 Client secret can be used from anywhere (not just Azure)\n")
 
-	// Azure AD propagation delay: Service principals and secrets need time to replicate globally
-	// Only wait for new service principals, existing ones are already propagated
-	if !isExisting {
-		fmt.Printf("   ⏳ Waiting 15s for Azure AD propagation...\n")
-		time.Sleep(15 * time.Second)
-	} else {
-		fmt.Printf("   ⏳ Waiting 5s for secret propagation...\n")
-		time.Sleep(5 * time.Second)
-	}
+	fmt.Printf("   ⏳ Waiting 15s for Azure AD propagation (new service principal)...\n")
+	time.Sleep(15 * time.Second)
 
 	return identity, nil
 }
