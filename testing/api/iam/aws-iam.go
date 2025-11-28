@@ -429,6 +429,6 @@ func sanitizeForPolicyName(s string) string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *AWSIAMService) GetTestableResources() ([]environment.TestParams, error) {
+func (s *AWSIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
 }

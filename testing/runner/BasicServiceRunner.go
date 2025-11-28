@@ -114,9 +114,9 @@ func (r *BasicServiceRunner) Run() int {
 		log.Fatalf("Failed to get service '%s': %v", config.ServiceName, err)
 	}
 
-	// Discover resources using GetTestableResources
+	// Discover resources using GetOrProvisionTestableResources
 	log.Println("🔍 Discovering testable resources...")
-	resources, err := service.GetTestableResources()
+	resources, err := service.GetOrProvisionTestableResources()
 	if err != nil {
 		log.Fatalf("Failed to discover resources: %v", err)
 	}

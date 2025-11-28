@@ -10,6 +10,6 @@ import (
 type Service interface {
 
 	// For a given service type, return all the resources that can be tested within it,
-	// as a set of TestParams.
-	GetTestableResources() ([]environment.TestParams, error)
+	// as a set of TestParams. If no resources exist, create default ones.
+	GetOrProvisionTestableResources() ([]environment.TestParams, error)
 }

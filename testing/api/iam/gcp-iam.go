@@ -404,6 +404,6 @@ func sanitizeServiceAccountID(userName string) string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *GCPIAMService) GetTestableResources() ([]environment.TestParams, error) {
+func (s *GCPIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -95,37 +96,61 @@ func getAzureTenantID() string {
 	return "" // Will be populated when we make Graph API calls
 }
 
-// ProvisionUser creates a new service principal with a client secret
+// ProvisionUser creates a new service principal with a client secret, or returns existing one
 func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	// Service principal display names can be more flexible than managed identity names
 	displayName := sanitizeServicePrincipalName(userName)
 
-	fmt.Printf("🔷 Creating service principal: %s\n", displayName)
+	fmt.Printf("🔷 Provisioning service principal: %s\n", displayName)
 
-	// Step 1: Create an Azure AD application
-	appID, objectID, err := s.createApplication(displayName)
+	// Check if application already exists
+	existingAppID, existingObjectID, err := s.findApplicationByDisplayName(displayName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create application: %w", err)
+		return nil, fmt.Errorf("failed to check for existing application: %w", err)
 	}
 
-	fmt.Printf("   📱 Application created: %s (ObjectID: %s)\n", appID, objectID)
+	var appID, objectID, spObjectID string
+	var isExisting bool
 
-	// Step 2: Create a service principal for the application
-	spObjectID, err := s.createServicePrincipal(appID)
-	if err != nil {
-		// Try to clean up the application if service principal creation fails
-		_ = s.deleteApplication(objectID)
-		return nil, fmt.Errorf("failed to create service principal: %w", err)
+	if existingAppID != "" {
+		// Application already exists
+		fmt.Printf("   ℹ️  Application already exists: %s\n", existingAppID)
+		appID = existingAppID
+		objectID = existingObjectID
+		isExisting = true
+
+		// Get or create service principal for existing app
+		spObjectID, err = s.getOrCreateServicePrincipal(appID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get service principal: %w", err)
+		}
+	} else {
+		// Create new application
+		fmt.Printf("   📱 Creating new application...\n")
+		appID, objectID, err = s.createApplication(displayName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create application: %w", err)
+		}
+		fmt.Printf("   📱 Application created: %s (ObjectID: %s)\n", appID, objectID)
+
+		// Create service principal for the application
+		spObjectID, err = s.createServicePrincipal(appID)
+		if err != nil {
+			// Try to clean up the application if service principal creation fails
+			_ = s.deleteApplication(objectID)
+			return nil, fmt.Errorf("failed to create service principal: %w", err)
+		}
+		fmt.Printf("   🔑 Service principal created (ObjectID: %s)\n", spObjectID)
 	}
 
-	fmt.Printf("   🔑 Service principal created (ObjectID: %s)\n", spObjectID)
-
-	// Step 3: Create a client secret
+	// Always create a new client secret (we can't retrieve existing ones)
 	clientSecret, secretID, err := s.addApplicationPassword(objectID, displayName)
 	if err != nil {
-		// Try to clean up on failure
-		_ = s.deleteServicePrincipal(spObjectID)
-		_ = s.deleteApplication(objectID)
+		if !isExisting {
+			// Clean up if this was a new resource
+			_ = s.deleteServicePrincipal(spObjectID)
+			_ = s.deleteApplication(objectID)
+		}
 		return nil, fmt.Errorf("failed to create client secret: %w", err)
 	}
 
@@ -154,13 +179,24 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	identity.Credentials["subscription_id"] = s.cloudParams.AzureSubscriptionID
 	identity.Credentials["display_name"] = displayName
 
-	fmt.Printf("✅ Provisioned service principal: %s\n", userName)
+	if isExisting {
+		fmt.Printf("✅ Using existing service principal with new secret: %s\n", userName)
+	} else {
+		fmt.Printf("✅ Provisioned new service principal: %s\n", userName)
+	}
 	fmt.Printf("   Client ID: %s\n", identity.Credentials["client_id"])
 	fmt.Printf("   Tenant ID: %s\n", identity.Credentials["tenant_id"])
 	fmt.Printf("   💡 Client secret can be used from anywhere (not just Azure)\n")
 
-	// Small delay to allow Azure AD propagation
-	time.Sleep(2 * time.Second)
+	// Azure AD propagation delay: Service principals and secrets need time to replicate globally
+	// Only wait for new service principals, existing ones are already propagated
+	if !isExisting {
+		fmt.Printf("   ⏳ Waiting 15s for Azure AD propagation...\n")
+		time.Sleep(15 * time.Second)
+	} else {
+		fmt.Printf("   ⏳ Waiting 5s for secret propagation...\n")
+		time.Sleep(5 * time.Second)
+	}
 
 	return identity, nil
 }
@@ -211,6 +247,11 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	}
 
 	fmt.Printf("   ✅ Access granted\n")
+
+	// Azure RBAC propagation delay: Role assignments need time to take effect
+	fmt.Printf("   ⏳ Waiting 10s for RBAC propagation...\n")
+	time.Sleep(10 * time.Second)
+
 	return nil
 }
 
@@ -375,7 +416,7 @@ func toPtr(s string) *string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *AzureIAMService) GetTestableResources() ([]environment.TestParams, error) {
+func (s *AzureIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
 }
 
@@ -522,4 +563,62 @@ func (s *AzureIAMService) getActualTenantID() (string, error) {
 	}
 
 	return "", fmt.Errorf("failed to extract tenant ID from organization response")
+}
+
+func (s *AzureIAMService) findApplicationByDisplayName(displayName string) (appID, objectID string, err error) {
+	// Search for applications by display name
+	filter := fmt.Sprintf("displayName eq '%s'", displayName)
+	endpoint := fmt.Sprintf("/applications?$filter=%s", url.QueryEscape(filter))
+
+	result, err := s.callGraphAPI("GET", endpoint, nil)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Check if any applications were found
+	if value, ok := result["value"].([]interface{}); ok && len(value) > 0 {
+		if app, ok := value[0].(map[string]interface{}); ok {
+			appID, _ = app["appId"].(string)
+			objectID, _ = app["id"].(string)
+
+			if appID != "" && objectID != "" {
+				return appID, objectID, nil
+			}
+		}
+	}
+
+	// No application found
+	return "", "", nil
+}
+
+func (s *AzureIAMService) getOrCreateServicePrincipal(appID string) (objectID string, err error) {
+	// Try to find existing service principal
+	filter := fmt.Sprintf("appId eq '%s'", appID)
+	endpoint := fmt.Sprintf("/servicePrincipals?$filter=%s", url.QueryEscape(filter))
+
+	result, err := s.callGraphAPI("GET", endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if service principal exists
+	if value, ok := result["value"].([]interface{}); ok && len(value) > 0 {
+		if sp, ok := value[0].(map[string]interface{}); ok {
+			objectID, _ = sp["id"].(string)
+			if objectID != "" {
+				fmt.Printf("   ℹ️  Service principal already exists (ObjectID: %s)\n", objectID)
+				return objectID, nil
+			}
+		}
+	}
+
+	// Service principal doesn't exist, create it
+	fmt.Printf("   🔑 Creating service principal...\n")
+	objectID, err = s.createServicePrincipal(appID)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Printf("   🔑 Service principal created (ObjectID: %s)\n", objectID)
+	return objectID, nil
 }

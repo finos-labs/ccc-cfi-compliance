@@ -292,8 +292,8 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 	return []Bucket{*bucket}, nil
 }
 
-// GetTestableResources returns all S3 buckets as testable resources
-func (s *AWSS3Service) GetTestableResources() ([]environment.TestParams, error) {
+// GetOrProvisionTestableResources returns all S3 buckets as testable resources
+func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// List all buckets and ensure at least one exists
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
