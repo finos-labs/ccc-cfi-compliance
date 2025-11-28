@@ -216,7 +216,9 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	// Parse the scope from serviceID
 	scope := s.parseScope(serviceID)
 
-	fmt.Printf("🔐 Granting %s access to %s for service principal %s...\n", level, scope, objectID)
+	fmt.Printf("🔐 Granting %s access for service principal %s\n", level, objectID)
+	fmt.Printf("   Scope: %s\n", scope)
+	fmt.Printf("   Role: %s\n", roleDefinitionID)
 
 	// Create a unique name for the role assignment
 	roleAssignmentName := uuid.New().String()
@@ -242,8 +244,9 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	fmt.Printf("   ✅ Access granted\n")
 
 	// Azure RBAC propagation delay: Role assignments need time to take effect
-	fmt.Printf("   ⏳ Waiting 10s for RBAC propagation...\n")
-	time.Sleep(10 * time.Second)
+	// Data plane permissions can take 30-60 seconds to propagate
+	fmt.Printf("   ⏳ Waiting 30s for RBAC propagation...\n")
+	time.Sleep(30 * time.Second)
 
 	return nil
 }

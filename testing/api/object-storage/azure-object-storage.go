@@ -427,11 +427,18 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 
 // GetOrProvisionTestableResources returns all Azure storage containers as testable resources
 func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+	// Validate that storage account name is set
+	if s.cloudParams.AzureStorageAccount == "" {
+		return nil, fmt.Errorf("AzureStorageAccount not set in CloudParams")
+	}
+
 	// Build the storage account resource ID for RBAC
 	storageAccountResourceID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
 		s.cloudParams.AzureSubscriptionID,
 		s.cloudParams.AzureResourceGroup,
 		s.cloudParams.AzureStorageAccount)
+
+	fmt.Printf("   Storage Account Resource ID for RBAC: %s\n", storageAccountResourceID)
 
 	// List all buckets and ensure at least one container exists per storage account
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
