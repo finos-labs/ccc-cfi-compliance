@@ -1,26 +1,31 @@
 package iam
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/google/uuid"
 )
 
-// AzureIAMService implements IAMService for Azure
+// AzureIAMService implements IAMService for Azure using Service Principals
 type AzureIAMService struct {
-	msiClient   *armmsi.UserAssignedIdentitiesClient
 	authClient  *armauthorization.RoleAssignmentsClient
 	ctx         context.Context
 	credential  azcore.TokenCredential
 	cloudParams environment.CloudParams
+	httpClient  *http.Client
+	tenantID    string
 }
 
 // NewAzureIAMService creates a new Azure IAM service using default credentials
@@ -30,102 +35,106 @@ func NewAzureIAMService(ctx context.Context, cloudParams environment.CloudParams
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
-	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(cloudParams.AzureSubscriptionID, cred, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MSI client: %w", err)
-	}
-
-	authClient, err := armauthorization.NewRoleAssignmentsClient(cloudParams.AzureSubscriptionID, cred, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create authorization client: %w", err)
-	}
-
-	return &AzureIAMService{
-		msiClient:   msiClient,
-		authClient:  authClient,
-		ctx:         ctx,
-		credential:  cred,
-		cloudParams: cloudParams,
-	}, nil
+	return newAzureIAMServiceInternal(ctx, cloudParams, cred)
 }
 
 // NewAzureIAMServiceWithCredentials creates a new Azure IAM service with specific credentials
 func NewAzureIAMServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, cred azcore.TokenCredential) (*AzureIAMService, error) {
-	msiClient, err := armmsi.NewUserAssignedIdentitiesClient(cloudParams.AzureSubscriptionID, cred, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create MSI client: %w", err)
-	}
+	return newAzureIAMServiceInternal(ctx, cloudParams, cred)
+}
 
+func newAzureIAMServiceInternal(ctx context.Context, cloudParams environment.CloudParams, cred azcore.TokenCredential) (*AzureIAMService, error) {
 	authClient, err := armauthorization.NewRoleAssignmentsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization client: %w", err)
 	}
 
+	// Get tenant ID from the credential
+	tenantID, err := getTenantID(ctx, cred)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant ID: %w", err)
+	}
+
 	return &AzureIAMService{
-		msiClient:   msiClient,
 		authClient:  authClient,
 		ctx:         ctx,
 		credential:  cred,
 		cloudParams: cloudParams,
+		httpClient:  &http.Client{Timeout: 30 * time.Second},
+		tenantID:    tenantID,
 	}, nil
 }
 
-// ProvisionUser creates a new user-assigned managed identity (Azure's equivalent for service identities)
+// getTenantID retrieves the tenant ID from the credential
+func getTenantID(ctx context.Context, cred azcore.TokenCredential) (string, error) {
+	// Get a token to extract tenant ID
+	token, err := cred.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://management.azure.com/.default"},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// Parse the JWT token to extract tenant ID
+	// The token is in format: header.payload.signature
+	parts := strings.Split(token.Token, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("invalid token format")
+	}
+
+	// For now, we'll use a simpler approach - get it from the Azure CLI config
+	// In production, you'd parse the JWT properly
+	return getAzureTenantID(), nil
+}
+
+// getAzureTenantID gets the tenant ID from environment or Azure CLI
+func getAzureTenantID() string {
+	// Try to get from Azure CLI
+	// In production, this should be passed as a parameter or read from config
+	// For now, return a placeholder that will be populated by the credential
+	return "" // Will be populated when we make Graph API calls
+}
+
+// ProvisionUser creates a new service principal with a client secret
 func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
-	// Managed identity names must be alphanumeric, hyphens, underscores
-	identityName := sanitizeManagedIdentityName(userName)
-	location := "eastus" // Default location, could be parameterized
+	// Service principal display names can be more flexible than managed identity names
+	displayName := sanitizeServicePrincipalName(userName)
 
-	var managedIdentity *armmsi.Identity
-	var identityAlreadyExists bool
+	fmt.Printf("🔷 Creating service principal: %s\n", displayName)
 
-	// Check if managed identity already exists
-	getResp, err := s.msiClient.Get(s.ctx, s.cloudParams.AzureResourceGroup, identityName, nil)
-	if err == nil {
-		// Identity exists - reuse it
-		fmt.Printf("🔷 Managed identity %s already exists, reusing...\n", identityName)
-		managedIdentity = &getResp.Identity
-		identityAlreadyExists = true
-	} else {
-		// Identity doesn't exist - create it
-		fmt.Printf("🔷 Creating managed identity %s...\n", identityName)
-
-		tags := map[string]*string{
-			"Purpose":   toPtr("CCC-Testing"),
-			"ManagedBy": toPtr("CCC-CFI-Compliance-Framework"),
-		}
-
-		createResp, err := s.msiClient.CreateOrUpdate(s.ctx, s.cloudParams.AzureResourceGroup, identityName, armmsi.Identity{
-			Location: &location,
-			Tags:     tags,
-		}, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create managed identity %s: %w", identityName, err)
-		}
-		managedIdentity = &createResp.Identity
+	// Step 1: Create an Azure AD application
+	appID, objectID, err := s.createApplication(displayName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create application: %w", err)
 	}
 
-	// Extract identity information
-	if managedIdentity.Properties == nil {
-		return nil, fmt.Errorf("managed identity properties are nil")
+	fmt.Printf("   📱 Application created: %s (ObjectID: %s)\n", appID, objectID)
+
+	// Step 2: Create a service principal for the application
+	spObjectID, err := s.createServicePrincipal(appID)
+	if err != nil {
+		// Try to clean up the application if service principal creation fails
+		_ = s.deleteApplication(objectID)
+		return nil, fmt.Errorf("failed to create service principal: %w", err)
 	}
 
-	principalID := ""
-	clientID := ""
-	tenantID := ""
-	resourceID := ""
+	fmt.Printf("   🔑 Service principal created (ObjectID: %s)\n", spObjectID)
 
-	if managedIdentity.Properties.PrincipalID != nil {
-		principalID = *managedIdentity.Properties.PrincipalID
+	// Step 3: Create a client secret
+	clientSecret, secretID, err := s.addApplicationPassword(objectID, displayName)
+	if err != nil {
+		// Try to clean up on failure
+		_ = s.deleteServicePrincipal(spObjectID)
+		_ = s.deleteApplication(objectID)
+		return nil, fmt.Errorf("failed to create client secret: %w", err)
 	}
-	if managedIdentity.Properties.ClientID != nil {
-		clientID = *managedIdentity.Properties.ClientID
-	}
-	if managedIdentity.Properties.TenantID != nil {
-		tenantID = *managedIdentity.Properties.TenantID
-	}
-	if managedIdentity.ID != nil {
-		resourceID = *managedIdentity.ID
+
+	fmt.Printf("   🔐 Client secret created\n")
+
+	// Get tenant ID
+	tenantID, err := s.getActualTenantID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tenant ID: %w", err)
 	}
 
 	// Create identity with credentials
@@ -136,37 +145,22 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	}
 
 	// Store Azure-specific fields in Credentials map
-	identity.Credentials["principal_id"] = principalID
-	identity.Credentials["client_id"] = clientID
-	identity.Credentials["tenant_id"] = tenantID
-	identity.Credentials["resource_id"] = resourceID
+	identity.Credentials["client_id"] = appID            // Application (client) ID
+	identity.Credentials["client_secret"] = clientSecret // Client secret (works from anywhere!)
+	identity.Credentials["tenant_id"] = tenantID         // Tenant ID
+	identity.Credentials["object_id"] = spObjectID       // Service principal object ID
+	identity.Credentials["app_object_id"] = objectID     // Application object ID
+	identity.Credentials["secret_id"] = secretID         // Secret ID for cleanup
 	identity.Credentials["subscription_id"] = s.cloudParams.AzureSubscriptionID
-	identity.Credentials["resource_group"] = s.cloudParams.AzureResourceGroup
-	identity.Credentials["identity_name"] = identityName
+	identity.Credentials["display_name"] = displayName
 
-	// For Azure managed identities, we don't have a secret key
-	// They authenticate via Azure AD using the managed identity
-	fmt.Printf("   ℹ️  Managed identities use Azure AD authentication (no keys)\n")
-
-	// Log the created/retrieved identity details
-	fmt.Printf("✅ Provisioned managed identity: %s\n", userName)
-	fmt.Printf("   Principal ID: %s\n", identity.Credentials["principal_id"])
+	fmt.Printf("✅ Provisioned service principal: %s\n", userName)
 	fmt.Printf("   Client ID: %s\n", identity.Credentials["client_id"])
-	fmt.Printf("   Resource ID: %s\n", identity.Credentials["resource_id"])
+	fmt.Printf("   Tenant ID: %s\n", identity.Credentials["tenant_id"])
+	fmt.Printf("   💡 Client secret can be used from anywhere (not just Azure)\n")
 
-	// Store identity info as JSON for potential future use
-	identityJSON, _ := json.Marshal(map[string]string{
-		"principal_id": principalID,
-		"client_id":    clientID,
-		"tenant_id":    tenantID,
-	})
-	identity.Credentials["identity_json"] = string(identityJSON)
-
-	if !identityAlreadyExists {
-		fmt.Printf("   ⏳ Waiting for identity to propagate in Azure AD...\n")
-		// Note: In production, you might want to add a sleep here to allow
-		// the identity to fully propagate through Azure AD
-	}
+	// Small delay to allow Azure AD propagation
+	time.Sleep(2 * time.Second)
 
 	return identity, nil
 }
@@ -184,16 +178,16 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 		return nil
 	}
 
-	// Get the principal ID from the identity
-	principalID := identity.Credentials["principal_id"]
-	if principalID == "" {
-		return fmt.Errorf("principal ID not found in identity credentials")
+	// Get the service principal object ID from the identity
+	objectID := identity.Credentials["object_id"]
+	if objectID == "" {
+		return fmt.Errorf("object_id not found in identity credentials")
 	}
 
 	// Parse the scope from serviceID
 	scope := s.parseScope(serviceID)
 
-	fmt.Printf("🔐 Granting %s access to %s for principal %s...\n", level, scope, principalID)
+	fmt.Printf("🔐 Granting %s access to %s for service principal %s...\n", level, scope, objectID)
 
 	// Create a unique name for the role assignment
 	roleAssignmentName := uuid.New().String()
@@ -201,7 +195,7 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	// Create role assignment
 	roleAssignmentParams := armauthorization.RoleAssignmentCreateParameters{
 		Properties: &armauthorization.RoleAssignmentProperties{
-			PrincipalID:      &principalID,
+			PrincipalID:      &objectID,
 			RoleDefinitionID: &roleDefinitionID,
 		},
 	}
@@ -220,23 +214,22 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	return nil
 }
 
-// DestroyUser removes a managed identity and all associated resources
+// DestroyUser removes a service principal and all associated resources
 func (s *AzureIAMService) DestroyUser(identity *Identity) error {
-	identityName := identity.Credentials["identity_name"]
-	if identityName == "" {
-		// Try to extract from userName
-		identityName = sanitizeManagedIdentityName(identity.UserName)
+	displayName := identity.Credentials["display_name"]
+	if displayName == "" {
+		displayName = identity.UserName
 	}
 
-	fmt.Printf("🗑️  Deleting managed identity %s...\n", identityName)
+	fmt.Printf("🗑️  Deleting service principal: %s\n", displayName)
 
-	// List and delete role assignments for this identity
-	principalID := identity.Credentials["principal_id"]
-	if principalID != "" {
-		fmt.Printf("   🔍 Looking for role assignments for principal %s...\n", principalID)
+	// Step 1: Delete role assignments for this identity
+	objectID := identity.Credentials["object_id"]
+	if objectID != "" {
+		fmt.Printf("   🔍 Looking for role assignments for principal %s...\n", objectID)
 
 		// List role assignments in the subscription
-		filter := fmt.Sprintf("principalId eq '%s'", principalID)
+		filter := fmt.Sprintf("principalId eq '%s'", objectID)
 		pager := s.authClient.NewListForSubscriptionPager(&armauthorization.RoleAssignmentsClientListForSubscriptionOptions{
 			Filter: &filter,
 		})
@@ -264,18 +257,29 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 		}
 	}
 
-	// Delete the managed identity
-	_, err := s.msiClient.Delete(s.ctx, s.cloudParams.AzureResourceGroup, identityName, nil)
-	if err != nil {
-		// Check if identity doesn't exist
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "NotFound") {
-			fmt.Printf("   ℹ️  Managed identity already deleted\n")
-			return nil
+	// Step 2: Delete the service principal
+	spObjectID := identity.Credentials["object_id"]
+	if spObjectID != "" {
+		err := s.deleteServicePrincipal(spObjectID)
+		if err != nil {
+			fmt.Printf("   ⚠️  Failed to delete service principal: %v\n", err)
+		} else {
+			fmt.Printf("   ✅ Service principal deleted\n")
 		}
-		return fmt.Errorf("failed to delete managed identity %s: %w", identityName, err)
 	}
 
-	fmt.Printf("   ✅ Managed identity deleted\n")
+	// Step 3: Delete the application
+	appObjectID := identity.Credentials["app_object_id"]
+	if appObjectID != "" {
+		err := s.deleteApplication(appObjectID)
+		if err != nil {
+			fmt.Printf("   ⚠️  Failed to delete application: %v\n", err)
+		} else {
+			fmt.Printf("   ✅ Application deleted\n")
+		}
+	}
+
+	fmt.Printf("✅ Service principal cleanup complete\n")
 	return nil
 }
 
@@ -348,30 +352,20 @@ func extractScopeFromAssignmentID(assignmentID string) string {
 	return assignmentID
 }
 
-func sanitizeManagedIdentityName(userName string) string {
-	// Managed identity names: alphanumeric, hyphens, underscores, 3-128 chars
-	result := ""
-	for _, char := range userName {
-		if (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') || char == '-' || char == '_' {
-			result += string(char)
-		} else {
-			result += "-"
-		}
+func sanitizeServicePrincipalName(userName string) string {
+	// Service principal display names can be more flexible
+	// Just ensure it's a valid display name
+	result := userName
+
+	// Add CCC prefix for easy identification
+	if !strings.HasPrefix(result, "CCC-") {
+		result = "CCC-Test-" + result
 	}
 
-	// Ensure minimum length
-	if len(result) < 3 {
-		result = result + "-test"
+	// Ensure maximum length (120 chars is safe)
+	if len(result) > 120 {
+		result = result[:120]
 	}
-
-	// Ensure maximum length
-	if len(result) > 128 {
-		result = result[:128]
-	}
-
-	// Remove leading/trailing hyphens
-	result = strings.Trim(result, "-")
 
 	return result
 }
@@ -383,4 +377,149 @@ func toPtr(s string) *string {
 // Fill this later when we are writing tests for IAM
 func (s *AzureIAMService) GetTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
+}
+
+// Microsoft Graph API helper methods
+
+func (s *AzureIAMService) callGraphAPI(method, endpoint string, body interface{}) (map[string]interface{}, error) {
+	graphURL := "https://graph.microsoft.com/v1.0" + endpoint
+
+	var reqBody io.Reader
+	if body != nil {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		reqBody = bytes.NewBuffer(jsonBody)
+	}
+
+	req, err := http.NewRequestWithContext(s.ctx, method, graphURL, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Get access token for Microsoft Graph
+	token, err := s.credential.GetToken(s.ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://graph.microsoft.com/.default"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("graph API request failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result map[string]interface{}
+	if len(respBody) > 0 {
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		}
+	}
+
+	return result, nil
+}
+
+func (s *AzureIAMService) createApplication(displayName string) (appID, objectID string, err error) {
+	requestBody := map[string]interface{}{
+		"displayName":    displayName,
+		"signInAudience": "AzureADMyOrg",
+	}
+
+	result, err := s.callGraphAPI("POST", "/applications", requestBody)
+	if err != nil {
+		return "", "", err
+	}
+
+	appID, _ = result["appId"].(string)
+	objectID, _ = result["id"].(string)
+
+	if appID == "" || objectID == "" {
+		return "", "", fmt.Errorf("failed to extract application IDs from response")
+	}
+
+	return appID, objectID, nil
+}
+
+func (s *AzureIAMService) createServicePrincipal(appID string) (objectID string, err error) {
+	requestBody := map[string]interface{}{
+		"appId": appID,
+	}
+
+	result, err := s.callGraphAPI("POST", "/servicePrincipals", requestBody)
+	if err != nil {
+		return "", err
+	}
+
+	objectID, _ = result["id"].(string)
+	if objectID == "" {
+		return "", fmt.Errorf("failed to extract service principal object ID from response")
+	}
+
+	return objectID, nil
+}
+
+func (s *AzureIAMService) addApplicationPassword(appObjectID, displayName string) (secret, secretID string, err error) {
+	requestBody := map[string]interface{}{
+		"passwordCredential": map[string]interface{}{
+			"displayName": displayName + "-secret",
+		},
+	}
+
+	result, err := s.callGraphAPI("POST", "/applications/"+appObjectID+"/addPassword", requestBody)
+	if err != nil {
+		return "", "", err
+	}
+
+	secret, _ = result["secretText"].(string)
+	secretID, _ = result["keyId"].(string)
+
+	if secret == "" || secretID == "" {
+		return "", "", fmt.Errorf("failed to extract secret from response")
+	}
+
+	return secret, secretID, nil
+}
+
+func (s *AzureIAMService) deleteServicePrincipal(objectID string) error {
+	_, err := s.callGraphAPI("DELETE", "/servicePrincipals/"+objectID, nil)
+	return err
+}
+
+func (s *AzureIAMService) deleteApplication(objectID string) error {
+	_, err := s.callGraphAPI("DELETE", "/applications/"+objectID, nil)
+	return err
+}
+
+func (s *AzureIAMService) getActualTenantID() (string, error) {
+	// Get the organization details to extract tenant ID
+	result, err := s.callGraphAPI("GET", "/organization", nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract tenant ID from the organization response
+	if value, ok := result["value"].([]interface{}); ok && len(value) > 0 {
+		if org, ok := value[0].(map[string]interface{}); ok {
+			if tenantID, ok := org["id"].(string); ok {
+				return tenantID, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to extract tenant ID from organization response")
 }

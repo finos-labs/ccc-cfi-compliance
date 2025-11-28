@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -265,10 +266,36 @@ func (s *AWSS3Service) GetBucketRegion(bucketID string) (string, error) {
 	return region, nil
 }
 
+// EnsureDefaultResourceExists ensures at least one S3 bucket exists for testing
+// Takes the result of ListBuckets() and creates a default bucket if none exist
+func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) ([]Bucket, error) {
+	// If there was an error listing buckets, return it
+	if err != nil {
+		return nil, err
+	}
+
+	// If buckets exist, return them as-is
+	if len(buckets) > 0 {
+		return buckets, nil
+	}
+
+	// Create a default test bucket
+	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(s.cloudParams.Region))
+	fmt.Printf("📦 No buckets found. Creating default test bucket: %s\n", defaultBucketName)
+
+	bucket, err := s.CreateBucket(defaultBucketName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create default bucket: %w", err)
+	}
+
+	fmt.Printf("✅ Default bucket created successfully\n")
+	return []Bucket{*bucket}, nil
+}
+
 // GetTestableResources returns all S3 buckets as testable resources
 func (s *AWSS3Service) GetTestableResources() ([]environment.TestParams, error) {
-	// List all buckets
-	buckets, err := s.ListBuckets()
+	// List all buckets and ensure at least one exists
+	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
