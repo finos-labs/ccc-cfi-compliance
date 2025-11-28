@@ -33,20 +33,26 @@ func NewTestSuite() *TestSuite {
 }
 
 // setupServiceParams sets up parameters for service tests
-func (suite *TestSuite) setupServiceParams(params environment.TestParams) {
-	// Reset Props and AsyncManager, but keep the same CloudWorld instance
-	// so the formatter can access attachments from the previous scenario
-	suite.Props = make(map[string]interface{})
-	suite.AsyncManager = generic.NewAsyncTaskManager()
-
-	// Use reflection to automatically populate all fields from TestParams
+// Accepts any struct and populates Props using reflection
+func (suite *TestSuite) setupServiceParams(params any) {
+	// Use reflection to automatically populate all fields from the params struct
 	v := reflect.ValueOf(params)
-	t := v.Type()
 
+	// Handle pointer to struct
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// Only process if it's a struct
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		field := t.Field(i)
 		value := v.Field(i)
-		suite.Props[field.Name] = value.Interface()
+		suite.Props[field.Name] = value.Interface() // Use .Interface() to get the actual value, not reflect.Value
 	}
 }
 
@@ -54,7 +60,10 @@ func (suite *TestSuite) setupServiceParams(params environment.TestParams) {
 func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, params environment.TestParams) {
 	// Setup before each scenario
 	sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
+		suite.Props = make(map[string]interface{})
+		suite.AsyncManager = generic.NewAsyncTaskManager()
 		suite.setupServiceParams(params)
+		suite.setupServiceParams(params.CloudParams)
 		return ctx, nil
 	})
 

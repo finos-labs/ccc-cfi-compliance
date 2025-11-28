@@ -264,19 +264,6 @@ func formatStepArgument(arg *messages.PickleStepArgument) string {
 	return buf.String()
 }
 
-// addSpacesToCamelCase converts camel case to space-separated words
-// e.g., "PortNumber" -> "Port Number"
-func addSpacesToCamelCase(s string) string {
-	var result strings.Builder
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			result.WriteRune(' ')
-		}
-		result.WriteRune(r)
-	}
-	return result.String()
-}
-
 // formatAttachments renders attachments as HTML
 func formatAttachments(attachments []attachments.Attachment) string {
 	if len(attachments) == 0 {
@@ -315,45 +302,74 @@ func formatAttachments(attachments []attachments.Attachment) string {
 }
 
 // generateHTML creates the HTML report using stats and bodyBuffer
+// appendStructFieldsToTable appends struct fields to the table builder using reflection
+// skipFieldName allows skipping a specific field (e.g., "CloudParams" to avoid duplication)
+func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v reflect.Value, skipFieldName string) {
+	// Handle pointer to struct
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// Only process if it's a struct
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+
+		// Skip the specified field if provided
+		if skipFieldName != "" && field.Name == skipFieldName {
+			continue
+		}
+
+		// Format the value based on its type
+		var valueStr string
+		switch value.Kind() {
+		case reflect.Slice:
+			// Handle slice types (like Labels, CatalogTypes)
+			if value.Len() > 0 {
+				items := make([]string, value.Len())
+				for j := 0; j < value.Len(); j++ {
+					items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
+				}
+				valueStr = strings.Join(items, ", ")
+			} else {
+				valueStr = ""
+			}
+		case reflect.Struct:
+			// Skip nested structs (like CloudParams) - they should be handled separately
+			continue
+		default:
+			valueStr = fmt.Sprintf("%v", value.Interface())
+		}
+
+		// Only add non-empty values
+		if valueStr != "" {
+			tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
+		}
+	}
+}
+
 func (f *HTMLFormatter) generateHTML() string {
 	totalRunTime := f.stats.endTime.Sub(f.stats.startTime)
 	passedScenarios := f.stats.totalScenarios - f.stats.failedScenarios
 
 	// Generate test parameters table if params are available
 	paramsTable := ""
-	if f.params != nil && (f.params.HostName != "" || f.params.UID != "") {
+	if f.params != nil {
 		var tableRows strings.Builder
 
-		// Use reflection to iterate through struct fields
+		// Add main params fields (excluding CloudParams to avoid duplication)
 		v := reflect.ValueOf(*f.params)
-		t := v.Type()
+		f.appendStructFieldsToTable(&tableRows, v, "CloudParams")
 
-		for i := 0; i < v.NumField(); i++ {
-			field := t.Field(i)
-			value := v.Field(i)
-
-			// Format the value based on its type
-			var valueStr string
-			switch value.Kind() {
-			case reflect.Slice:
-				// Handle slice types (like Labels)
-				if value.Len() > 0 {
-					items := make([]string, value.Len())
-					for j := 0; j < value.Len(); j++ {
-						items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
-					}
-					valueStr = strings.Join(items, ", ")
-				} else {
-					valueStr = ""
-				}
-			default:
-				valueStr = fmt.Sprintf("%v", value.Interface())
-			}
-
-			// Only add non-empty values
-			if valueStr != "" {
-				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
-			}
+		// Add CloudParams fields separately
+		cloudParamsField := v.FieldByName("CloudParams")
+		if cloudParamsField.IsValid() {
+			f.appendStructFieldsToTable(&tableRows, cloudParamsField, "")
 		}
 
 		if tableRows.Len() > 0 {

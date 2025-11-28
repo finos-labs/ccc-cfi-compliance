@@ -189,17 +189,33 @@ func combineOCSFFiles(outputDir string) error {
 
 // buildCloudParams constructs CloudParams from command-line flags
 func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup, gcpProjectID string) environment.CloudParams {
-	return environment.CloudParams{
-		Provider:            provider,
-		Region:              region,
-		AzureSubscriptionID: azureSubscriptionID,
-		AzureResourceGroup:  azureResourceGroup,
-		GCPProjectID:        gcpProjectID,
+	params := environment.CloudParams{
+		Provider: provider,
+		Region:   region,
 	}
+
+	// Only set provider-specific fields
+	switch provider {
+	case "azure":
+		params.AzureSubscriptionID = azureSubscriptionID
+		params.AzureResourceGroup = azureResourceGroup
+	case "gcp":
+		params.GCPProjectID = gcpProjectID
+	case "aws":
+		// AWS only needs Provider and Region
+	}
+
+	return params
 }
 
 // validateCloudParams validates that required parameters are set for the provider
 func validateCloudParams(provider string, cloudParams environment.CloudParams) error {
+	// Region is required for all providers
+	if cloudParams.Region == "" {
+		return fmt.Errorf("region is required (use --region flag)")
+	}
+
+	// Provider-specific validation
 	switch provider {
 	case "azure":
 		if cloudParams.AzureSubscriptionID == "" {

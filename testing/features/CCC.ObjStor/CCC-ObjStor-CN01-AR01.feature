@@ -21,7 +21,7 @@ Feature: CCC.ObjStor.CN01.AR01
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     And we wait for a period of "10000" ms
-    When I call "{userStorage}" with "ListObjects" with parameters "{ResourceName}" and "{Region}"
+    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "untrusted-list-error.txt"
 
@@ -36,6 +36,6 @@ Feature: CCC.ObjStor.CN01.AR01
     And I attach "{result}" to the test output as "trusted-storage-service.json"
     And I refer to "{result}" as "userStorage"
     And we wait for a period of "10000" ms
-    When I call "{userStorage}" with "ListObjects" with parameters "{ResourceName}" and "{Region}"
+    When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "trusted-list-objects-result.json"
