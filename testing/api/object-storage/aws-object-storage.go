@@ -169,22 +169,19 @@ func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 }
 
 // CreateObject creates a new object in a bucket
-func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data []string) (*Object, error) {
+func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
 	regionalConfig.Region = s.cloudParams.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
-	// Convert []string to []byte
-	var content bytes.Buffer
-	for _, line := range data {
-		content.WriteString(line)
-	}
+	// Convert string to []byte
+	content := []byte(data)
 
 	_, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
-		Body:   bytes.NewReader(content.Bytes()),
+		Body:   bytes.NewReader(content),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create object %s in bucket %s: %w", objectID, bucketID, err)
@@ -194,8 +191,8 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data []str
 		ID:       objectID,
 		BucketID: bucketID,
 		Name:     objectID,
-		Size:     int64(content.Len()),
-		Data:     data,
+		Size:     int64(len(content)),
+		Data:     []string{data},
 	}, nil
 }
 

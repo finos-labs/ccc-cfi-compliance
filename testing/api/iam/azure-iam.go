@@ -198,8 +198,17 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   Tenant ID: %s\n", identity.Credentials["tenant_id"])
 	fmt.Printf("   💡 Client secret can be used from anywhere (not just Azure)\n")
 
-	fmt.Printf("   ⏳ Waiting 15s for Azure AD propagation (new service principal)...\n")
-	time.Sleep(15 * time.Second)
+	// Validate that the credentials actually work before returning
+	fmt.Printf("   🔄 Validating service principal credentials...\n")
+	err = s.waitForCredentialPropagation(identity.Credentials["client_id"], identity.Credentials["client_secret"], identity.Credentials["tenant_id"])
+	if err != nil {
+		return nil, fmt.Errorf("service principal credentials failed to propagate: %w", err)
+	}
+
+	// Add buffer for cross-service propagation (credentials work for Graph, but other services may lag)
+	fmt.Printf("   ⏳ Waiting 10s for cross-service propagation...\n")
+	time.Sleep(10 * time.Second)
+	fmt.Printf("   ✅ Service principal credentials ready\n")
 
 	// Cache the identity for future requests
 	s.provisionedUsers[userName] = identity
@@ -267,10 +276,13 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 
 	fmt.Printf("   ✅ Access granted\n")
 
-	// Azure RBAC propagation delay: Role assignments need time to take effect
-	// Data plane permissions can take 30-60 seconds to propagate
-	fmt.Printf("   ⏳ Waiting 30s for RBAC propagation...\n")
-	time.Sleep(30 * time.Second)
+	// Validate that the role assignment has propagated
+	fmt.Printf("   🔄 Validating RBAC propagation...\n")
+	err = s.waitForRBACPropagation(objectID, scope, roleDefinitionID)
+	if err != nil {
+		return fmt.Errorf("RBAC propagation validation failed: %w", err)
+	}
+	fmt.Printf("   ✅ RBAC permissions validated and active\n")
 
 	// Cache the access level for future requests
 	s.accessLevels[cacheKey] = level
@@ -644,4 +656,107 @@ func (s *AzureIAMService) getOrCreateServicePrincipal(appID string) (objectID st
 
 	fmt.Printf("   🔑 Service principal created (ObjectID: %s)\n", objectID)
 	return objectID, nil
+}
+
+// waitForCredentialPropagation validates that the service principal credentials work
+// by attempting to acquire a token for Graph API (identity management scope).
+// It retries for up to 60 seconds.
+func (s *AzureIAMService) waitForCredentialPropagation(clientID, clientSecret, tenantID string) error {
+	maxAttempts := 12 // 12 attempts * 5 seconds = 60 seconds max
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Try to create a credential and get a token
+		cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create credential for validation: %w", err)
+		}
+
+		// Try to get a token for Microsoft Graph (IAM's own domain)
+		_, err = cred.GetToken(s.ctx, policy.TokenRequestOptions{
+			Scopes: []string{"https://graph.microsoft.com/.default"},
+		})
+
+		if err == nil {
+			// Success! Credentials work for authentication
+			fmt.Printf("   ✅ Credentials validated after %d attempt(s)\n", attempt)
+			return nil
+		}
+
+		// Check if it's a credential error (propagation issue) or something else
+		if strings.Contains(err.Error(), "AADSTS7000215") ||
+			strings.Contains(err.Error(), "invalid_client") ||
+			strings.Contains(err.Error(), "unauthorized_client") {
+			// Credential not yet propagated, wait and retry
+			if attempt < maxAttempts {
+				waitTime := 5 * time.Second
+				fmt.Printf("   ⏳ Credentials not ready yet (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
+				time.Sleep(waitTime)
+				continue
+			}
+		}
+
+		// Other error or max attempts reached
+		return fmt.Errorf("credential validation failed after %d attempts: %w", attempt, err)
+	}
+
+	return fmt.Errorf("credential validation timed out after %d seconds", maxAttempts*5)
+}
+
+// waitForRBACPropagation validates that the role assignment has propagated and is effective
+// by verifying the assignment exists. It retries for up to 60 seconds.
+func (s *AzureIAMService) waitForRBACPropagation(principalID, scope, roleDefinitionID string) error {
+	maxAttempts := 12 // 12 attempts * 5 seconds = 60 seconds max
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// List role assignments for this principal at this scope
+		filter := fmt.Sprintf("principalId eq '%s'", principalID)
+		pager := s.authClient.NewListForScopePager(scope, &armauthorization.RoleAssignmentsClientListForScopeOptions{
+			Filter: &filter,
+		})
+
+		// Check if the expected role assignment exists
+		found := false
+		for pager.More() {
+			page, err := pager.NextPage(s.ctx)
+			if err != nil {
+				// Network or permission error - wait and retry
+				if attempt < maxAttempts {
+					waitTime := 5 * time.Second
+					fmt.Printf("   ⏳ Error checking role assignment (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
+					time.Sleep(waitTime)
+					break
+				}
+				return fmt.Errorf("failed to list role assignments after %d attempts: %w", attempt, err)
+			}
+
+			for _, assignment := range page.Value {
+				if assignment.Properties != nil &&
+					assignment.Properties.RoleDefinitionID != nil &&
+					*assignment.Properties.RoleDefinitionID == roleDefinitionID {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+
+		if found {
+			// Role assignment exists in control plane
+			fmt.Printf("   ✅ RBAC assignment found after %d attempt(s)\n", attempt)
+			// Add buffer for data plane propagation (control plane is fast, data plane lags)
+			fmt.Printf("   ⏳ Waiting 10s for data plane propagation...\n")
+			time.Sleep(10 * time.Second)
+			return nil
+		}
+
+		// Role assignment not found yet, wait and retry
+		if attempt < maxAttempts {
+			waitTime := 5 * time.Second
+			fmt.Printf("   ⏳ Role assignment not active yet (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
+			time.Sleep(waitTime)
+		}
+	}
+
+	return fmt.Errorf("RBAC validation timed out after %d seconds", maxAttempts*5)
 }

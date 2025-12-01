@@ -8,8 +8,10 @@ Feature: CCC.ObjStor.CN01.AR04
     Given a cloud api for "{Provider}" in "api"
     And I call "{api}" with "GetServiceAPI" with parameter "object-storage"
     And I refer to "{result}" as "storage"
+    And "{result}" is not an error
     And I call "{api}" with "GetServiceAPI" with parameter "iam"
     And I refer to "{result}" as "iamService"
+    And "{result}" is not an error
 
   Scenario: Service prevents writing object with read-only access
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-read"

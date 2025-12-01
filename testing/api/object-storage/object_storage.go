@@ -33,7 +33,7 @@ type Service interface {
 
 	// Object operations
 	ListObjects(bucketID string) ([]Object, error)
-	CreateObject(bucketID string, objectID string, data []string) (*Object, error)
+	CreateObject(bucketID string, objectID string, data string) (*Object, error)
 	ReadObject(bucketID string, objectID string) (*Object, error)
 	DeleteObject(bucketID string, objectID string) error
 }

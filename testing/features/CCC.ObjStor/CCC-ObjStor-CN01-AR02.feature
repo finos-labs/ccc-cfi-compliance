@@ -11,7 +11,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I call "{api}" with "GetServiceAPI" with parameter "iam"
     And I refer to "{result}" as "iamService"
     And I call "{storage}" with "CreateObject" with parameters "{ResourceName}", "test-object.txt" and "test content"
-    And I refer to "{result}" as "testObject"
+    And "{result}" is not an error
 
   Scenario: Service prevents reading object with no access
     Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-no-access"

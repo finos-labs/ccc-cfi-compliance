@@ -216,15 +216,12 @@ func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
 
 // CreateObject creates a new blob in a container
 // bucketID is the container name
-func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data []string) (*Object, error) {
+func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
 	storageAccountName := s.cloudParams.AzureStorageAccount
 	containerName := bucketID
 
-	// Convert []string to []byte
-	var content bytes.Buffer
-	for _, line := range data {
-		content.WriteString(line)
-	}
+	// Convert string to []byte
+	content := []byte(data)
 
 	// Get blob client
 	blobClient, err := s.getBlobServiceClient(storageAccountName)
@@ -236,7 +233,7 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data [
 	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
 
 	// Upload blob
-	_, err = blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content.Bytes()), nil)
+	_, err = blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload blob %s: %w", objectID, err)
 	}
@@ -245,8 +242,8 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data [
 		ID:       objectID,
 		BucketID: bucketID,
 		Name:     objectID,
-		Size:     int64(content.Len()),
-		Data:     data,
+		Size:     int64(len(content)),
+		Data:     []string{data},
 	}, nil
 }
 
