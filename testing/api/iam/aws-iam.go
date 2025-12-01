@@ -16,8 +16,10 @@ import (
 
 // AWSIAMService implements IAMService for AWS
 type AWSIAMService struct {
-	client *iam.Client
-	ctx    context.Context
+	client           *iam.Client
+	ctx              context.Context
+	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
+	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewAWSIAMService creates a new AWS IAM service using default credentials
@@ -28,13 +30,21 @@ func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
 	}
 
 	return &AWSIAMService{
-		client: iam.NewFromConfig(cfg),
-		ctx:    ctx,
+		client:           iam.NewFromConfig(cfg),
+		ctx:              ctx,
+		provisionedUsers: make(map[string]*Identity),
+		accessLevels:     make(map[string]string),
 	}, nil
 }
 
 // ProvisionUser creates a new IAM user with access keys
 func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
+	// Check cache first - if we've already provisioned this user in this session, return it
+	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
+		fmt.Printf("♻️  Using cached identity for user %s (skipping propagation delay)\n", userName)
+		return cachedIdentity, nil
+	}
+
 	var createUserOutput *iam.CreateUserOutput
 	var userAlreadyExists bool
 
@@ -142,11 +152,26 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 		fmt.Printf("   Account ID: %s\n", identity.Credentials["account_id"])
 	}
 
+	// Cache the identity for future requests
+	s.provisionedUsers[userName] = identity
+
 	return identity, nil
 }
 
 // SetAccess grants an identity access to a specific AWS service/resource at the specified level
 func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level string) (string, error) {
+	// Check cache first - if we've already set this access level, skip it
+	cacheKey := fmt.Sprintf("%s:%s", identity.UserName, serviceID)
+	if cachedLevel, exists := s.accessLevels[cacheKey]; exists && cachedLevel == level {
+		fmt.Printf("♻️  Access level already set to %s for %s (skipping propagation delay)\n", level, identity.UserName)
+		// Generate and return the policy document without making AWS calls
+		policyDocument, err := s.generatePolicyDocument(serviceID, level)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate policy: %w", err)
+		}
+		return policyDocument, nil
+	}
+
 	// Check current access level
 	currentLevel, currentPolicy, err := s.GetAccess(identity, serviceID)
 	if err != nil {
@@ -156,6 +181,8 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 		if currentLevel == level {
 			fmt.Printf("ℹ️  Access level unchanged, skipping...\n")
+			// Cache this access level
+			s.accessLevels[cacheKey] = level
 			// Return the existing policy document
 			return currentPolicy, nil
 		}
@@ -186,6 +213,9 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 	fmt.Printf("⏳ Waiting 15 seconds for IAM policy changes to propagate...\n")
 	time.Sleep(15 * time.Second)
 	fmt.Printf("✅ IAM policy propagation wait complete\n")
+
+	// Cache the access level for future requests
+	s.accessLevels[cacheKey] = level
 
 	return policyDocument, nil
 }

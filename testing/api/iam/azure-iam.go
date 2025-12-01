@@ -21,12 +21,14 @@ import (
 
 // AzureIAMService implements IAMService for Azure using Service Principals
 type AzureIAMService struct {
-	authClient  *armauthorization.RoleAssignmentsClient
-	ctx         context.Context
-	credential  azcore.TokenCredential
-	cloudParams environment.CloudParams
-	httpClient  *http.Client
-	tenantID    string
+	authClient       *armauthorization.RoleAssignmentsClient
+	ctx              context.Context
+	credential       azcore.TokenCredential
+	cloudParams      environment.CloudParams
+	httpClient       *http.Client
+	tenantID         string
+	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
+	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewAzureIAMService creates a new Azure IAM service using default credentials
@@ -57,12 +59,14 @@ func newAzureIAMServiceInternal(ctx context.Context, cloudParams environment.Clo
 	}
 
 	return &AzureIAMService{
-		authClient:  authClient,
-		ctx:         ctx,
-		credential:  cred,
-		cloudParams: cloudParams,
-		httpClient:  &http.Client{Timeout: 30 * time.Second},
-		tenantID:    tenantID,
+		authClient:       authClient,
+		ctx:              ctx,
+		credential:       cred,
+		cloudParams:      cloudParams,
+		httpClient:       &http.Client{Timeout: 30 * time.Second},
+		tenantID:         tenantID,
+		provisionedUsers: make(map[string]*Identity),
+		accessLevels:     make(map[string]string),
 	}, nil
 }
 
@@ -98,6 +102,12 @@ func getAzureTenantID() string {
 
 // ProvisionUser creates a new service principal with a client secret, or returns existing one
 func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
+	// Check cache first - if we've already provisioned this user in this session, return it
+	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
+		fmt.Printf("♻️  Using cached identity for user %s (skipping propagation delay)\n", userName)
+		return cachedIdentity, nil
+	}
+
 	// Service principal display names can be more flexible than managed identity names
 	displayName := sanitizeServicePrincipalName(userName)
 
@@ -191,11 +201,21 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   ⏳ Waiting 15s for Azure AD propagation (new service principal)...\n")
 	time.Sleep(15 * time.Second)
 
+	// Cache the identity for future requests
+	s.provisionedUsers[userName] = identity
+
 	return identity, nil
 }
 
 // SetAccess grants an identity access to a specific Azure resource at the specified level
 func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level string) error {
+	// Check cache first - if we've already set this access level, skip it
+	cacheKey := fmt.Sprintf("%s:%s", identity.UserName, serviceID)
+	if cachedLevel, exists := s.accessLevels[cacheKey]; exists && cachedLevel == level {
+		fmt.Printf("♻️  Access level already set to %s for %s (skipping propagation delay)\n", level, identity.UserName)
+		return nil
+	}
+
 	// Get the role definition ID based on access level
 	roleDefinitionID, err := s.getRoleDefinitionForLevel(serviceID, level)
 	if err != nil {
@@ -204,6 +224,8 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 
 	if roleDefinitionID == "" {
 		// "none" level - no role to assign
+		// Cache this state
+		s.accessLevels[cacheKey] = level
 		return nil
 	}
 
@@ -236,6 +258,8 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 		// Check if assignment already exists
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "RoleAssignmentExists") {
 			fmt.Printf("   ℹ️  Role assignment already exists\n")
+			// Cache this state
+			s.accessLevels[cacheKey] = level
 			return nil
 		}
 		return fmt.Errorf("failed to create role assignment: %w", err)
@@ -247,6 +271,9 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 	// Data plane permissions can take 30-60 seconds to propagate
 	fmt.Printf("   ⏳ Waiting 30s for RBAC propagation...\n")
 	time.Sleep(30 * time.Second)
+
+	// Cache the access level for future requests
+	s.accessLevels[cacheKey] = level
 
 	return nil
 }

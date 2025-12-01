@@ -14,35 +14,43 @@ import (
 type AzureFactory struct {
 	ctx         context.Context
 	cloudParams environment.CloudParams
+	iamService  generic.Service
 }
 
 // NewAzureFactory creates a new Azure factory
 func NewAzureFactory(cloudParams environment.CloudParams) *AzureFactory {
+	ctx := context.Background()
+
+	// Create IAM service once and cache it
+	iamService, err := iam.NewAzureIAMService(ctx, cloudParams)
+	if err != nil {
+		// Log error but don't fail - IAM service might not be needed
+		fmt.Printf("⚠️  Warning: Failed to create Azure IAM service: %v\n", err)
+	}
+
 	return &AzureFactory{
-		ctx:         context.Background(),
+		ctx:         ctx,
 		cloudParams: cloudParams,
+		iamService:  iamService,
 	}
 }
 
 // GetServiceAPI returns a generic service API client for the given service type
 func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	var service generic.Service
-	var err error
-
 	switch serviceID {
 	case "iam":
-		service, err = iam.NewAzureIAMService(f.ctx, f.cloudParams)
+		return f.iamService, nil
+
 	case "object-storage":
-		service, err = objstorage.NewAzureBlobService(f.ctx, f.cloudParams)
+		service, err := objstorage.NewAzureBlobService(f.ctx, f.cloudParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
+		}
+		return service, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
@@ -51,25 +59,20 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
 
-	var service generic.Service
-	var err error
 	switch serviceID {
 	case "iam":
-		// IAM service doesn't typically use per-identity clients, return the standard IAM service
-		service, err = iam.NewAzureIAMService(f.ctx, f.cloudParams)
+		return f.iamService, nil
 
 	case "object-storage":
-		service, err = objstorage.NewAzureBlobServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		service, err := objstorage.NewAzureBlobServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
+		}
+		return service, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for Azure: %s", serviceID)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetProvider returns the cloud provider

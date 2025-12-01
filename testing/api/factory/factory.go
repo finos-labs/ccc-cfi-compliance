@@ -17,6 +17,9 @@ const (
 	ProviderGCP   CloudProvider = "gcp"
 )
 
+// Cache for factories (one per provider)
+var factoryCache = make(map[CloudProvider]Factory)
+
 // Factory creates cloud service API clients for different providers
 type Factory interface {
 	// GetServiceAPI returns a generic service API client for the given service ID
@@ -30,15 +33,29 @@ type Factory interface {
 }
 
 // NewFactory creates a new factory for the specified cloud provider using cloud-specific configuration
+// Factories are cached per provider to ensure IAM service caching works across calls
 func NewFactory(provider CloudProvider, cloudParams environment.CloudParams) (Factory, error) {
+	// Check cache first
+	if cachedFactory, exists := factoryCache[provider]; exists {
+		fmt.Printf("♻️  Using cached factory for provider: %s\n", provider)
+		return cachedFactory, nil
+	}
+
+	// Create new factory
+	fmt.Printf("🏭 Creating new factory for provider: %s\n", provider)
+	var factory Factory
 	switch provider {
 	case ProviderAWS:
-		return NewAWSFactory(cloudParams), nil
+		factory = NewAWSFactory(cloudParams)
 	case ProviderAzure:
-		return NewAzureFactory(cloudParams), nil
+		factory = NewAzureFactory(cloudParams)
 	case ProviderGCP:
-		return NewGCPFactory(), nil
+		factory = NewGCPFactory()
 	default:
 		return nil, fmt.Errorf("unsupported cloud provider: %s", provider)
 	}
+
+	// Cache the factory
+	factoryCache[provider] = factory
+	return factory, nil
 }

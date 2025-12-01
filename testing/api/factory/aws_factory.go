@@ -14,35 +14,46 @@ import (
 type AWSFactory struct {
 	ctx         context.Context
 	cloudParams environment.CloudParams
+	iamService  generic.Service
 }
 
 // NewAWSFactory creates a new AWS factory
 func NewAWSFactory(cloudParams environment.CloudParams) *AWSFactory {
+	ctx := context.Background()
+
+	// Create IAM service once and cache it
+	iamService, err := iam.NewAWSIAMService(ctx)
+	if err != nil {
+		// Log error but don't fail - IAM service might not be needed
+		fmt.Printf("⚠️  Warning: Failed to create AWS IAM service: %v\n", err)
+	}
+
 	return &AWSFactory{
-		ctx:         context.Background(),
+		ctx:         ctx,
 		cloudParams: cloudParams,
+		iamService:  iamService,
 	}
 }
 
 // GetServiceAPI returns a generic service API client for the given service type
 func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	var service generic.Service
-	var err error
-
 	switch serviceID {
 	case "iam":
-		service, err = iam.NewAWSIAMService(f.ctx)
+		if f.iamService == nil {
+			return nil, fmt.Errorf("AWS IAM service not initialized")
+		}
+		return f.iamService, nil
+
 	case "object-storage":
-		service, err = objstorage.NewAWSS3Service(f.ctx, f.cloudParams)
+		service, err := objstorage.NewAWSS3Service(f.ctx, f.cloudParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS service '%s': %w", serviceID, err)
+		}
+		return service, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create AWS service '%s': %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
@@ -51,29 +62,20 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		return nil, fmt.Errorf("identity is not for AWS provider: %s", identity.Provider)
 	}
 
-	var service generic.Service
-	var err error
-
-	// Create a copy of cloud params with identity-specific overrides if any
-	cloudParams := f.cloudParams
-
 	switch serviceID {
 	case "iam":
-		// IAM service doesn't typically use per-identity clients, return the standard IAM service
-		service, err = iam.NewAWSIAMService(f.ctx)
+		return f.iamService, nil
 
 	case "object-storage":
-		service, err = objstorage.NewAWSS3ServiceWithCredentials(f.ctx, cloudParams, identity)
+		service, err := objstorage.NewAWSS3ServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS service '%s' with identity: %w", serviceID, err)
+		}
+		return service, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create AWS service '%s' with identity: %w", serviceID, err)
-	}
-
-	return service, nil
 }
 
 // GetProvider returns the cloud provider
