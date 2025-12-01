@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -287,6 +288,70 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 
 	fmt.Printf("✅ Default bucket created successfully\n")
 	return []Bucket{*bucket}, nil
+}
+
+// GetBucketRetentionDurationDays retrieves the Object Lock retention duration in days for a bucket
+func (s *AWSS3Service) GetBucketRetentionDurationDays(bucketID string) (int, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = s.cloudParams.Region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	// Get Object Lock configuration
+	lockConfig, err := regionalClient.GetObjectLockConfiguration(s.ctx, &s3.GetObjectLockConfigurationInput{
+		Bucket: aws.String(bucketID),
+	})
+	if err != nil {
+		// No Object Lock configured
+		return 0, nil
+	}
+
+	// Check if Object Lock is enabled with a default retention
+	if lockConfig.ObjectLockConfiguration != nil &&
+		lockConfig.ObjectLockConfiguration.Rule != nil &&
+		lockConfig.ObjectLockConfiguration.Rule.DefaultRetention != nil {
+
+		retention := lockConfig.ObjectLockConfiguration.Rule.DefaultRetention
+		if retention.Days != nil {
+			return int(*retention.Days), nil
+		}
+		if retention.Years != nil {
+			return int(*retention.Years * 365), nil
+		}
+	}
+
+	// No default retention configured
+	return 0, nil
+}
+
+// GetObjectRetentionDurationDays retrieves the Object Lock retention duration in days for a specific object
+func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
+	// Create a regional client
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = s.cloudParams.Region
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	// Get object retention
+	retention, err := regionalClient.GetObjectRetention(s.ctx, &s3.GetObjectRetentionInput{
+		Bucket: aws.String(bucketID),
+		Key:    aws.String(objectID),
+	})
+	if err != nil {
+		// No retention set on this object, check bucket default
+		return s.GetBucketRetentionDurationDays(bucketID)
+	}
+
+	// Calculate days until retention expires
+	if retention.Retention != nil && retention.Retention.RetainUntilDate != nil {
+		daysUntilExpiry := int(time.Until(*retention.Retention.RetainUntilDate).Hours() / 24)
+		if daysUntilExpiry > 0 {
+			return daysUntilExpiry, nil
+		}
+		return 0, nil // Retention already expired
+	}
+
+	// No retention set
+	return 0, nil
 }
 
 // GetOrProvisionTestableResources returns all S3 buckets as testable resources

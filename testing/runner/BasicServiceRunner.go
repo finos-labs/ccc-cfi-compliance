@@ -237,9 +237,15 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	godog.Format(htmlFormat, "HTML report", formatterFactory.GetHTMLFormatterFunc())
 	godog.Format(ocsfFormat, "OCSF report", formatterFactory.GetOCSFFormatterFunc())
 
-	// Build tag filter
-	tagFilter := buildTagFilter(params.CatalogTypes)
-	log.Printf("   Tag Filter: %s", tagFilter)
+	// Build tag filter - use provided tag or auto-generate from catalog types
+	var tagFilter string
+	if r.Config.Tag != "" {
+		tagFilter = r.Config.Tag
+		log.Printf("   Tag Filter (manual): %s", tagFilter)
+	} else {
+		tagFilter = buildTagFilter(params.CatalogTypes)
+		log.Printf("   Tag Filter (auto): %s", tagFilter)
+	}
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),

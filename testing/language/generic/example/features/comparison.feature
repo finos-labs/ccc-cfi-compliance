@@ -67,3 +67,19 @@ Feature: Data comparison and validation patterns
       | name       | active |
       | Intruder 1 | true   |
       | Dodgy Guy  | false  |
+
+  @comparison
+  Scenario: Numeric comparisons - greater than
+    Given "score" is a function which returns a value of "{100}"
+    When I call "{score}"
+    And I refer to "{result}" as "scoreValue"
+    Then "{scoreValue}" should be greater than "50"
+    And "{scoreValue}" should be greater than "99"
+
+  @comparison
+  Scenario: Numeric comparisons - less than
+    Given "temperature" is a function which returns a value of "{15}"
+    When I call "{temperature}"
+    And I refer to "{result}" as "tempValue"
+    Then "{tempValue}" should be less than "20"
+    And "{tempValue}" should be less than "16"

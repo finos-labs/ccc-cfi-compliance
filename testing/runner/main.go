@@ -19,6 +19,7 @@ var (
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
+	tag            = flag.String("tag", "", "Tag filter to override automatic catalog type filtering (e.g., 'CCC.ObjStor.CN04')")
 
 	// Cloud configuration flags
 	region              = flag.String("region", "", "Cloud region")
@@ -83,6 +84,7 @@ func main() {
 			OutputDir:      *outputDir,
 			Timeout:        *timeout,
 			ResourceFilter: *resourceFilter,
+			Tag:            *tag,
 		}))
 	}
 

@@ -422,6 +422,65 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 	return newBuckets, nil
 }
 
+// GetBucketRetentionDurationDays retrieves the retention policy duration in days for a container
+func (s *AzureBlobService) GetBucketRetentionDurationDays(bucketID string) (int, error) {
+	storageAccountName := s.cloudParams.AzureStorageAccount
+	containerName := bucketID
+
+	// Get container client
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+
+	// Get container properties
+	_, err = containerClient.GetProperties(s.ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get container properties: %w", err)
+	}
+
+	// Note: Checking immutability policies requires the Azure Blob Storage Management API
+	// For now, return 0 (no retention) as the default
+	// In production, this would query the container's immutability policy settings
+	// which are configured via ARM templates or the Management API
+	return 0, nil
+}
+
+// GetObjectRetentionDurationDays retrieves the retention policy duration in days for a blob
+func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
+	storageAccountName := s.cloudParams.AzureStorageAccount
+	containerName := bucketID
+
+	// Get blob client
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
+
+	// Get blob properties
+	props, err := blockBlobClient.GetProperties(s.ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get blob properties: %w", err)
+	}
+
+	// Check for legal hold or immutability policy
+	if props.LegalHold != nil && *props.LegalHold {
+		// Legal hold is active - return max retention
+		return 9999, nil
+	}
+
+	// Check for time-based retention
+	// Azure blob immutability policies inherit from container level
+	// For object-level specifics, we'd need to check the blob's immutability policy
+	// Return container-level retention as default
+	return s.GetBucketRetentionDurationDays(bucketID)
+}
+
 // GetOrProvisionTestableResources returns all Azure storage containers as testable resources
 func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// Validate that storage account name is set

@@ -968,6 +968,78 @@ func (pw *PropsWorld) fieldContains(field, substring string) error {
 	return nil
 }
 
+// parseNumber converts a value to float64 for numeric comparisons
+func parseNumber(val interface{}) (float64, error) {
+	switch v := val.(type) {
+	case int:
+		return float64(v), nil
+	case int32:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case float32:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	case string:
+		return strconv.ParseFloat(v, 64)
+	default:
+		// Try to parse string representation
+		str := fmt.Sprintf("%v", v)
+		return strconv.ParseFloat(str, 64)
+	}
+}
+
+func (pw *PropsWorld) fieldShouldBeGreaterThan(field, thresholdStr string) error {
+	actual := pw.HandleResolve(field)
+	threshold := pw.HandleResolve(thresholdStr)
+
+	actualNum, err := parseNumber(actual)
+	if err != nil {
+		return fmt.Errorf("cannot parse %s as number: %v", field, err)
+	}
+
+	thresholdNum, err := parseNumber(threshold)
+	if err != nil {
+		return fmt.Errorf("cannot parse threshold '%s' as number: %v", thresholdStr, err)
+	}
+
+	fmt.Printf("EXPECTED: > %v\n", thresholdNum)
+	fmt.Printf("ACTUAL:   %v\n", actualNum)
+
+	if actualNum <= thresholdNum {
+		return fmt.Errorf("expected %s (%v) to be greater than %v", field, actualNum, thresholdNum)
+	}
+
+	fmt.Printf("✓ %v > %v\n", actualNum, thresholdNum)
+	return nil
+}
+
+func (pw *PropsWorld) fieldShouldBeLessThan(field, thresholdStr string) error {
+	actual := pw.HandleResolve(field)
+	threshold := pw.HandleResolve(thresholdStr)
+
+	actualNum, err := parseNumber(actual)
+	if err != nil {
+		return fmt.Errorf("cannot parse %s as number: %v", field, err)
+	}
+
+	thresholdNum, err := parseNumber(threshold)
+	if err != nil {
+		return fmt.Errorf("cannot parse threshold '%s' as number: %v", thresholdStr, err)
+	}
+
+	fmt.Printf("EXPECTED: < %v\n", thresholdNum)
+	fmt.Printf("ACTUAL:   %v\n", actualNum)
+
+	if actualNum >= thresholdNum {
+		return fmt.Errorf("expected %s (%v) to be less than %v", field, actualNum, thresholdNum)
+	}
+
+	fmt.Printf("✓ %v < %v\n", actualNum, thresholdNum)
+	return nil
+}
+
 func (pw *PropsWorld) fieldIsError(field string) error {
 	actual := pw.HandleResolve(field)
 
@@ -1387,6 +1459,10 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^"([^"]*)" is an error$`, pw.fieldIsError)
 	s.Step(`^"([^"]*)" is not an error$`, pw.fieldIsNotError)
 	s.Step(`^"([^"]*)" contains "([^"]*)"$`, pw.fieldContains)
+
+	// Numeric comparisons
+	s.Step(`^"([^"]*)" should be greater than "([^"]*)"$`, pw.fieldShouldBeGreaterThan)
+	s.Step(`^"([^"]*)" should be less than "([^"]*)"$`, pw.fieldShouldBeLessThan)
 
 	// Test setup patterns
 	s.Step(`^"([^"]*)" is a invocation counter into "([^"]*)"$`, pw.HandlerIsInvocationCounter)

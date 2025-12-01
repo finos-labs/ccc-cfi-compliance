@@ -18,13 +18,13 @@ type GCPFactory struct {
 // NewGCPFactory creates a new GCP factory
 func NewGCPFactory() *GCPFactory {
 	ctx := context.Background()
-	
+
 	// Get project ID from environment
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
 		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	}
-	
+
 	// Create IAM service once and cache it
 	var iamService generic.Service
 	if projectID != "" {

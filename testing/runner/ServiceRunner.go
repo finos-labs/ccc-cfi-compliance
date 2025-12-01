@@ -13,6 +13,7 @@ type RunConfig struct {
 	OutputDir      string
 	Timeout        time.Duration
 	ResourceFilter string
+	Tag            string // Optional tag filter to override automatic catalog type filtering
 }
 
 // ServiceRunner is the interface for running compliance tests for a specific service

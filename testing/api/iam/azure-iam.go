@@ -348,7 +348,7 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 	appObjectID := identity.Credentials["app_object_id"]
 	if appObjectID != "" {
 		err := s.deleteApplication(appObjectID)
-		if err != nil {
+	if err != nil {
 			fmt.Printf("   ⚠️  Failed to delete application: %v\n", err)
 		} else {
 			fmt.Printf("   ✅ Application deleted\n")
