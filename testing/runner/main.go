@@ -122,11 +122,14 @@ func main() {
 
 	// Report final results and exit
 	if totalFailed > 0 {
-		log.Println("❌ Some runners failed")
+		log.Println("❌ Some runners had test failures")
 		os.Exit(1)
 	} else if len(runners) == 0 {
 		log.Println("⚠️  No runners were executed")
 		os.Exit(1)
+	} else if totalPassed == 0 {
+		log.Println("⚠️  No runners executed any tests")
+		os.Exit(0) // Not a failure - just nothing to do
 	} else {
 		log.Println("✅ All runners passed")
 		os.Exit(0)

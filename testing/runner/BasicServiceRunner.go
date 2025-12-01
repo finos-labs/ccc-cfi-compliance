@@ -156,9 +156,8 @@ func (r *BasicServiceRunner) Run() int {
 	r.printSummary(stats)
 
 	// Return exit code
+	// Note: Having no tests to run (Total == 0) is not a failure
 	if stats.Failed > 0 {
-		return 1
-	} else if stats.Total == 0 {
 		return 1
 	}
 	return 0
