@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red
+@CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.ObjStor.CN01.AR03
 Feature: CCC.ObjStor.CN01.AR03
   As a security administrator
   I want to prevent any requests to create buckets using untrusted KMS keys
