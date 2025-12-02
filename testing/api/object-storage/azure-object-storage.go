@@ -558,6 +558,12 @@ func (s *AzureBlobService) CheckUserProvisioned() error {
 	return nil
 }
 
+// SetObjectPermission always returns an error for Azure Blob Storage
+// Azure does not support object-level permissions - only uniform bucket-level access via RBAC
+func (s *AzureBlobService) SetObjectPermission(bucketID, objectID string, permissionLevel string) error {
+	return fmt.Errorf("Azure Blob Storage does not support object-level permissions - uniform bucket-level access is enforced via RBAC")
+}
+
 func (s *AzureBlobService) ElevateAccessForInspection() error {
 	return s.elevator.ElevateStorageAccountAccess(s.cloudParams.AzureStorageAccount)
 }

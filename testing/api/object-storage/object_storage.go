@@ -38,4 +38,9 @@ type Service interface {
 	ReadObject(bucketID string, objectID string) (*Object, error)
 	DeleteObject(bucketID string, objectID string) error
 	GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error)
+
+	// SetObjectPermission attempts to set object-level permissions
+	// AWS: Should fail if uniform bucket-level access is enforced (ACLs disabled)
+	// Azure: Always fails (doesn't support object-level permissions)
+	SetObjectPermission(bucketID string, objectID string, permissionLevel string) error
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
@@ -391,6 +392,42 @@ func (s *AWSS3Service) CheckUserProvisioned() error {
 
 func (s *AWSS3Service) ElevateAccessForInspection() error {
 	// No-op: AWS S3 access is managed through IAM policies, not network access
+	return nil
+}
+
+// SetObjectPermission attempts to set object-level permissions using S3 ACLs
+// If S3 bucket has ACLs disabled (uniform bucket-level access), this will fail
+func (s *AWSS3Service) SetObjectPermission(bucketID, objectID string, permissionLevel string) error {
+	// Map permission level to S3 canned ACL
+	var acl string
+	switch permissionLevel {
+	case "read":
+		acl = "public-read"
+	case "write":
+		acl = "public-read-write"
+	case "none":
+		acl = "private"
+	default:
+		return fmt.Errorf("unsupported permission level: %s", permissionLevel)
+	}
+
+	// Attempt to set object-level ACL
+	// If bucket has ACLs disabled (enforcing uniform access), this will fail
+	_, err := s.client.PutObjectAcl(s.ctx, &s3.PutObjectAclInput{
+		Bucket: aws.String(bucketID),
+		Key:    aws.String(objectID),
+		ACL:    s3types.ObjectCannedACL(acl),
+	})
+
+	if err != nil {
+		// Check if it's because ACLs are disabled (which is GOOD - uniform access is enforced)
+		if strings.Contains(err.Error(), "AccessControlListNotSupported") {
+			return fmt.Errorf("S3 object-level ACLs are disabled - uniform bucket-level access is enforced: %w", err)
+		}
+		return fmt.Errorf("failed to set object ACL: %w", err)
+	}
+
+	// ACL was set successfully (only happens if uniform access is NOT enforced)
 	return nil
 }
 
