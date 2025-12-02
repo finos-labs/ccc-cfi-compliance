@@ -60,7 +60,7 @@ func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) 
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
+func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
 	if identity.Provider != string(ProviderAzure) {
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
@@ -73,6 +73,14 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 		service, err := objstorage.NewAzureBlobServiceWithCredentials(f.ctx, f.cloudParams, identity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
+		}
+
+		// If testAccess is true, validate that permissions have propagated
+		if testAccess {
+			err = waitForUserProvisioning(service)
+			if err != nil {
+				return nil, fmt.Errorf("user provisioning validation failed: %w", err)
+			}
 		}
 
 		return service, nil

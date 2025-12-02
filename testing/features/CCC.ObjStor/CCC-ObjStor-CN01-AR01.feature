@@ -12,12 +12,10 @@ Feature: CCC.ObjStor.CN01.AR01
     And I refer to "{result}" as "iamService"
 
   Scenario: Service prevents reading bucket with no access
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-no-access"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-no-access", "{UID}" and "none"
     And I refer to "{result}" as "testUserNoAccess"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserNoAccess}", "{UID}" and "none"
-    And I attach "{result}" to the test output as "no-access-user-policy.json"
-    Given I attach "{testUserNoAccess}" to the test output as "no-access-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserNoAccess}"
+    And I attach "{result}" to the test output as "no-access-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserNoAccess}" and "{false}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
@@ -25,12 +23,10 @@ Feature: CCC.ObjStor.CN01.AR01
     And I attach "{result}" to the test output as "no-access-list-error.txt"
 
   Scenario: Service allows reading bucket with read access
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-read"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-read", "{UID}" and "read"
     And I refer to "{result}" as "testUserRead"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserRead}", "{UID}" and "read"
-    And I attach "{result}" to the test output as "read-user-policy.json"
-    Given I attach "{testUserRead}" to the test output as "read-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserRead}"
+    And I attach "{result}" to the test output as "read-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserRead}" and "{true}"
     And "{result}" is not an error
     And I attach "{result}" to the test output as "read-storage-service.json"
     And I refer to "{result}" as "userStorage"

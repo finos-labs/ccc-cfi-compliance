@@ -101,13 +101,43 @@ func getAzureTenantID() string {
 }
 
 // ProvisionUser creates a new service principal with a client secret, or returns existing one
-func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
-	// Check cache first - if we've already provisioned this user in this session, return it
+// ProvisionUserWithAccess creates a user and sets their access level in a single operation
+func (s *AzureIAMService) ProvisionUserWithAccess(userName string, serviceID string, level string) (*Identity, error) {
+	// Check cache first for both user and access level
+	cacheKey := fmt.Sprintf("%s:%s", userName, serviceID)
 	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
-		fmt.Printf("♻️  Using cached identity for user %s (skipping propagation delay)\n", userName)
-		return cachedIdentity, nil
+		if cachedLevel, levelExists := s.accessLevels[cacheKey]; levelExists && cachedLevel == level {
+			fmt.Printf("♻️  Using cached identity for user %s with %s access (skipping all delays)\n", userName, level)
+			return cachedIdentity, nil
+		}
 	}
 
+	// Step 1: Provision the user (or retrieve existing) - no waiting yet
+	identity, err := s.provisionUserInternal(userName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 2: Set access level - this will wait for both credential and RBAC propagation together
+	policyDoc, err := s.setAccessInternal(identity, serviceID, level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store policy in identity
+	identity.Policy = policyDoc
+
+	// Cache the identity and access level AFTER validation completes
+	s.provisionedUsers[userName] = identity
+	s.accessLevels[cacheKey] = level
+
+	return identity, nil
+}
+
+// provisionUserInternal is the internal implementation of ProvisionUser
+// Note: This does NOT interact with cache or wait for credential propagation
+// All caching and validation is handled by ProvisionUserWithAccess
+func (s *AzureIAMService) provisionUserInternal(userName string) (*Identity, error) {
 	// Service principal display names can be more flexible than managed identity names
 	displayName := sanitizeServicePrincipalName(userName)
 
@@ -198,50 +228,32 @@ func (s *AzureIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   Tenant ID: %s\n", identity.Credentials["tenant_id"])
 	fmt.Printf("   💡 Client secret can be used from anywhere (not just Azure)\n")
 
-	// Validate that the credentials actually work before returning
-	fmt.Printf("   🔄 Validating service principal credentials...\n")
-	err = s.waitForCredentialPropagation(identity.Credentials["client_id"], identity.Credentials["client_secret"], identity.Credentials["tenant_id"])
-	if err != nil {
-		return nil, fmt.Errorf("service principal credentials failed to propagate: %w", err)
-	}
-
-	// Add buffer for cross-service propagation (credentials work for Graph, but other services may lag)
-	fmt.Printf("   ⏳ Waiting 10s for cross-service propagation...\n")
-	time.Sleep(10 * time.Second)
-	fmt.Printf("   ✅ Service principal credentials ready\n")
-
-	// Cache the identity for future requests
-	s.provisionedUsers[userName] = identity
-
+	// Don't cache or wait here - that's handled by ProvisionUserWithAccess
 	return identity, nil
 }
 
-// SetAccess grants an identity access to a specific Azure resource at the specified level
-func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level string) error {
-	// Check cache first - if we've already set this access level, skip it
-	cacheKey := fmt.Sprintf("%s:%s", identity.UserName, serviceID)
-	if cachedLevel, exists := s.accessLevels[cacheKey]; exists && cachedLevel == level {
-		fmt.Printf("♻️  Access level already set to %s for %s (skipping propagation delay)\n", level, identity.UserName)
-		return nil
-	}
-
+// setAccessInternal grants an identity access to a specific Azure resource at the specified level
+// This is the internal implementation called by ProvisionUserWithAccess
+// Note: This does NOT interact with cache - all caching is handled by ProvisionUserWithAccess
+func (s *AzureIAMService) setAccessInternal(identity *Identity, serviceID string, level string) (string, error) {
 	// Get the role definition ID based on access level
 	roleDefinitionID, err := s.getRoleDefinitionForLevel(serviceID, level)
 	if err != nil {
-		return fmt.Errorf("failed to determine role: %w", err)
+		return "", fmt.Errorf("failed to determine role: %w", err)
 	}
+
+	// Generate policy document
+	policyDoc := fmt.Sprintf(`{"user": "%s", "service": "%s", "level": "%s", "role": "%s"}`, identity.UserName, serviceID, level, roleDefinitionID)
 
 	if roleDefinitionID == "" {
 		// "none" level - no role to assign
-		// Cache this state
-		s.accessLevels[cacheKey] = level
-		return nil
+		return policyDoc, nil
 	}
 
 	// Get the service principal object ID from the identity
 	objectID := identity.Credentials["object_id"]
 	if objectID == "" {
-		return fmt.Errorf("object_id not found in identity credentials")
+		return "", fmt.Errorf("object_id not found in identity credentials")
 	}
 
 	// Parse the scope from serviceID
@@ -267,27 +279,32 @@ func (s *AzureIAMService) SetAccess(identity *Identity, serviceID string, level 
 		// Check if assignment already exists
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "RoleAssignmentExists") {
 			fmt.Printf("   ℹ️  Role assignment already exists\n")
-			// Cache this state
-			s.accessLevels[cacheKey] = level
-			return nil
+			return policyDoc, nil
 		}
-		return fmt.Errorf("failed to create role assignment: %w", err)
+		return "", fmt.Errorf("failed to create role assignment: %w", err)
 	}
 
 	fmt.Printf("   ✅ Access granted\n")
 
-	// Validate that the role assignment has propagated
-	fmt.Printf("   🔄 Validating RBAC propagation...\n")
+	// Now validate both credential and RBAC propagation together
+	fmt.Printf("   🔄 Validating service principal credentials and RBAC propagation...\n")
+
+	// Step 1: Validate credentials work
+	err = s.waitForCredentialPropagation(identity.Credentials["client_id"], identity.Credentials["client_secret"], identity.Credentials["tenant_id"])
+	if err != nil {
+		return "", fmt.Errorf("service principal credentials failed to propagate: %w", err)
+	}
+
+	// Step 2: Validate RBAC has propagated
 	err = s.waitForRBACPropagation(objectID, scope, roleDefinitionID)
 	if err != nil {
-		return fmt.Errorf("RBAC propagation validation failed: %w", err)
+		return "", fmt.Errorf("RBAC propagation validation failed: %w", err)
 	}
-	fmt.Printf("   ✅ RBAC permissions validated and active\n")
 
-	// Cache the access level for future requests
-	s.accessLevels[cacheKey] = level
+	fmt.Printf("   ✅ Credentials and RBAC permissions validated and active\n")
 
-	return nil
+	// Don't cache here - that's handled by ProvisionUserWithAccess
+	return policyDoc, nil
 }
 
 // DestroyUser removes a service principal and all associated resources
@@ -455,7 +472,11 @@ func (s *AzureIAMService) GetOrProvisionTestableResources() ([]environment.TestP
 	return []environment.TestParams{}, nil
 }
 
-// ElevateAccessForInspection is a no-op for IAM services
+func (s *AzureIAMService) CheckUserProvisioned() error {
+	// No-op: IAM services don't require additional credential validation
+	return nil
+}
+
 func (s *AzureIAMService) ElevateAccessForInspection() error {
 	// No-op: IAM services don't have network-level access controls to elevate
 	return nil

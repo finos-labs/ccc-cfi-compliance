@@ -12,12 +12,10 @@ Feature: CCC.ObjStor.CN01.AR03
     And I refer to "{result}" as "iamService"
 
   Scenario: Service prevents creating bucket with no access
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-no-access"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-no-access", "{UID}" and "none"
     And I refer to "{result}" as "testUserNoAccess"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserNoAccess}", "{UID}" and "none"
-    And I attach "{result}" to the test output as "no-access-user-policy.json"
-    Given I attach "{testUserNoAccess}" to the test output as "no-access-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserNoAccess}"
+    And I attach "{result}" to the test output as "no-access-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserNoAccess}" and "{false}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateBucket" with parameter "test-bucket-no-access"
@@ -25,12 +23,10 @@ Feature: CCC.ObjStor.CN01.AR03
     And I attach "{result}" to the test output as "no-access-create-bucket-error.txt"
 
   Scenario: Service allows creating bucket with write access
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-write"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-write", "{UID}" and "write"
     And I refer to "{result}" as "testUserWrite"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserWrite}", "{UID}" and "write"
-    And I attach "{result}" to the test output as "write-user-policy.json"
-    Given I attach "{testUserWrite}" to the test output as "write-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserWrite}"
+    And I attach "{result}" to the test output as "write-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserWrite}" and "{true}"
     And "{result}" is not an error
     And I attach "{result}" to the test output as "write-storage-service.json"
     And I refer to "{result}" as "userStorage"

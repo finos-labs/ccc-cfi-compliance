@@ -63,7 +63,7 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
+func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
 	if identity.Provider != string(ProviderAWS) {
 		return nil, fmt.Errorf("identity is not for AWS provider: %s", identity.Provider)
 	}
@@ -81,6 +81,14 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		// Elevate access for testing
 		if err := service.ElevateAccessForInspection(); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
+		}
+
+		// If testAccess is true, validate that permissions have propagated
+		if testAccess {
+			err = waitForUserProvisioning(service)
+			if err != nil {
+				return nil, fmt.Errorf("user provisioning validation failed: %w", err)
+			}
 		}
 
 		return service, nil

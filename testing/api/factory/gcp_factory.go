@@ -35,7 +35,7 @@ func NewGCPFactory() *GCPFactory {
 			fmt.Printf("⚠️  Warning: Failed to create GCP IAM service: %v\n", err)
 		}
 	}
-	
+
 	return &GCPFactory{
 		ctx:        ctx,
 		iamService: iamService,
@@ -47,18 +47,18 @@ func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 	switch serviceID {
 	case "iam":
 		return f.iamService, nil
-		
+
 	case "object-storage":
 		// TODO: Implement GCS service creation
 		return nil, fmt.Errorf("object-storage not yet implemented for GCP")
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
 	}
 }
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
-func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity) (generic.Service, error) {
+func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
 	if identity.Provider != string(ProviderGCP) {
 		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
 	}

@@ -12,12 +12,10 @@ Feature: CCC.ObjStor.CN04.AR01
     And I refer to "{result}" as "iamService"
 
   Scenario: Service applies default retention policy to newly uploaded object
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-write"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-write", "{UID}" and "write"
     And I refer to "{result}" as "testUserWrite"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserWrite}", "{UID}" and "write"
-    And I attach "{result}" to the test output as "write-user-policy.json"
-    And I attach "{testUserWrite}" to the test output as "write-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserWrite}"
+    And I attach "{result}" to the test output as "write-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserWrite}" and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateObject" with parameters "{ResourceName}", "test-retention-object.txt" and "protected data"

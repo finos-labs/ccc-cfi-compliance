@@ -12,12 +12,10 @@ Feature: CCC.ObjStor.CN04.AR02
     And I refer to "{result}" as "iamService"
 
   Scenario: Service prevents object deletion by write user during retention period
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-write"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-write", "{UID}" and "write"
     And I refer to "{result}" as "testUserWrite"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserWrite}", "{UID}" and "write"
-    And I attach "{result}" to the test output as "write-user-policy.json"
-    And I attach "{testUserWrite}" to the test output as "write-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserWrite}"
+    And I attach "{result}" to the test output as "write-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserWrite}" and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateObject" with parameters "{ResourceName}", "protected-object.txt" and "immutable data"
@@ -37,10 +35,9 @@ Feature: CCC.ObjStor.CN04.AR02
     And "{result}" should contain "retention"
 
   Scenario: Service prevents object modification during retention period
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-write"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-write", "{UID}" and "write"
     And I refer to "{result}" as "testUserWrite"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserWrite}", "{UID}" and "write"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserWrite}"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserWrite}" and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "CreateObject" with parameters "{ResourceName}", "modify-test-object.txt" and "original content"
@@ -54,12 +51,10 @@ Feature: CCC.ObjStor.CN04.AR02
   Scenario: Service allows object read access during retention period
     When I call "{storage}" with "CreateObject" with parameters "{ResourceName}", "readable-protected-object.txt" and "readable data"
     Then "{result}" is not an error
-    Given I call "{iamService}" with "ProvisionUser" with parameter "test-user-read"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-read", "{UID}" and "read"
     And I refer to "{result}" as "testUserRead"
-    And I call "{iamService}" with "SetAccess" with parameters "{testUserRead}", "{UID}" and "read"
-    And I attach "{result}" to the test output as "read-user-policy.json"
-    And I attach "{testUserRead}" to the test output as "read-user-identity.json"
-    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage" and "{testUserRead}"
+    And I attach "{result}" to the test output as "read-user-identity.json"
+    And I call "{api}" with "GetServiceAPIWithIdentity" with parameters "object-storage", "{testUserRead}" and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
     When I call "{userStorage}" with "ReadObject" with parameters "{ResourceName}" and "readable-protected-object.txt"

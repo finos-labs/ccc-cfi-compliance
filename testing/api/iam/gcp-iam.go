@@ -15,9 +15,11 @@ import (
 
 // GCPIAMService implements IAMService for GCP
 type GCPIAMService struct {
-	client    *admin.IamClient
-	ctx       context.Context
-	projectID string
+	client           *admin.IamClient
+	ctx              context.Context
+	projectID        string
+	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
+	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewGCPIAMService creates a new GCP IAM service using default credentials
@@ -28,9 +30,11 @@ func NewGCPIAMService(ctx context.Context, projectID string) (*GCPIAMService, er
 	}
 
 	return &GCPIAMService{
-		client:    client,
-		ctx:       ctx,
-		projectID: projectID,
+		client:           client,
+		ctx:              ctx,
+		projectID:        projectID,
+		provisionedUsers: make(map[string]*Identity),
+		accessLevels:     make(map[string]string),
 	}, nil
 }
 
@@ -42,14 +46,51 @@ func NewGCPIAMServiceWithCredentials(ctx context.Context, projectID string, cred
 	}
 
 	return &GCPIAMService{
-		client:    client,
-		ctx:       ctx,
-		projectID: projectID,
+		client:           client,
+		ctx:              ctx,
+		projectID:        projectID,
+		provisionedUsers: make(map[string]*Identity),
+		accessLevels:     make(map[string]string),
 	}, nil
 }
 
 // ProvisionUser creates a new IAM service account (GCP's equivalent of a user for programmatic access)
-func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
+// ProvisionUserWithAccess creates a user and sets their access level in a single operation
+func (s *GCPIAMService) ProvisionUserWithAccess(userName string, serviceID string, level string) (*Identity, error) {
+	// Check cache first for both user and access level
+	cacheKey := fmt.Sprintf("%s:%s", userName, serviceID)
+	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
+		if cachedLevel, levelExists := s.accessLevels[cacheKey]; levelExists && cachedLevel == level {
+			fmt.Printf("♻️  Using cached identity for user %s with %s access (skipping all delays)\n", userName, level)
+			return cachedIdentity, nil
+		}
+	}
+
+	// Step 1: Provision the user (or retrieve existing) - GCP service account keys are immediately usable
+	identity, err := s.provisionUserInternal(userName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 2: Set access level - GCP IAM changes propagate quickly, no explicit wait needed
+	policyDoc, err := s.setAccessInternal(identity, serviceID, level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store policy in identity
+	identity.Policy = policyDoc
+
+	// Cache the identity and access level AFTER validation completes
+	s.provisionedUsers[userName] = identity
+	s.accessLevels[cacheKey] = level
+
+	return identity, nil
+}
+
+// provisionUserInternal is the internal implementation of ProvisionUser
+// Note: This does NOT interact with cache - all caching is handled by ProvisionUserWithAccess
+func (s *GCPIAMService) provisionUserInternal(userName string) (*Identity, error) {
 	// Service account ID must be between 6-30 characters, lowercase, digits, hyphens
 	serviceAccountID := sanitizeServiceAccountID(userName)
 	serviceAccountEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAccountID, s.projectID)
@@ -153,26 +194,32 @@ func (s *GCPIAMService) ProvisionUser(userName string) (*Identity, error) {
 	fmt.Printf("   Unique ID: %s\n", identity.Credentials["unique_id"])
 	fmt.Printf("   Project ID: %s\n", identity.Credentials["project_id"])
 
+	// Don't cache here - that's handled by ProvisionUserWithAccess
 	return identity, nil
 }
 
-// SetAccess grants an identity access to a specific GCP service/resource at the specified level
-func (s *GCPIAMService) SetAccess(identity *Identity, serviceID string, level string) error {
+// setAccessInternal grants an identity access to a specific GCP resource at the specified level
+// This is the internal implementation called by ProvisionUserWithAccess
+// Note: This does NOT interact with cache - all caching is handled by ProvisionUserWithAccess
+func (s *GCPIAMService) setAccessInternal(identity *Identity, serviceID string, level string) (string, error) {
 	// Determine the IAM role based on access level
 	role, err := s.getRoleForLevel(serviceID, level)
 	if err != nil {
-		return fmt.Errorf("failed to determine role: %w", err)
+		return "", fmt.Errorf("failed to determine role: %w", err)
 	}
+
+	// Generate policy document
+	policyDoc := fmt.Sprintf(`{"user": "%s", "service": "%s", "level": "%s", "role": "%s"}`, identity.UserName, serviceID, level, role)
 
 	if role == "" {
 		// "none" level - no role to assign
-		return nil
+		return policyDoc, nil
 	}
 
 	// Get the service account email
 	serviceAccountEmail := identity.Credentials["email"]
 	if serviceAccountEmail == "" {
-		return fmt.Errorf("service account email not found in identity credentials")
+		return "", fmt.Errorf("service account email not found in identity credentials")
 	}
 
 	member := fmt.Sprintf("serviceAccount:%s", serviceAccountEmail)
@@ -191,7 +238,7 @@ func (s *GCPIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 	policy, err := s.getResourcePolicy(s.ctx, resourceName, getPolicyReq)
 	if err != nil {
-		return fmt.Errorf("failed to get IAM policy for %s: %w", resourceName, err)
+		return "", fmt.Errorf("failed to get IAM policy for %s: %w", resourceName, err)
 	}
 
 	// Check if binding already exists
@@ -231,11 +278,13 @@ func (s *GCPIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 	_, err = s.setResourcePolicy(s.ctx, resourceName, setPolicyReq)
 	if err != nil {
-		return fmt.Errorf("failed to set IAM policy for %s: %w", resourceName, err)
+		return "", fmt.Errorf("failed to set IAM policy for %s: %w", resourceName, err)
 	}
 
 	fmt.Printf("   ✅ Access granted\n")
-	return nil
+
+	// Don't cache here - that's handled by ProvisionUserWithAccess
+	return policyDoc, nil
 }
 
 // DestroyUser removes a service account and all associated resources
@@ -406,6 +455,10 @@ func sanitizeServiceAccountID(userName string) string {
 // Fill this later when we are writing tests for IAM
 func (s *GCPIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
+}
+
+func (s *GCPIAMService) CheckUserProvisioned() error {
+	return nil
 }
 
 // ElevateAccessForInspection is a no-op for IAM services

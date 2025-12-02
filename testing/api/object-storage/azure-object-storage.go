@@ -548,6 +548,16 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 	return resources, nil
 }
 
+// CheckUserProvisioned validates that the given identity can access Azure Blob Storage
+// This performs a simple list operation to ensure credentials have propagated
+func (s *AzureBlobService) CheckUserProvisioned() error {
+	_, err := s.listContainersForAccount(s.cloudParams.AzureStorageAccount)
+	if err != nil {
+		return fmt.Errorf("credentials not ready for Azure Blob Storage access: %w", err)
+	}
+	return nil
+}
+
 func (s *AzureBlobService) ElevateAccessForInspection() error {
 	return s.elevator.ElevateStorageAccountAccess(s.cloudParams.AzureStorageAccount)
 }

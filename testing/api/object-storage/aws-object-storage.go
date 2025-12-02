@@ -378,7 +378,17 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 	return resources, nil
 }
 
-// ElevateAccessForInspection is a no-op for AWS S3 (access is managed via IAM)
+// CheckUserProvisioned validates that the given identity can access S3
+// For AWS, credentials are immediately usable, so this just attempts a simple S3 API call
+func (s *AWSS3Service) CheckUserProvisioned() error {
+	// Try to list buckets as a validation that credentials work
+	_, err := s.client.ListBuckets(s.ctx, &s3.ListBucketsInput{})
+	if err != nil {
+		return fmt.Errorf("credentials not ready for S3 access: %w", err)
+	}
+	return nil
+}
+
 func (s *AWSS3Service) ElevateAccessForInspection() error {
 	// No-op: AWS S3 access is managed through IAM policies, not network access
 	return nil

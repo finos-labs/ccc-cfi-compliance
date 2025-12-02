@@ -13,6 +13,11 @@ type Service interface {
 	// as a set of TestParams. If no resources exist, create default ones.
 	GetOrProvisionTestableResources() ([]environment.TestParams, error)
 
+	// CheckUserProvisioned validates that the service's identity is properly provisioned
+	// and usable. Returns nil if the user is ready, error otherwise.
+	// This is used in a retry loop to ensure credentials have propagated before use.
+	CheckUserProvisioned() error
+
 	// ElevateAccessForInspection temporarily elevates access permissions to allow testing
 	// For example, Azure storage might enable public network access
 	// The original access level is stored internally for later reset

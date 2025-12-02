@@ -11,17 +11,10 @@ const (
 
 // IAMService provides identity and access management operations
 type IAMService interface {
-	// ProvisionUser creates a new user/identity in the cloud provider
-	// Returns the created Identity with credentials
-	// returns an existing user if it already exists
-	ProvisionUser(userName string) (*Identity, error)
-
-	// SetAccess grants an identity access to a specific service at the specified level
-	// serviceID is the cloud service identifier (ARN, resource ID, etc.)
+	// ProvisionUserWithAccess creates a new user/identity in the cloud provider and sets their access level
+	// Includes propagation/retry logic to ensure credentials and permissions are active
 	// level specifies the access level: "none", "read", "write", or "admin"
-	// makes no change if the level is already set.
-	// Returns the generated policy document JSON and any error
-	SetAccess(identity *Identity, serviceID string, level string) (string, error)
+	ProvisionUserWithAccess(userName string, serviceID string, level string) (*Identity, error)
 
 	// GetAccess retrieves the current access level for a user and service
 	// Returns the access level ("none", "read", "write", "admin"), the policy document JSON, and any error

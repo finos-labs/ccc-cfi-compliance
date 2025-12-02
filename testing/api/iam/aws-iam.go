@@ -38,12 +38,42 @@ func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
 }
 
 // ProvisionUser creates a new IAM user with access keys
-func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
-	// Check cache first - if we've already provisioned this user in this session, return it
+// ProvisionUserWithAccess creates a user and sets their access level in a single operation
+func (s *AWSIAMService) ProvisionUserWithAccess(userName string, serviceID string, level string) (*Identity, error) {
+	// Check cache first for both user and access level
+	cacheKey := fmt.Sprintf("%s:%s", userName, serviceID)
 	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
-		fmt.Printf("♻️  Using cached identity for user %s (skipping propagation delay)\n", userName)
-		return cachedIdentity, nil
+		if cachedLevel, levelExists := s.accessLevels[cacheKey]; levelExists && cachedLevel == level {
+			fmt.Printf("♻️  Using cached identity for user %s with %s access (skipping all delays)\n", userName, level)
+			return cachedIdentity, nil
+		}
 	}
+
+	// Step 1: Provision the user (or retrieve existing) - no waiting needed for AWS credentials
+	identity, err := s.provisionUserInternal(userName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 2: Set access level - this will wait for IAM policy propagation
+	policyDoc, err := s.setAccessInternal(identity, serviceID, level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Store policy in identity
+	identity.Policy = policyDoc
+
+	// Cache the identity and access level AFTER validation completes
+	s.provisionedUsers[userName] = identity
+	s.accessLevels[cacheKey] = level
+
+	return identity, nil
+}
+
+// provisionUserInternal is the internal implementation of ProvisionUser
+// Note: This does NOT interact with cache - all caching is handled by ProvisionUserWithAccess
+func (s *AWSIAMService) provisionUserInternal(userName string) (*Identity, error) {
 
 	var createUserOutput *iam.CreateUserOutput
 	var userAlreadyExists bool
@@ -152,26 +182,14 @@ func (s *AWSIAMService) ProvisionUser(userName string) (*Identity, error) {
 		fmt.Printf("   Account ID: %s\n", identity.Credentials["account_id"])
 	}
 
-	// Cache the identity for future requests
-	s.provisionedUsers[userName] = identity
-
+	// Don't cache here - that's handled by ProvisionUserWithAccess
 	return identity, nil
 }
 
-// SetAccess grants an identity access to a specific AWS service/resource at the specified level
-func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level string) (string, error) {
-	// Check cache first - if we've already set this access level, skip it
-	cacheKey := fmt.Sprintf("%s:%s", identity.UserName, serviceID)
-	if cachedLevel, exists := s.accessLevels[cacheKey]; exists && cachedLevel == level {
-		fmt.Printf("♻️  Access level already set to %s for %s (skipping propagation delay)\n", level, identity.UserName)
-		// Generate and return the policy document without making AWS calls
-		policyDocument, err := s.generatePolicyDocument(serviceID, level)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate policy: %w", err)
-		}
-		return policyDocument, nil
-	}
-
+// setAccessInternal grants an identity access to a specific AWS service/resource at the specified level
+// This is the internal implementation called by ProvisionUserWithAccess
+// Note: This does NOT interact with cache - all caching is handled by ProvisionUserWithAccess
+func (s *AWSIAMService) setAccessInternal(identity *Identity, serviceID string, level string) (string, error) {
 	// Check current access level
 	currentLevel, currentPolicy, err := s.GetAccess(identity, serviceID)
 	if err != nil {
@@ -181,8 +199,6 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 
 		if currentLevel == level {
 			fmt.Printf("ℹ️  Access level unchanged, skipping...\n")
-			// Cache this access level
-			s.accessLevels[cacheKey] = level
 			// Return the existing policy document
 			return currentPolicy, nil
 		}
@@ -214,9 +230,7 @@ func (s *AWSIAMService) SetAccess(identity *Identity, serviceID string, level st
 	time.Sleep(15 * time.Second)
 	fmt.Printf("✅ IAM policy propagation wait complete\n")
 
-	// Cache the access level for future requests
-	s.accessLevels[cacheKey] = level
-
+	// Don't cache here - that's handled by ProvisionUserWithAccess
 	return policyDocument, nil
 }
 
@@ -461,6 +475,12 @@ func sanitizeForPolicyName(s string) string {
 // Fill this later when we are writing tests for IAM
 func (s *AWSIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
+}
+
+// CheckUserProvisioned is a no-op for IAM services (no service-specific validation needed)
+func (s *AWSIAMService) CheckUserProvisioned() error {
+	// No-op: IAM services don't require additional credential validation
+	return nil
 }
 
 // ElevateAccessForInspection is a no-op for IAM services
