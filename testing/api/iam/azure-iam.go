@@ -348,7 +348,7 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 	appObjectID := identity.Credentials["app_object_id"]
 	if appObjectID != "" {
 		err := s.deleteApplication(appObjectID)
-	if err != nil {
+		if err != nil {
 			fmt.Printf("   ⚠️  Failed to delete application: %v\n", err)
 		} else {
 			fmt.Printf("   ✅ Application deleted\n")
@@ -453,6 +453,18 @@ func toPtr(s string) *string {
 // Fill this later when we are writing tests for IAM
 func (s *AzureIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
+}
+
+// ElevateAccessForInspection is a no-op for IAM services
+func (s *AzureIAMService) ElevateAccessForInspection() error {
+	// No-op: IAM services don't have network-level access controls to elevate
+	return nil
+}
+
+// ResetAccess is a no-op for IAM services
+func (s *AzureIAMService) ResetAccess() error {
+	// No-op: IAM services don't have network-level access controls to reset
+	return nil
 }
 
 // Microsoft Graph API helper methods

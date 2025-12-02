@@ -49,6 +49,12 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AWS service '%s': %w", serviceID, err)
 		}
+
+		// Elevate access for testing
+		if err := service.ElevateAccessForInspection(); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
+		}
+
 		return service, nil
 
 	default:
@@ -71,6 +77,12 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AWS service '%s' with identity: %w", serviceID, err)
 		}
+
+		// Elevate access for testing
+		if err := service.ElevateAccessForInspection(); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
+		}
+
 		return service, nil
 
 	default:

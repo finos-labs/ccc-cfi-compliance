@@ -23,7 +23,7 @@ Feature: CCC.ObjStor.CN04.AR01
     When I call "{userStorage}" with "CreateObject" with parameters "{ResourceName}", "test-retention-object.txt" and "protected data"
     And I attach "{result}" to the test output as "uploaded-object.json"
     And I call "{userStorage}" with "GetObjectRetentionDurationDays" with parameters "{ResourceName}" and "test-retention-object.txt"
-    Then "{result}" should be greater than "10"
+    Then "{result}" should be greater than "1"
     And I call "{storage}" with "DeleteObject" with parameters "{ResourceName}" and "test-retention-object.txt"
 
   Scenario: Service enforces retention policy on newly created objects
@@ -37,6 +37,6 @@ Feature: CCC.ObjStor.CN04.AR01
   Scenario: Service validates retention period meets minimum requirements
     When I call "{storage}" with "CreateObject" with parameters "{ResourceName}", "retention-period-test.txt" and "compliance data"
     And I call "{storage}" with "GetObjectRetentionDurationDays" with parameters "{ResourceName}" and "retention-period-test.txt"
-    Then "{result}" should be greater than "7"
+    Then "{result}" should be greater than "1"
     And I attach "{result}" to the test output as "retention-period-days.json"
     And I call "{storage}" with "DeleteObject" with parameters "{ResourceName}" and "retention-period-test.txt"

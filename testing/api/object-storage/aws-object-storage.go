@@ -377,3 +377,15 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 
 	return resources, nil
 }
+
+// ElevateAccessForInspection is a no-op for AWS S3 (access is managed via IAM)
+func (s *AWSS3Service) ElevateAccessForInspection() error {
+	// No-op: AWS S3 access is managed through IAM policies, not network access
+	return nil
+}
+
+// ResetAccess is a no-op for AWS S3 (access is managed via IAM)
+func (s *AWSS3Service) ResetAccess() error {
+	// No-op: AWS S3 access is managed through IAM policies, not network access
+	return nil
+}

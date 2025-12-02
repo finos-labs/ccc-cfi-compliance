@@ -462,3 +462,15 @@ func sanitizeForPolicyName(s string) string {
 func (s *AWSIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
 }
+
+// ElevateAccessForInspection is a no-op for IAM services
+func (s *AWSIAMService) ElevateAccessForInspection() error {
+	// No-op: IAM services don't have network-level access controls to elevate
+	return nil
+}
+
+// ResetAccess is a no-op for IAM services
+func (s *AWSIAMService) ResetAccess() error {
+	// No-op: IAM services don't have network-level access controls to reset
+	return nil
+}

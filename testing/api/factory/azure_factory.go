@@ -46,6 +46,12 @@ func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
 		}
+
+		// TODO: DO this generically.  Elevate access for testing
+		if err := service.ElevateAccessForInspection(); err != nil {
+			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
+		}
+
 		return service, nil
 
 	default:
@@ -68,6 +74,7 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
 		}
+
 		return service, nil
 
 	default:

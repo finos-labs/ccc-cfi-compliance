@@ -12,4 +12,13 @@ type Service interface {
 	// For a given service type, return all the resources that can be tested within it,
 	// as a set of TestParams. If no resources exist, create default ones.
 	GetOrProvisionTestableResources() ([]environment.TestParams, error)
+
+	// ElevateAccessForInspection temporarily elevates access permissions to allow testing
+	// For example, Azure storage might enable public network access
+	// The original access level is stored internally for later reset
+	ElevateAccessForInspection() error
+
+	// ResetAccess restores the original access permissions that were in place
+	// before ElevateAccessForInspection was called
+	ResetAccess() error
 }

@@ -13,15 +13,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage/elevation"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AzureBlobService implements Service for Azure Blob Storage
 type AzureBlobService struct {
-	storageClient *armstorage.AccountsClient
+	storageClient *armstorage.AccountsClient // For normal storage operations
 	credential    azcore.TokenCredential
 	ctx           context.Context
 	cloudParams   environment.CloudParams
+	elevator      *elevation.AzureStorageElevator // Handles access elevation (RBAC + network)
 }
 
 // NewAzureBlobService creates a new Azure Blob Storage service using default credentials
@@ -31,9 +33,21 @@ func NewAzureBlobService(ctx context.Context, cloudParams environment.CloudParam
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
+	// Create storage client for normal operations
 	storageClient, err := armstorage.NewAccountsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage accounts client: %w", err)
+	}
+
+	// Create elevator for managing access controls (RBAC + network)
+	elevator, err := elevation.NewAzureStorageElevator(
+		ctx,
+		cred,
+		cloudParams.AzureSubscriptionID,
+		cloudParams.AzureResourceGroup,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure storage elevator: %w", err)
 	}
 
 	return &AzureBlobService{
@@ -41,6 +55,7 @@ func NewAzureBlobService(ctx context.Context, cloudParams environment.CloudParam
 		credential:    cred,
 		ctx:           ctx,
 		cloudParams:   cloudParams,
+		elevator:      elevator,
 	}, nil
 }
 
@@ -72,9 +87,21 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environ
 		return nil, fmt.Errorf("failed to create service principal credential: %w", err)
 	}
 
+	// Create storage client for normal operations
 	storageClient, err := armstorage.NewAccountsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage accounts client: %w", err)
+	}
+
+	// Create elevator for managing access controls (RBAC + network)
+	elevator, err := elevation.NewAzureStorageElevator(
+		ctx,
+		cred,
+		cloudParams.AzureSubscriptionID,
+		cloudParams.AzureResourceGroup,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure storage elevator: %w", err)
 	}
 
 	return &AzureBlobService{
@@ -82,6 +109,7 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environ
 		credential:    cred,
 		ctx:           ctx,
 		cloudParams:   cloudParams,
+		elevator:      elevator,
 	}, nil
 }
 
@@ -518,4 +546,12 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 	}
 
 	return resources, nil
+}
+
+func (s *AzureBlobService) ElevateAccessForInspection() error {
+	return s.elevator.ElevateStorageAccountAccess(s.cloudParams.AzureStorageAccount)
+}
+
+func (s *AzureBlobService) ResetAccess() error {
+	return s.elevator.ResetStorageAccountAccess(s.cloudParams.AzureStorageAccount)
 }

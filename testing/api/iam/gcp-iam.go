@@ -407,3 +407,15 @@ func sanitizeServiceAccountID(userName string) string {
 func (s *GCPIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	return []environment.TestParams{}, nil
 }
+
+// ElevateAccessForInspection is a no-op for IAM services
+func (s *GCPIAMService) ElevateAccessForInspection() error {
+	// No-op: IAM services don't have network-level access controls to elevate
+	return nil
+}
+
+// ResetAccess is a no-op for IAM services
+func (s *GCPIAMService) ResetAccess() error {
+	// No-op: IAM services don't have network-level access controls to reset
+	return nil
+}
