@@ -15,4 +15,33 @@ module "storage_account" {
   account_replication_type = "LRS"  # Locally redundant - cheapest option
   access_tier              = "Hot"  # Hot is default, but explicit
 
+  # Enable versioning required for immutability policies
+  is_hns_enabled = false
+  blob_properties = {
+    versioning_enabled = true
+    
+    # Container delete retention for soft delete (CN03 tests)
+    container_delete_retention_policy = {
+      days = 3
+    }
+    
+    # Blob delete retention for soft delete (CN03 tests)
+    delete_retention_policy = {
+      days = 3
+    }
+  }
+
+  # Create default container with immutability policy (CN04 tests - 3 day retention)
+  containers = {
+    ccc-test-container = {
+      name                  = "ccc-test-container"
+      container_access_type = "private"
+      
+      # Time-based retention policy for WORM compliance
+      immutability_policy = {
+        immutability_period_in_days = 3
+        policy_mode                  = "Unlocked"  # Unlocked allows testing, Locked is for production
+      }
+    }
+  }
 }
