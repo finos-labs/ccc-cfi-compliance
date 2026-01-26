@@ -62,6 +62,7 @@ func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, par
 	sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
 		suite.Props = make(map[string]interface{})
 		suite.AsyncManager = generic.NewAsyncTaskManager()
+		suite.ClearAttachments() // Clear attachments from previous scenario
 		suite.setupServiceParams(params)
 		suite.setupServiceParams(params.CloudParams)
 		return ctx, nil

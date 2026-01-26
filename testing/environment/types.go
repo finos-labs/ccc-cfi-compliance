@@ -27,5 +27,10 @@ type CloudParams struct {
 // ServiceTypes contains all known service types
 var ServiceTypes = []string{
 	"object-storage",
+	"block-storage",
+	"relational-database",
 	"iam",
+	"load-balancer",
+	"security-group",
+	"vpc",
 }

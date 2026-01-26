@@ -1,0 +1,42 @@
+name: ALB Trust Store Validation
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 7
+validity_commentary: >
+  This companion query validates the trust store configuration used by mTLS.
+  It ensures the trust store is active and contains CA certificates. Limitations:
+  - Does not validate the specific CA certificates in the trust store
+  - Cannot verify certificate chain validity
+  - Revocation list contents are not inspected
+  - Should be used in conjunction with the listener mTLS configuration check
+  - Consider adding certificate expiry monitoring for trust store CAs
+
+query: |
+  aws elbv2 describe-trust-stores \
+    --trust-store-arns ${TRUST_STORE_ARN}
+
+rules:
+  - jsonpath: "$.TrustStores[*].Status"
+    expected_values:
+      - "ACTIVE"
+    validation_rule: "^ACTIVE$"
+    description: >
+      Verifies that the trust store is in ACTIVE status. A trust store in any
+      other state (e.g., CREATING, FAILED) would not properly validate certificates.
+
+  - jsonpath: "$.TrustStores[*].NumberOfCaCertificates"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Ensures at least one CA certificate is present in the trust store.
+      A trust store with zero CA certificates cannot validate any client certificates.
+
+  - jsonpath: "$.TrustStores[*].Name"
+    expected_values: []
+    validation_rule: "^[a-zA-Z0-9-]+$"
+    description: >
+      Validates that the trust store has a properly formatted name.
+      This is a basic sanity check for the trust store configuration.

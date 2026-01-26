@@ -1,0 +1,54 @@
+name: S3 Bucket KMS Key Algorithm Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST verify that all encryption 
+  keys use the latest industry-standard cryptographic algorithms.
+
+validity_score: 7
+validity_commentary: >
+  This query validates the KMS key configuration used for S3 bucket encryption.
+  AWS KMS keys use AES-256-GCM for symmetric encryption. Strengths:
+  - Validates KMS key is properly configured
+  - AWS KMS enforces FIPS 140-2 validated cryptographic modules
+  - Key spec confirms algorithm type (SYMMETRIC_DEFAULT = AES-256-GCM)
+  Limitations:
+  - Requires a separate KMS API call to get key details
+  - Does not validate key policy or usage permissions
+  - SSE-S3 (AES256) keys are AWS-managed and not queryable
+
+query: |
+  aws kms describe-key \
+    --key-id ${KMS_KEY_ID}
+
+rules:
+  - jsonpath: "$.KeyMetadata.KeySpec"
+    expected_values:
+      - "SYMMETRIC_DEFAULT"
+    validation_rule: "^SYMMETRIC_DEFAULT$"
+    description: >
+      Validates that the KMS key uses SYMMETRIC_DEFAULT spec, which is
+      AES-256-GCM - an industry-standard authenticated encryption algorithm.
+
+  - jsonpath: "$.KeyMetadata.KeyUsage"
+    expected_values:
+      - "ENCRYPT_DECRYPT"
+    validation_rule: "^ENCRYPT_DECRYPT$"
+    description: >
+      Verifies the key is configured for encryption/decryption operations,
+      which is required for S3 server-side encryption.
+
+  - jsonpath: "$.KeyMetadata.KeyState"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Confirms the KMS key is in Enabled state and can be used for
+      cryptographic operations.
+
+  - jsonpath: "$.KeyMetadata.KeyManager"
+    expected_values:
+      - "CUSTOMER"
+    validation_rule: "^CUSTOMER$"
+    description: >
+      Validates this is a customer-managed key (CMK), not an AWS-managed key.
+      Customer-managed keys provide more control over key lifecycle.

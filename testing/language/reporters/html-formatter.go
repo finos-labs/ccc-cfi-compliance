@@ -119,6 +119,8 @@ func (f *HTMLFormatter) Summary() {
 			attachments := f.attachmentProvider.GetAttachments()
 			if len(attachments) > 0 {
 				f.bodyBuffer.WriteString(formatAttachments(attachments))
+				// Clear attachments after rendering
+				f.attachmentProvider.ClearAttachments()
 			}
 		}
 		fmt.Fprintf(&f.bodyBuffer, `</div>`)
@@ -315,41 +317,41 @@ func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v 
 		return
 	}
 
-		t := v.Type()
-		for i := 0; i < v.NumField(); i++ {
-			field := t.Field(i)
-			value := v.Field(i)
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
 
 		// Skip the specified field if provided
 		if skipFieldName != "" && field.Name == skipFieldName {
 			continue
 		}
 
-			// Format the value based on its type
-			var valueStr string
-			switch value.Kind() {
-			case reflect.Slice:
+		// Format the value based on its type
+		var valueStr string
+		switch value.Kind() {
+		case reflect.Slice:
 			// Handle slice types (like Labels, CatalogTypes)
-				if value.Len() > 0 {
-					items := make([]string, value.Len())
-					for j := 0; j < value.Len(); j++ {
-						items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
-					}
-					valueStr = strings.Join(items, ", ")
-				} else {
-					valueStr = ""
+			if value.Len() > 0 {
+				items := make([]string, value.Len())
+				for j := 0; j < value.Len(); j++ {
+					items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
 				}
+				valueStr = strings.Join(items, ", ")
+			} else {
+				valueStr = ""
+			}
 		case reflect.Struct:
 			// Skip nested structs (like CloudParams) - they should be handled separately
 			continue
-			default:
-				valueStr = fmt.Sprintf("%v", value.Interface())
-			}
+		default:
+			valueStr = fmt.Sprintf("%v", value.Interface())
+		}
 
-			// Only add non-empty values
-			if valueStr != "" {
-				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
-			}
+		// Only add non-empty values
+		if valueStr != "" {
+			tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
+		}
 	}
 }
 

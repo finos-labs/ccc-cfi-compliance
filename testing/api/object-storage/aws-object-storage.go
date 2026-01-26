@@ -431,6 +431,24 @@ func (s *AWSS3Service) SetObjectPermission(bucketID, objectID string, permission
 	return nil
 }
 
+// ListDeletedBuckets returns an error - AWS S3 does not support bucket-level soft delete
+// S3 bucket deletion is immediate and permanent (CN03.AR01 not supported)
+func (s *AWSS3Service) ListDeletedBuckets() ([]Bucket, error) {
+	return nil, fmt.Errorf("AWS S3 does not support bucket-level soft delete - bucket deletion is immediate and permanent")
+}
+
+// RestoreBucket returns an error - AWS S3 does not support bucket-level soft delete
+// S3 bucket deletion is immediate and permanent (CN03.AR01 not supported)
+func (s *AWSS3Service) RestoreBucket(bucketID string) error {
+	return fmt.Errorf("AWS S3 does not support bucket restoration - bucket deletion is immediate and permanent")
+}
+
+// SetBucketRetentionDurationDays returns an error - AWS S3 does not support bucket-level retention policies
+// S3 has Object Lock for object-level retention, but not bucket-level (CN03.AR02 not supported at bucket level)
+func (s *AWSS3Service) SetBucketRetentionDurationDays(bucketID string, days int) error {
+	return fmt.Errorf("AWS S3 does not support bucket-level retention policies - use Object Lock for object-level retention instead")
+}
+
 // ResetAccess is a no-op for AWS S3 (access is managed via IAM)
 func (s *AWSS3Service) ResetAccess() error {
 	// No-op: AWS S3 access is managed through IAM policies, not network access

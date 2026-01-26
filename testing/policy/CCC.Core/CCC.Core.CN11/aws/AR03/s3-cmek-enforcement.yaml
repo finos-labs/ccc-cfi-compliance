@@ -1,0 +1,38 @@
+name: S3 Customer-Managed Encryption Key (CMEK) Enforcement
+service_type: object-storage
+requirement_text: >
+  When encrypting data, the service MUST verify that customer-managed encryption 
+  keys (CMEKs) are used.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that S3 bucket encryption uses a customer-managed KMS key
+  (CMEK) rather than AWS-managed keys or S3-managed keys. Strengths:
+  - Directly validates encryption configuration
+  - KMSMasterKeyID presence indicates CMEK usage
+  - Can distinguish between aws:kms (CMEK) and AES256 (SSE-S3)
+  Limitations:
+  - Does not validate the referenced KMS key exists or is accessible
+  - Does not verify key policy allows the required operations
+  - Bucket policy may allow objects with different encryption
+
+query: |
+  aws s3api get-bucket-encryption \
+    --bucket ${BUCKET_NAME}
+
+rules:
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[*].ApplyServerSideEncryptionByDefault.SSEAlgorithm"
+    expected_values:
+      - "aws:kms"
+      - "aws:kms:dsse"
+    validation_rule: "^aws:kms(:dsse)?$"
+    description: >
+      Verifies that the bucket uses SSE-KMS encryption (not SSE-S3/AES256).
+      SSE-KMS allows use of customer-managed keys for encryption.
+
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[*].ApplyServerSideEncryptionByDefault.KMSMasterKeyID"
+    expected_values: []
+    validation_rule: "^arn:aws:kms:[a-z0-9-]+:[0-9]+:key/[a-f0-9-]+$"
+    description: >
+      Validates that a specific KMS key ARN is configured. The presence of a
+      key ARN (not alias/aws/s3) indicates a customer-managed key is in use.

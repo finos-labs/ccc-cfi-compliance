@@ -1,0 +1,36 @@
+name: EC2 Security Group SSH Port Configuration
+service_type: security-group
+requirement_text: >
+  When a port is exposed for SSH network traffic, all traffic MUST include a SSH 
+  handshake AND be encrypted using SSHv2 or higher.
+
+validity_score: 4
+validity_commentary: >
+  This query has significant limitations for validating SSHv2 enforcement:
+  - SSH protocol version is configured at the OS level (sshd_config), not in AWS API
+  - This query only verifies that port 22 is exposed via TCP, not the SSH version
+  - Cannot detect if SSH is running on non-standard ports
+  - Does not validate SSH key algorithms or cipher suites
+  - EC2 Instance Connect enforces SSHv2 but its usage cannot be mandated via policy
+  - A behavioral test (actual SSH connection) would be needed for full validation
+  - Consider supplementing with SSM Session Manager which provides encrypted tunnels
+
+query: |
+  aws ec2 describe-security-group-rules \
+    --filters Name=group-id,Values=${SECURITY_GROUP_ID}
+
+rules:
+  - jsonpath: "$.SecurityGroupRules[?(@.FromPort == 22 && @.ToPort == 22 && @.IsEgress == false)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      Verifies that port 22 ingress rules use TCP protocol, which is required for SSH.
+      UDP on port 22 would indicate a misconfiguration.
+
+  - jsonpath: "$.SecurityGroupRules[?(@.FromPort == 22 && @.ToPort == 22 && @.IsEgress == false)].CidrIpv4"
+    expected_values: []
+    validation_rule: "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|100\\.64\\.).*$"
+    description: >
+      Validates that SSH access is restricted to private IP ranges (RFC 1918 or CGNAT).
+      Public SSH access (0.0.0.0/0) represents a security risk and should be flagged.

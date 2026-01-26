@@ -1,0 +1,29 @@
+name: KMS Key Automatic Rotation (180 days)
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST rotate active keys within 
+  180 days of issuance.
+
+validity_score: 5
+validity_commentary: >
+  This query checks if KMS automatic key rotation is enabled. However, AWS KMS
+  automatic rotation occurs annually (365 days), not every 180 days. Limitations:
+  - AWS KMS automatic rotation is annual, not configurable to 180 days
+  - To achieve 180-day rotation, manual key rotation is required
+  - This query can only verify automatic rotation is enabled
+  - Manual rotation compliance requires tracking key creation dates
+  - Consider using AWS Config rules for custom rotation period validation
+
+query: |
+  aws kms get-key-rotation-status \
+    --key-id ${KMS_KEY_ID}
+
+rules:
+  - jsonpath: "$.KeyRotationEnabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that automatic key rotation is enabled. Note: AWS KMS rotates
+      keys annually. For 180-day rotation, manual rotation processes must be
+      implemented and tracked separately.

@@ -31,6 +31,9 @@ type Service interface {
 	DeleteBucket(bucketID string) error
 	GetBucketRegion(bucketID string) (string, error)
 	GetBucketRetentionDurationDays(bucketID string) (int, error)
+	SetBucketRetentionDurationDays(bucketID string, days int) error
+	ListDeletedBuckets() ([]Bucket, error)
+	RestoreBucket(bucketID string) error
 
 	// Object operations
 	ListObjects(bucketID string) ([]Object, error)
