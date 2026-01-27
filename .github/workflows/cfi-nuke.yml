@@ -113,11 +113,22 @@ jobs:
               ${{ env.DRY_RUN_FLAG }} \
               --no-prompt || true
           elif [ "${{ matrix.platform.name }}" = "azure" ]; then
+            # Get OIDC token from GitHub Actions and write to file
+            FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+            echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
+            
             ${{ matrix.platform.binary_name }} run \
               --config .github/workflows/nuke/${{ matrix.platform.config }} \
-              --use-azure-cli \
+              --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
+              --client-id ${{ secrets.AZURE_CLIENT_ID }} \
+              --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+              --client-federated-token-file /tmp/azure-federated-token.txt \
               ${{ env.DRY_RUN_FLAG }} \
               --force || true
+            
+            # Clean up token file
+            rm -f /tmp/azure-federated-token.txt
           else
             ${{ matrix.platform.binary_name }} run \
               --config .github/workflows/nuke/${{ matrix.platform.config }} \
