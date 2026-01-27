@@ -17,6 +17,10 @@ jobs:
       max-parallel: 3 # Run all platforms concurrently
       matrix:
         platform:
+          - name: gcp
+            config: gcp-nuke-config.yaml
+            binary_url: https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz
+            binary_name: gcp-nuke
           - name: aws
             config: aws-nuke-config.yaml
             binary_url: https://github.com/ekristen/aws-nuke/releases/download/v3.60.1/aws-nuke-v3.60.1-linux-amd64.tar.gz
@@ -25,10 +29,6 @@ jobs:
             config: azure-nuke-config.yaml
             binary_url: https://github.com/ekristen/azure-nuke/releases/download/v1.2.3/azure-nuke-v1.2.3-linux-amd64.tar.gz
             binary_name: azure-nuke
-          # - name: gcp
-          #   config: gcp-nuke-config.yaml
-          #   binary_url: https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz
-          #   binary_name: gcp-nuke
       fail-fast: false
 
     env:
