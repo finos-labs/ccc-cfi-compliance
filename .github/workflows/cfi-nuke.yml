@@ -113,9 +113,21 @@ jobs:
               ${{ env.DRY_RUN_FLAG }} \
               --no-prompt || true
           elif [ "${{ matrix.platform.name }}" = "azure" ]; then
+            # Debug: Show subscription ID being used (first 8 chars only for security)
+            SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            echo "🔍 Debug: Subscription ID starts with: ${SUBSCRIPTION_ID:0:8}..."
+            echo "🔍 Debug: Expected in config: c1cedd8e-bf91-4d7d-a4cc-45700402a2a1"
+            
             # Get OIDC token from GitHub Actions and write to file
+            echo "🔍 Debug: Fetching OIDC token..."
             FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+            
+            if [ -z "$FEDERATED_TOKEN" ] || [ "$FEDERATED_TOKEN" = "null" ]; then
+              echo "❌ Error: Failed to retrieve OIDC token"
+              exit 1
+            fi
+            echo "✅ OIDC token retrieved (length: ${#FEDERATED_TOKEN})"
             echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
             
             ${{ matrix.platform.binary_name }} run \
