@@ -3,7 +3,7 @@ blocklist:
 
 regions:
   - global
-  - us-central1
+  - all
 
 accounts:
   "nodal-time-474015-p5":

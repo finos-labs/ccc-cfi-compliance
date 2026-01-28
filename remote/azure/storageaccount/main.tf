@@ -4,11 +4,17 @@ variable "storage_account_name" {
   default     = "storagecfitesting2026"
 }
 
+# Resource group for CFI testing
+resource "azurerm_resource_group" "cfi_test" {
+  name     = "cfi_test"
+  location = "eastus"
+}
+
 # Storage account for compliance testing
 module "storage_account" {
   source = "git::https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount.git?ref=main"
-  location = "eastus"
-  resource_group_name = "cfi_test"
+  location = azurerm_resource_group.cfi_test.location
+  resource_group_name = azurerm_resource_group.cfi_test.name
   name = var.storage_account_name
 
   account_tier             = "Standard"

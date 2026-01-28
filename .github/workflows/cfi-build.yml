@@ -361,6 +361,30 @@ jobs:
             echo "⚠️  No combined OCSF file found for $TARGET_ID"
           fi
 
+      - name: Refresh AWS Credentials (OIDC)
+        if: always() && steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Azure Credentials (OIDC)
+        if: always() && steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh GCP Credentials (OIDC)
+        if: always() && steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
       - name: Terraform Destroy
         if: always() && steps.terraform-apply.outcome == 'success'
         run: |
