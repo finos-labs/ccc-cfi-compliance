@@ -1,7 +1,7 @@
 variable "storage_account_name" {
   description = "Azure storage account name (set via TF_VAR_storage_account_name or AZURE_STORAGE_ACCOUNT)"
   type        = string
-  default     = "storagecfitesting2025"
+  default     = "storagecfitesting2026"
 }
 
 # Storage account for compliance testing
