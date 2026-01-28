@@ -4,6 +4,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: cfi-build
+  cancel-in-progress: false
+
 on:
   schedule:
     # Run every morning at 4 AM UTC (11 PM EST / 8 PM PST)

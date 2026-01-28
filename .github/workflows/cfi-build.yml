@@ -4,6 +4,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: cfi-build
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
   push:
