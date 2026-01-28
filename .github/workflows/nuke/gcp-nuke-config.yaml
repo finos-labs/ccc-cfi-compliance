@@ -6,11 +6,12 @@ regions:
   - us-central1
 
 accounts:
-  "nodal-time-474015-p5": 
+  "nodal-time-474015-p5":
     filters:
       IAMWorkloadIdentityPool:
         - "finos-oidc-pool"
       IAMServiceAccount:
-        - "gha-deployer"
+        - type: contains
+          value: "gha-deployer"
       IAMWorkloadIdentityPoolProvider:
         - "github-provider"
