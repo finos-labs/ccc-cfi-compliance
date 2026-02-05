@@ -1,0 +1,47 @@
+name: Enforce VPC Flow Logs on VPCs
+family: Network Security
+control_id: CCC.VPC.CN04
+control_title: Enforce VPC Flow Logs on VPCs
+control_objective: >
+  Ensure VPCs are configured with flow logs enabled to capture traffic information.
+assessment_requirement_id: CCC.VPC.CN04.AR01
+assessment_requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
+test_requirement_category: B
+test_rationale: "Flow log enablement requires observing that network traffic generates corresponding log records; this involves runtime observation but no misuse or disruption."
+
+service_type: vpc
+requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
+
+validity_score: 7
+validity_commentary: >
+  This query validates that flow logs are configured for a VPC and are in an active state.
+  It also checks that flow logs are configured to capture all traffic (TrafficType=ALL).
+
+  Strengths:
+  - Uses control-plane inventory (DescribeFlowLogs) and does not generate traffic
+  - Verifies key configuration fields that strongly indicate flow logging is enabled
+
+  Limitations:
+  - Does not prove log delivery or completeness; delivery depends on the destination configuration
+  - Interface-level flow logs may exist even if VPC-level flow logs are absent (scope decisions needed)
+
+query: |
+  aws ec2 describe-flow-logs \
+    --region ${AWS_REGION} \
+    --filter Name=resource-id,Values=${VPC_ID}
+
+rules:
+  - jsonpath: "$.FlowLogs[*].FlowLogStatus"
+    expected_values:
+      - "ACTIVE"
+    validation_rule: "^(ACTIVE)$"
+    description: >
+      Flow logs for the VPC should be ACTIVE.
+
+  - jsonpath: "$.FlowLogs[*].TrafficType"
+    expected_values:
+      - "ALL"
+    validation_rule: "^(ALL)$"
+    description: >
+      Flow logs should be configured to capture ALL traffic to/from interfaces in the VPC.
+

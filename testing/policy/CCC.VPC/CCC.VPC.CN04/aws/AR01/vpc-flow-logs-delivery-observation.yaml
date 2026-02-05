@@ -1,0 +1,43 @@
+name: Enforce VPC Flow Logs on VPCs - Delivery Observation
+family: Network Security
+control_id: CCC.VPC.CN04
+control_title: Enforce VPC Flow Logs on VPCs
+control_objective: >
+  Ensure VPCs are configured with flow logs enabled to capture traffic information.
+assessment_requirement_id: CCC.VPC.CN04.AR01
+assessment_requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
+test_requirement_category: B
+test_rationale: "Flow log enablement requires observing that network traffic generates corresponding log records; this involves runtime observation but no misuse or disruption."
+
+service_type: vpc
+requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
+
+validity_score: 5
+validity_commentary: >
+  This check is a documented procedure for observing flow log delivery after generating traffic.
+  The exact query depends on the configured flow log destination (CloudWatch Logs, S3, or Kinesis Data Firehose).
+
+  Strengths:
+  - When implemented for the chosen destination, it provides direct evidence that traffic produces log records
+
+  Limitations:
+  - Destination-specific and environment-specific (log group names, bucket paths, etc.)
+  - Requires generating traffic and waiting for delivery/ingestion delays
+
+query: |
+  # Procedure (CloudWatch Logs destination example):
+  #
+  # 1) Generate traffic between two instances/interfaces in the VPC (e.g., ping, curl).
+  # 2) Identify the flow logs log group configured for the VPC flow log.
+  # 3) Query recent events and confirm new records appear after traffic generation.
+  #
+  # Example:
+  # aws logs filter-log-events \
+  #   --region ${AWS_REGION} \
+  #   --log-group-name ${FLOW_LOGS_LOG_GROUP_NAME} \
+  #   --start-time ${START_EPOCH_MS}
+  #
+  # Expected: at least one event matching the interface/ENI involved in the traffic.
+
+rules: []
+
