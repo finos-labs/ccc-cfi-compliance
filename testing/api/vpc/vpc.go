@@ -16,6 +16,9 @@ type Service interface {
 	// CountDefaultVpcs returns the number of default VPCs in the configured region.
 	CountDefaultVpcs() (int, error)
 
+	// IsDefaultVpc reports whether the specified VPC is a "default VPC".
+	IsDefaultVpc(vpcID string) (bool, error)
+
 	// ListDefaultVpcs returns basic metadata for default VPCs in the configured region.
 	ListDefaultVpcs() ([]DefaultVPC, error)
 
