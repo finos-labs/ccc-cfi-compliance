@@ -1,0 +1,50 @@
+name: Restrict Default Network Creation - Internet Gateway
+family: Network Security
+control_id: CCC.VPC.CN01
+control_title: Restrict Default Network Creation
+control_objective: >
+  Restrict the automatic creation of default virtual networks and related resources during subscription initialization to avoid insecure default configurations and enforce custom network policies.
+assessment_requirement_id: CCC.VPC.CN01.AR01
+assessment_requirement_text: "When a subscription is created, the subscription MUST NOT contain default network resources."
+test_requirement_category: P
+test_rationale: "Presence or absence of default network resources at subscription creation can be verified via control-plane configuration and inventory metadata without generating traffic or inducing failure."
+
+service_type: vpc
+requirement_text: >
+  When a subscription is created, the subscription MUST NOT contain default network resources.
+
+validity_score: 6
+validity_commentary: >
+  This query checks for an Internet Gateway attached to the AWS default VPC in a given region.
+
+  Strengths:
+  - Uses control-plane inventory (DescribeInternetGateways) and does not generate traffic
+  - Filters by attachment to the derived default VPC ID
+
+  Limitations:
+  - The query derives the default VPC ID first; if no default VPC exists, the check returns an empty list
+  - An Internet Gateway may exist and be detached; this check only covers attached gateways
+  - This is a current-state check, not a direct subscription-creation-time proof
+
+query: |
+  DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --region ${AWS_REGION} \
+    --filters Name=is-default,Values=true \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null || true)
+
+  if [ -z "${DEFAULT_VPC_ID}" ] || [ "${DEFAULT_VPC_ID}" = "None" ]; then
+    echo '{"InternetGateways":[]}'
+  else
+    aws ec2 describe-internet-gateways \
+      --region ${AWS_REGION} \
+      --filters Name=attachment.vpc-id,Values=${DEFAULT_VPC_ID}
+  fi
+
+rules:
+  - jsonpath: "$.InternetGateways"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      A compliant environment should return an empty InternetGateways array for the default VPC.
+      If an Internet Gateway is attached to the default VPC, it indicates the default VPC still exists in that region.

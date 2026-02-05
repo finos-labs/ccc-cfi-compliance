@@ -1,0 +1,79 @@
+name: Restrict VPC Peering to Authorized Accounts
+family: Network Security
+control_id: CCC.VPC.CN03
+control_title: Restrict VPC Peering to Authorized Accounts
+control_objective: >
+  Ensure VPC peering connections are only established with explicitly authorized destinations to limit network exposure and enforce boundary controls.
+assessment_requirement_id: CCC.VPC.CN03.AR01
+assessment_requirement_text: "When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed."
+test_requirement_category: D
+test_rationale: "Verifying that unauthorized VPC peering requests are prevented requires attempting a disallowed peering request to observe enforcement behavior."
+
+service_type: vpc
+requirement_text: "When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed."
+
+validity_score: 7
+validity_commentary: >
+  This query attempts to create a VPC peering connection to a peer VPC that is
+  intentionally not authorized, and asserts that the request is denied.
+
+  Strengths:
+  - Directly exercises the prohibited behavior and observes enforcement
+  - Uses `--dry-run` to avoid creating real peering connections during testing
+  - Captures both exit code and error output for validation
+
+  Limitations:
+  - Requires a known "disallowed" peer VPC ID (and potentially peer account ID)
+  - The exact failure mode varies (IAM AccessDenied, SCP denial, org guardrail, etc.)
+  - If the environment allows the action, AWS returns a `DryRunOperation` error (which should be treated as a failure for this control)
+
+query: |
+  # Attempt to create a VPC peering connection to a peer VPC that is NOT allowed.
+  #
+  # Required inputs:
+  # - AWS_REGION
+  # - REQUESTER_VPC_ID
+  # - PEER_VPC_ID
+  #
+  # Output is normalized to JSON so it can be validated with simple JSONPath rules.
+
+  set +e
+  STDERR_FILE=$(mktemp)
+  aws ec2 create-vpc-peering-connection \
+    --region ${AWS_REGION} \
+    --vpc-id ${REQUESTER_VPC_ID} \
+    --peer-vpc-id ${PEER_VPC_ID} \
+    --dry-run \
+    1>/dev/null 2>"${STDERR_FILE}"
+  EXIT_CODE=$?
+  STDERR_RAW=$(cat "${STDERR_FILE}" | tr -d '\n')
+  STDERR_TEXT=$(printf "%s" "${STDERR_RAW}" | sed 's/"/\\"/g')
+  DRYRUN_ALLOWED=false
+  if echo "${STDERR_RAW}" | grep -q "DryRunOperation"; then
+    DRYRUN_ALLOWED=true
+  fi
+  rm -f "${STDERR_FILE}"
+  set -e
+
+  echo "{\"ExitCode\":${EXIT_CODE},\"DryRunAllowed\":${DRYRUN_ALLOWED},\"Stderr\":\"${STDERR_TEXT}\"}"
+
+rules:
+  - jsonpath: "$.ExitCode"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      The create peering request must be prevented; the CLI should exit non-zero.
+
+  - jsonpath: "$.DryRunAllowed"
+    expected_values:
+      - false
+    validation_rule: "^false$"
+    description: >
+      The request must not be allowed. If AWS returns DryRunOperation, it indicates
+      the action would have succeeded (failure for this control).
+
+  - jsonpath: "$.Stderr"
+    expected_values: []
+    validation_rule: "(?i)(AccessDenied|UnauthorizedOperation|AuthFailure|not authorized|explicit deny|denied)"
+    description: >
+      The error output should indicate the request was denied by policy/guardrails.
