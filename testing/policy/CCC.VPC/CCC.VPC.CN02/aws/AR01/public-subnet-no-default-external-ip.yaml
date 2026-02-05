@@ -26,6 +26,7 @@ validity_commentary: >
   - Determining whether a subnet is "public" requires route table analysis (IGW route + association)
   - Some workloads can still request/attach public IPs explicitly (outside the scope of this default behavior check)
   - IPv6 and EIP attachment behaviors require additional checks if in scope
+  - If no public subnets are present, the check becomes N/A for that VPC
 
 query: |
   # Identify public subnets in a VPC by finding subnets whose effective route table
@@ -82,10 +83,9 @@ query: |
   fi
 
 rules:
-  - jsonpath: "$.Subnets[*].MapPublicIpOnLaunch"
-    expected_values:
-      - false
-    validation_rule: "^false$"
+  - jsonpath: "$.Subnets[?(@.MapPublicIpOnLaunch==true)]"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
     description: >
-      For all identified public subnets in the VPC, MapPublicIpOnLaunch must be false
-      so that resources are not assigned an external/public IP by default on creation.
+      The result MUST NOT contain any public subnet where MapPublicIpOnLaunch is true.
+      If no public subnets are present, the result is empty (treated as N/A for that VPC).

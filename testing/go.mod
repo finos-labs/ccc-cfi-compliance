@@ -14,6 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.39.2
 	github.com/aws/aws-sdk-go-v2/config v1.31.12
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.16
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.253.0
 	github.com/aws/aws-sdk-go-v2/service/iam v1.47.7
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.4
 	github.com/cucumber/godog v0.14.1
