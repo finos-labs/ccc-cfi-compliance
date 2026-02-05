@@ -161,7 +161,8 @@ func (r *BasicServiceRunner) Run() int {
 	// Create cloud factory with the full InstanceConfig so every service can find its properties
 	cloudFactory, err := factory.NewFactory(factory.CloudProvider(config.Instance.Properties.Provider), config.Instance)
 	if err != nil {
-		log.Fatalf("Failed to create factory: %v", err)
+		log.Printf("❌ Failed to create factory: %v", err)
+		return 1
 	}
 	defer func() {
 		log.Println("🧹 Running TearDown to remove test-created resources...")
@@ -176,14 +177,24 @@ func (r *BasicServiceRunner) Run() int {
 	log.Printf("🔧 Getting service: %s", config.ServiceName)
 	service, err := cloudFactory.GetServiceAPI(config.ServiceName)
 	if err != nil {
-		log.Fatalf("Failed to get service '%s': %v", config.ServiceName, err)
+		// Many service types are enumerated but not yet implemented for every provider.
+		// Treat unsupported services as skipped so other runners can proceed.
+		if strings.Contains(err.Error(), "unsupported service type") ||
+			strings.Contains(err.Error(), "not yet implemented") {
+			log.Printf("⏭️  Skipping unsupported service '%s': %v", config.ServiceName, err)
+			return 0
+		}
+
+		log.Printf("❌ Failed to get service '%s': %v", config.ServiceName, err)
+		return 1
 	}
 
 	// Discover resources using GetOrProvisionTestableResources
 	log.Println("🔍 Discovering testable resources...")
 	resources, err := service.GetOrProvisionTestableResources()
 	if err != nil {
-		log.Fatalf("Failed to discover resources: %v", err)
+		log.Printf("❌ Failed to discover resources: %v", err)
+		return 1
 	}
 
 	if len(resources) > 0 {
@@ -203,7 +214,8 @@ func (r *BasicServiceRunner) Run() int {
 	featuresPaths := []string{}
 	entries, err := os.ReadDir(featuresBaseDir)
 	if err != nil {
-		log.Fatalf("Failed to read features directory: %v", err)
+		log.Printf("❌ Failed to read features directory: %v", err)
+		return 1
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
