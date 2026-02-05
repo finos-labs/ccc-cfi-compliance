@@ -20,6 +20,7 @@ var (
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
 	tag            = flag.String("tag", "", "Tag filter to override automatic catalog type filtering (e.g., 'CCC.ObjStor.CN04')")
+	serviceFilter  = flag.String("service", "", "Run only these service runner(s) (comma-separated), e.g. 'vpc' or 'object-storage,vpc'")
 
 	// Cloud configuration flags
 	region              = flag.String("region", "", "Cloud region")
@@ -77,7 +78,11 @@ func main() {
 
 	// Assemble list of service runners - one for each service type
 	var runners []ServiceRunner
+	allowedServices := parseServiceFilter(*serviceFilter)
 	for _, serviceName := range environment.ServiceTypes {
+		if len(allowedServices) > 0 && !allowedServices[serviceName] {
+			continue
+		}
 		runners = append(runners, NewBasicServiceRunner(RunConfig{
 			ServiceName:    serviceName,
 			CloudParams:    cloudParams,
@@ -136,6 +141,23 @@ func main() {
 		log.Println("✅ All runners passed")
 		os.Exit(0)
 	}
+}
+
+func parseServiceFilter(raw string) map[string]bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	out := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			continue
+		}
+		out[name] = true
+	}
+	return out
 }
 
 // combineOCSFFiles combines all *ocsf.json files in the output directory into a single combined_ocsf.json file

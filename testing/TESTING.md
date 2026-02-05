@@ -54,11 +54,17 @@ Abstractions for interacting with cloud services:
 # Test AWS resources
 ./testing/run-compliance-tests.sh --provider aws
 
+# Test only one service runner (faster iteration)
+./testing/run-compliance-tests.sh --provider aws --service vpc
+
 # Test Azure resources with custom output directory
 ./testing/run-compliance-tests.sh --provider azure --output results
 
 # Test GCP resources, skip port tests
 ./testing/run-compliance-tests.sh --provider gcp --skip-ports
+
+# Run only scenarios matching a specific CCC tag
+./testing/run-compliance-tests.sh --provider aws --tag 'CCC.VPC.CN01.AR01'
 
 # Custom features path and timeout
 ./testing/run-compliance-tests.sh \
@@ -66,6 +72,11 @@ Abstractions for interacting with cloud services:
   --features ./my-features \
   --timeout 1h
 ```
+
+### Notes on service runners
+
+- By default, the runner iterates all known service types listed in `testing/environment/types.go`.
+- Some service types may not be implemented for every provider yet. Unsupported services are skipped so other service runners can continue.
 
 ## Adding New Service Mappings
 
