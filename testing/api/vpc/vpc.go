@@ -18,5 +18,13 @@ type Service interface {
 
 	// ListDefaultVpcs returns basic metadata for default VPCs in the configured region.
 	ListDefaultVpcs() ([]DefaultVPC, error)
-}
 
+	// ListPublicSubnets returns a slice of objects describing subnets which are
+	// considered public (have a default route to an Internet Gateway) for the
+	// given VPC. Each object should include at least SubnetId and MapPublicIpOnLaunch.
+	ListPublicSubnets(vpcID string) ([]interface{}, error)
+
+	// SummarizePublicSubnets returns a human-readable summary of what will be checked
+	// for CN02, including an explicit N/A marker when no public subnets are found.
+	SummarizePublicSubnets(vpcID string) (string, error)
+}

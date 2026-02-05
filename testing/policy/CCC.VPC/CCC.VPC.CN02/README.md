@@ -26,3 +26,4 @@ This repository evaluates "external IP assigned by default" on AWS as the subnet
 
 - This check focuses on *default* assignment. Workloads can still request/attach public IPs explicitly depending on IAM/policies.
 - "Public subnet" classification is environment-specific; this approach uses route table analysis (0.0.0.0/0 to an Internet Gateway) as a practical definition.
+- If no public subnets are found for a VPC, the check is treated as **N/A** for that VPC (and will show this explicitly in test output).
