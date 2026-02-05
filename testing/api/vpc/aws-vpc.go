@@ -81,6 +81,25 @@ func (s *AWSVPCService) CountDefaultVpcs() (int, error) {
 	return len(vpcs), nil
 }
 
+func (s *AWSVPCService) IsDefaultVpc(vpcID string) (bool, error) {
+	vpcIDStr := fmt.Sprintf("%v", vpcID)
+	if vpcIDStr == "" {
+		return false, fmt.Errorf("vpcID is required")
+	}
+
+	out, err := s.client.DescribeVpcs(s.ctx, &ec2.DescribeVpcsInput{
+		VpcIds: []string{vpcIDStr},
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to describe vpc %s: %w", vpcIDStr, err)
+	}
+	if len(out.Vpcs) == 0 {
+		return false, fmt.Errorf("vpc %s not found", vpcIDStr)
+	}
+
+	return aws.ToBool(out.Vpcs[0].IsDefault), nil
+}
+
 func (s *AWSVPCService) ListDefaultVpcs() ([]DefaultVPC, error) {
 	vpcs, err := s.describeDefaultVpcs()
 	if err != nil {

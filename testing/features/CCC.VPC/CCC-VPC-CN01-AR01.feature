@@ -10,6 +10,5 @@ Feature: CCC.VPC.CN01.AR01
     And I refer to "{result}" as "vpc"
 
   Scenario: Subscription must not contain a default VPC
-    When I call "{vpc}" with "CountDefaultVpcs"
-    Then "{result}" is "0"
-
+    When I call "{vpc}" with "IsDefaultVpc" with parameter "{UID}"
+    Then "{result}" is "false"
