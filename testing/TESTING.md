@@ -42,30 +42,92 @@ Abstractions for interacting with cloud services:
 ### Prerequisites
 
 **Cloud credentials** must be configured for the provider you're testing:
+
 - AWS: `aws configure` or environment variables
 - Azure: `az login`
 - GCP: `gcloud auth login`
 
-### Running Tests
+### Quick Start: Object Storage Testing
 
-#### Using the Shell Script (Recommended)
+Quick reference for setting up cloud storage infrastructure for CCC compliance testing.
+
+#### 1. Cloud Provider Login
+
+**AWS**
 
 ```bash
-# Test AWS resources
-./testing/run-compliance-tests.sh --provider aws
-
-# Test Azure resources with custom output directory
-./testing/run-compliance-tests.sh --provider azure --output results
-
-# Test GCP resources, skip port tests
-./testing/run-compliance-tests.sh --provider gcp --skip-ports
-
-# Custom features path and timeout
-./testing/run-compliance-tests.sh \
-  --provider aws \
-  --features ./my-features \
-  --timeout 1h
+aws configure
+# Or verify existing session:
+aws sts get-caller-identity
 ```
+
+**Azure**
+
+```bash
+az login
+# Verify:
+az account show
+```
+
+**GCP**
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+# Verify:
+gcloud auth list
+```
+
+---
+
+#### 2. Deploy Object Storage Terraform Modules
+
+**AWS S3 Bucket**
+
+Module: [terraform-aws-modules/terraform-aws-s3-bucket](https://github.com/terraform-aws-modules/terraform-aws-s3-bucket)
+
+```bash
+cd remote/aws/s3bucket
+terraform init
+terraform plan
+terraform apply
+```
+
+**Azure Storage Account**
+
+Module: [Azure/terraform-azurerm-avm-res-storage-storageaccount](https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount)
+
+```bash
+cd remote/azure/storageaccount
+terraform init
+terraform plan
+terraform apply
+```
+
+**GCP Cloud Storage**
+
+Module: [terraform-google-modules/terraform-google-cloud-storage](https://github.com/terraform-google-modules/terraform-google-cloud-storage)
+
+```bash
+cd remote/gcp/cloudstorage
+terraform init
+terraform plan
+terraform apply
+```
+
+---
+
+#### 3. Run Compliance Tests
+
+After deploying infrastructure:
+
+```bash
+./testing/run-compliance-tests.sh --provider aws
+./testing/run-compliance-tests.sh --provider azure
+./testing/run-compliance-tests.sh --provider gcp
+```
+
+All required variables are auto-loaded from `compliance-testing.env`.
 
 ## Adding New Service Mappings
 

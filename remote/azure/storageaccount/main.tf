@@ -16,11 +16,17 @@ variable "resource_group_name" {
   default     = "cfi_test"
 }
 
+# Create the resource group if it doesn't exist
+resource "azurerm_resource_group" "this" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
 # Storage account for compliance testing
 module "storage_account" {
   source = "git::https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount.git?ref=main"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
   name                = var.storage_account_name
 
   account_tier             = "Standard"

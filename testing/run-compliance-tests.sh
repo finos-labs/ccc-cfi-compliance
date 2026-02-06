@@ -4,6 +4,16 @@ set -euo pipefail
 # CCC CFI Compliance Test Runner
 # This script discovers cloud resources and runs compliance tests against them
 
+# Load environment variables from compliance-testing.env if it exists
+SCRIPT_DIR="$(dirname "$0")"
+ENV_FILE="$SCRIPT_DIR/compliance-testing.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "📋 Loading environment from $ENV_FILE"
+  set -a  # automatically export all variables
+  source "$ENV_FILE"
+  set +a
+fi
+
 # Default values
 PROVIDER=""
 OUTPUT_DIR=""
@@ -82,22 +92,17 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "  -h, --help                           Show this help message"
       echo ""
-      echo "Note: All flags can also be provided via environment variables:"
-      echo "  --region                  → AWS_REGION, AZURE_LOCATION, or GCP_REGION"
-      echo "  --azure-subscription-id   → AZURE_SUBSCRIPTION_ID"
-      echo "  --azure-resource-group    → AZURE_RESOURCE_GROUP"
-      echo "  --azure-storage-account   → AZURE_STORAGE_ACCOUNT"
-      echo "  --gcp-project-id          → GCP_PROJECT_ID"
+      echo "Note: Environment variables are auto-loaded from compliance-testing.env"
+      echo "  --region                  → TF_VAR_location (Azure), TF_VAR_gcp_region (GCP), AWS_REGION"
+      echo "  --azure-subscription-id   → TF_VAR_subscription_id"
+      echo "  --azure-resource-group    → TF_VAR_resource_group_name"
+      echo "  --azure-storage-account   → TF_VAR_storage_account_name"
+      echo "  --gcp-project-id          → TF_VAR_gcp_project_id"
       echo ""
       echo "Examples:"
       echo "  $0 --provider aws --region us-east-1"
-      echo "  $0 --provider azure --azure-subscription-id xxx --azure-resource-group cfi_test --region eastus"
-      echo "  $0 --provider gcp --gcp-project-id my-project --region us-central1"
-      echo ""
-      echo "  # Using environment variables:"
-      echo "  export AZURE_SUBSCRIPTION_ID=xxx"
-      echo "  export AZURE_RESOURCE_GROUP=cfi_test"
-      echo "  $0 --provider azure"
+      echo "  $0 --provider azure    # uses values from compliance-testing.env"
+      echo "  $0 --provider gcp --gcp-project-id my-project"
       exit 0
       ;;
     *)
@@ -109,10 +114,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Fall back to environment variables if flags not provided
-[ -z "$AZURE_SUBSCRIPTION_ID_FLAG" ] && AZURE_SUBSCRIPTION_ID_FLAG="${AZURE_SUBSCRIPTION_ID:-}"
-[ -z "$AZURE_RESOURCE_GROUP_FLAG" ] && AZURE_RESOURCE_GROUP_FLAG="${AZURE_RESOURCE_GROUP:-}"
-[ -z "$AZURE_STORAGE_ACCOUNT_FLAG" ] && AZURE_STORAGE_ACCOUNT_FLAG="${AZURE_STORAGE_ACCOUNT:-}"
-[ -z "$GCP_PROJECT_ID_FLAG" ] && GCP_PROJECT_ID_FLAG="${GCP_PROJECT_ID:-}"
+[ -z "$AZURE_SUBSCRIPTION_ID_FLAG" ] && AZURE_SUBSCRIPTION_ID_FLAG="${TF_VAR_subscription_id:-}"
+[ -z "$AZURE_RESOURCE_GROUP_FLAG" ] && AZURE_RESOURCE_GROUP_FLAG="${TF_VAR_resource_group_name:-}"
+[ -z "$AZURE_STORAGE_ACCOUNT_FLAG" ] && AZURE_STORAGE_ACCOUNT_FLAG="${TF_VAR_storage_account_name:-}"
+[ -z "$GCP_PROJECT_ID_FLAG" ] && GCP_PROJECT_ID_FLAG="${TF_VAR_gcp_project_id:-}"
 
 # Set region from flag or environment based on provider
 if [ -z "$REGION" ]; then
@@ -121,10 +126,10 @@ if [ -z "$REGION" ]; then
       REGION="${AWS_REGION:-}"
       ;;
     azure)
-      REGION="${AZURE_LOCATION:-}"
+      REGION="${TF_VAR_location:-}"
       ;;
     gcp)
-      REGION="${GCP_REGION:-}"
+      REGION="${TF_VAR_gcp_region:-}"
       ;;
   esac
 fi
