@@ -59,10 +59,7 @@ jobs:
       TARGET_PATH: ${{ matrix.target.path }}
       TARGET_PROVIDER: ${{ matrix.target.provider }}
       TARGET_SERVICE: ${{ matrix.target.service }}
-      # Azure configuration
-      AZURE_STORAGE_ACCOUNT: storagecfitesting2025
       # Terraform variables
-      TF_VAR_storage_account_name: storagecfitesting2025
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_target_id: ${{ matrix.target.id }}
       TF_VAR_github_run_id: ${{ github.run_id }}
@@ -75,6 +72,12 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Load compliance testing environment
+        run: |
+          echo "📋 Loading compliance testing environment..."
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          echo "✅ Environment variables loaded"
 
       - name: Configure AWS Credentials (OIDC)
         if: matrix.target.provider == 'aws'
@@ -307,13 +310,13 @@ jobs:
             ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
             ./run-compliance-tests.sh --provider azure --output "output" \
-              --region "eastus" \
+              --region "$TF_VAR_location" \
               --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              --azure-resource-group "cfi_test" \
-              --azure-storage-account "$AZURE_STORAGE_ACCOUNT"
+              --azure-resource-group "$TF_VAR_resource_group_name" \
+              --azure-storage-account "$TF_VAR_storage_account_name"
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
             ./run-compliance-tests.sh --provider gcp --output "output" \
-              --region "us-central1" \
+              --region "$TF_VAR_gcp_region" \
               --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
           fi
 
