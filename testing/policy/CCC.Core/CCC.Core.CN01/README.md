@@ -3,7 +3,6 @@
 | Field                 | Value                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Family**            | Data                                                                                                   |
-| **Control ID**        | CCC.Core.CN01                                                                                          |
 | **Control Title**     | Encrypt Data for Transmission                                                                          |
 | **Control Objective** | Ensure that all communications are encrypted in transit to protect data integrity and confidentiality. |
 

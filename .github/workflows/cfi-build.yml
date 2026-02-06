@@ -355,13 +355,15 @@ jobs:
             echo "⚠️  No Prowler delta-modified OCSF file found for $TARGET_ID"
           fi
 
-          # Copy combined OCSF results from compliance tests
-          cd "$GITHUB_WORKSPACE/testing"
-          if [ -f "output/combined.ocsf.json" ]; then
-            cp "output/combined.ocsf.json" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}-combined.ocsf.json"
-            echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
+          # Copy all compliance test results (HTML reports and OCSF JSON)
+          cd "$GITHUB_WORKSPACE/testing/output"
+          if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
+            for f in *.ocsf.json *.html; do
+              [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
+            done
+            echo "✅ Successfully captured compliance test output for $TARGET_ID"
           else
-            echo "⚠️  No combined OCSF file found for $TARGET_ID"
+            echo "⚠️  No compliance test output files found for $TARGET_ID"
           fi
 
       - name: Terraform Destroy

@@ -19,7 +19,7 @@ validity_commentary: >
 
 query: |
   aws s3api get-bucket-location \
-    --bucket ${BUCKET_NAME}
+    --bucket ${ResourceName}
 
 rules:
   - jsonpath: "$.LocationConstraint"
