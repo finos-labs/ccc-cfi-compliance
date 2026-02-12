@@ -182,6 +182,13 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 			continue
 		}
 
+		// Set the tag filter - use provided tag or auto-generate from catalog types
+		if r.Config.Tag != "" {
+			resource.TagFilter = r.Config.Tag
+		} else {
+			resource.TagFilter = buildTagFilter(resource.CatalogTypes)
+		}
+
 		log.Printf("\n🔬 Running tests for resource %d/%d:", i+1, len(resources))
 		if resourceJSON, err := json.MarshalIndent(resource, "   ", "  "); err == nil {
 			log.Printf("   Resource: %s", string(resourceJSON))
@@ -238,20 +245,13 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	godog.Format(htmlFormat, "HTML report", formatterFactory.GetHTMLFormatterFunc())
 	godog.Format(ocsfFormat, "OCSF report", formatterFactory.GetOCSFFormatterFunc())
 
-	// Build tag filter - use provided tag or auto-generate from catalog types
-	var tagFilter string
-	if r.Config.Tag != "" {
-		tagFilter = r.Config.Tag
-		log.Printf("   Tag Filter (manual): %s", tagFilter)
-	} else {
-		tagFilter = buildTagFilter(params.CatalogTypes)
-		log.Printf("   Tag Filter (auto): %s", tagFilter)
-	}
+	// Log the tag filter (already set in runTests)
+	log.Printf("   Tag Filter: %s", params.TagFilter)
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
 		Paths:       featuresPaths,
-		Tags:        tagFilter,
+		Tags:        params.TagFilter,
 		Concurrency: 1,
 		Strict:      true,
 		NoColors:    false,

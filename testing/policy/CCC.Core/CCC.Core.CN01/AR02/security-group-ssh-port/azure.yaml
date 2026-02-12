@@ -1,0 +1,39 @@
+name: Azure NSG SSH Port Configuration
+service_type: security-group
+requirement_text: >
+  When a port is exposed for SSH network traffic, all traffic MUST include a SSH 
+  handshake AND be encrypted using SSHv2 or higher.
+
+validity_score: 4
+validity_commentary: >
+  This query has significant limitations for validating SSHv2 enforcement:
+  - SSH protocol version is configured at the OS level (sshd_config), not in Azure API
+  - This query only verifies that port 22 is exposed via TCP, not the SSH version
+  - Cannot detect if SSH is running on non-standard ports
+  - Does not validate SSH key algorithms or cipher suites
+  - Azure Bastion provides a more secure alternative with built-in encryption
+  - A behavioral test (actual SSH connection) would be needed for full validation
+
+query: |
+  az network nsg rule list \
+    --nsg-name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "[?destinationPortRange=='22' || contains(destinationPortRanges, '22')]" \
+    --output json
+
+rules:
+  - jsonpath: "$[?(@.direction=='Inbound')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      Verifies that port 22 ingress rules use TCP protocol, which is required for SSH.
+      UDP on port 22 would indicate a misconfiguration.
+
+  - jsonpath: "$[?(@.direction=='Inbound')].sourceAddressPrefix"
+    expected_values: []
+    validation_rule: "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|VirtualNetwork).*$"
+    description: >
+      Validates that SSH access is restricted to private IP ranges or VirtualNetwork.
+      Public SSH access (*/Internet) represents a security risk and should be flagged.

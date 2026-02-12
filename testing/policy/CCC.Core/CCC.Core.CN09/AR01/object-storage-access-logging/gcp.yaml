@@ -1,0 +1,38 @@
+name: GCP Cloud Storage Access Logging Configuration
+service_type: object-storage
+requirement_text: >
+  When the service is operational, its logs and any child resource logs MUST NOT 
+  be accessible from the resource they record access to.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that GCP Cloud Storage access logging is configured
+  to write to a separate bucket. GCP also supports Cloud Audit Logs.
+  Strengths:
+  - Validates logging is enabled and configured
+  - Target bucket separation ensures logs are not accessible from source
+  - Cloud Audit Logs provide additional logging
+  Limitations:
+  - Does not validate Cloud Audit Logs configuration
+  - Does not verify target bucket permissions
+  - Legacy logging (bucket-level) is being deprecated
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.logging.logBucket"
+    expected_values: []
+    validation_rule: "^(?!${ResourceName}$).+$"
+    description: >
+      Validates that access logging is enabled and the log bucket is different
+      from the source bucket. Logs stored in the same bucket would violate
+      the integrity requirement.
+
+  - jsonpath: "$.logging.logObjectPrefix"
+    expected_values: []
+    validation_rule: "^.*$"
+    description: >
+      Checks that a log object prefix is configured. A prefix helps organize
+      logs for easier management.

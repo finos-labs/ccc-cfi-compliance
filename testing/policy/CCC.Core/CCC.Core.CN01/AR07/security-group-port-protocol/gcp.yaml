@@ -1,0 +1,49 @@
+name: GCP Firewall Rule IANA Port/Protocol Compliance
+service_type: security-group
+requirement_text: >
+  When a port is exposed, the service MUST ensure that the protocol and service 
+  officially assigned to that port number by the IANA Service Name and Transport 
+  Protocol Port Number Registry, and no other, is run on that port.
+
+validity_score: 6
+validity_commentary: >
+  This query validates that firewall port/protocol combinations align with IANA
+  standards. Limitations include:
+  - Only validates declared firewall rules, not actual running services
+  - Cannot detect if a non-standard service is running on a standard port
+  - Custom/high ports (>1024) don't have strict IANA assignments
+
+query: |
+  gcloud compute firewall-rules describe ${ResourceName} \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.allowed[?(@.ports[*]=='22')].IPProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 22 (SSH) must use TCP protocol.
+
+  - jsonpath: "$.allowed[?(@.ports[*]=='80')].IPProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 80 (HTTP) must use TCP protocol.
+
+  - jsonpath: "$.allowed[?(@.ports[*]=='443')].IPProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 443 (HTTPS) must use TCP protocol.
+
+  - jsonpath: "$.allowed[?(@.ports[*]=='53')].IPProtocol"
+    expected_values:
+      - "tcp"
+      - "udp"
+    validation_rule: "^(tcp|udp)$"
+    description: >
+      IANA Port 53 (DNS) may use either TCP or UDP.

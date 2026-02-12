@@ -1,0 +1,41 @@
+name: Azure Virtual Network Region Compliance
+service_type: vpc
+requirement_text: >
+  When the service is running, its region and availability zone MUST be included 
+  in a list of explicitly trusted or approved locations within the trust perimeter.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that Azure Virtual Networks are deployed in approved
+  regions. Strengths:
+  - Directly queries VNet location
+  - Subnets inherit region from VNet
+  - Easy to validate against an approved region list
+  Limitations:
+  - Approved regions must be defined externally
+  - Does not validate resources within the VNet
+  - VNet peering may extend trust boundaries
+  - Azure availability zones are optional per subnet
+
+query: |
+  az network vnet show \
+    --name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{location: location, subnets: subnets[*].name}" \
+    --output json
+
+rules:
+  - jsonpath: "$.location"
+    expected_values:
+      - "eastus"
+      - "eastus2"
+      - "westus"
+      - "westus2"
+      - "westeurope"
+      - "northeurope"
+    validation_rule: "^(eastus|eastus2|westus|westus2|westeurope|northeurope)$"
+    todo: Replace with parameterised list of approved regions
+    description: >
+      Validates that the Virtual Network is in an approved Azure region.
+      The expected_values list should be customized to match your organization's
+      approved regions within the trust perimeter.

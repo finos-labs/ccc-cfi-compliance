@@ -1,0 +1,30 @@
+name: GCP Cloud KMS Key IAM Policy Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are accessed, the service MUST verify that access to 
+  encryption keys is restricted to authorized personnel and services, following 
+  the principle of least privilege.
+
+validity_score: 6
+validity_commentary: >
+  This query retrieves the GCP Cloud KMS key IAM policy for validation.
+  IAM policy analysis requires additional processing to verify least privilege.
+  Limitations:
+  - Policy review requires context about authorized principals
+  - Cannot automatically determine if permissions are excessive
+  - Consider using IAM Recommender for comprehensive analysis
+
+query: |
+  gcloud kms keys get-iam-policy ${GCPKMSKey} \
+    --keyring=${GCPKMSKeyRing} \
+    --location=${GCPKMSLocation} \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.bindings"
+    expected_values: []
+    validation_rule: "^\\[.*\\]$"
+    description: >
+      Retrieves the IAM policy bindings. The policy should be parsed and
+      validated to ensure only authorized principals have access.

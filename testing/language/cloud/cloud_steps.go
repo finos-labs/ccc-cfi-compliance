@@ -446,7 +446,7 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 	// Check if the policy file exists
 	if _, err := os.Stat(policyPath); os.IsNotExist(err) {
 		cw.Props["result"] = false
-		return fmt.Errorf("policy file not found: %s", policyPath)
+		return fmt.Errorf("policy check file not found: %s", policyPath)
 	}
 
 	// Load the policy to check service_type

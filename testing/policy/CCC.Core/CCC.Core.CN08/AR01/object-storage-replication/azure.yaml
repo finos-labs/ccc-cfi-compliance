@@ -1,0 +1,53 @@
+name: Azure Storage Geo-Redundant Replication Configuration
+service_type: object-storage
+requirement_text: >
+  When data is created or modified, the data MUST have a complete and recoverable 
+  duplicate that is stored in a physically separate data center.
+
+validity_score: 8
+validity_commentary: >
+  This query validates Azure Storage geo-redundant replication configuration.
+  Azure Storage provides automatic geo-replication through GRS, GZRS, or RA-GRS.
+  Strengths:
+  - Replication is automatic and synchronous/asynchronous
+  - Secondary region is automatically selected by Azure (paired region)
+  - RA-GRS/RA-GZRS provides read access to secondary
+  Limitations:
+  - Does not support custom destination region (uses Azure paired regions)
+  - Failover must be manually initiated or use account failover
+  - Object replication for cross-region copies requires separate configuration
+  - LRS and ZRS do not provide geographic redundancy
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{sku: sku.name, primaryLocation: primaryLocation, secondaryLocation: secondaryLocation, statusOfSecondary: statusOfSecondary}" \
+    --output json
+
+rules:
+  - jsonpath: "$.sku"
+    expected_values:
+      - "Standard_GRS"
+      - "Standard_GZRS"
+      - "Standard_RAGRS"
+      - "Standard_RAGZRS"
+    validation_rule: "^Standard_(GRS|GZRS|RAGRS|RAGZRS)$"
+    description: >
+      Validates that the storage account uses a geo-redundant SKU.
+      GRS/GZRS replicate to a secondary region. RA- variants provide read access.
+      LRS and ZRS do not satisfy cross-region replication requirements.
+
+  - jsonpath: "$.secondaryLocation"
+    expected_values: []
+    validation_rule: "^[a-z]+$"
+    description: >
+      Validates that a secondary location is configured for geo-replication.
+      This is automatically set based on Azure paired regions.
+
+  - jsonpath: "$.statusOfSecondary"
+    expected_values:
+      - "available"
+    validation_rule: "^available$"
+    description: >
+      Verifies the secondary region is available and replication is healthy.

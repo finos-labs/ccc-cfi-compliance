@@ -114,14 +114,13 @@ func (c *PolicyChecker) EvaluateRule(rule Rule, queryOutput string) RuleResult {
 		return result
 	}
 
+	// Get the actual value - handle nil (JSON null) as "null" string for matching
+	var actualValue string
 	if value == nil {
-		result.ActualValue = "<not found>"
-		result.Error = "JSONPath returned nil"
-		return result
+		actualValue = "null"
+	} else {
+		actualValue = fmt.Sprintf("%v", value)
 	}
-
-	// Get the actual value
-	actualValue := fmt.Sprintf("%v", value)
 	result.ActualValue = actualValue
 
 	// Check against validation rule (regex)

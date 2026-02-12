@@ -1,0 +1,37 @@
+name: GCP Cloud Storage Bucket Region Compliance
+service_type: object-storage
+requirement_text: >
+  When the service is running, its region and availability zone MUST be included 
+  in a list of explicitly trusted or approved locations within the trust perimeter.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that GCP Cloud Storage buckets are deployed in approved
+  locations. GCS supports regional, dual-region, and multi-region locations.
+  Strengths:
+  - Directly queries bucket location
+  - Bucket location cannot be changed after creation
+  - Easy to validate against an approved location list
+  Limitations:
+  - Approved locations must be defined externally
+  - Multi-region buckets span multiple locations
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.location"
+    expected_values:
+      - "US"
+      - "US-EAST1"
+      - "US-WEST1"
+      - "US-CENTRAL1"
+      - "EU"
+      - "EUROPE-WEST1"
+    validation_rule: "^(US|US-EAST1|US-WEST1|US-CENTRAL1|EU|EUROPE-WEST1)$"
+    todo: Replace with parameterised list of approved locations
+    description: >
+      Validates that the bucket is located in an approved GCP location.
+      The expected_values list should be customized to match your organization's
+      approved locations.

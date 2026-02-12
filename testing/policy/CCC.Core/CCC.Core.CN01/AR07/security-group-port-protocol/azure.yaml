@@ -1,0 +1,92 @@
+name: Azure NSG IANA Port/Protocol Compliance
+service_type: security-group
+requirement_text: >
+  When a port is exposed, the service MUST ensure that the protocol and service 
+  officially assigned to that port number by the IANA Service Name and Transport 
+  Protocol Port Number Registry, and no other, is run on that port.
+
+validity_score: 6
+validity_commentary: >
+  This query validates that NSG port/protocol combinations align with IANA standards.
+  Limitations include:
+  - Only validates declared NSG rules, not actual running services
+  - Cannot detect if a non-standard service is running on a standard port
+  - Custom/high ports (>1024) don't have strict IANA assignments
+  - Some services legitimately use non-standard ports (e.g., HTTPS on 8443)
+  - Does not cover application-layer protocol validation
+  - A runtime port scan or service enumeration would provide better assurance
+
+query: |
+  az network nsg rule list \
+    --nsg-name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "[?direction=='Inbound']" \
+    --output json
+
+rules:
+  - jsonpath: "$[?(@.destinationPortRange=='22')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 22 (SSH) must use TCP protocol. SSH does not operate over UDP.
+
+  - jsonpath: "$[?(@.destinationPortRange=='80')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 80 (HTTP) must use TCP protocol for standard web traffic.
+
+  - jsonpath: "$[?(@.destinationPortRange=='443')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 443 (HTTPS) must use TCP protocol for secure web traffic.
+
+  - jsonpath: "$[?(@.destinationPortRange=='3306')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 3306 (MySQL) must use TCP protocol for database connections.
+
+  - jsonpath: "$[?(@.destinationPortRange=='5432')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 5432 (PostgreSQL) must use TCP protocol for database connections.
+
+  - jsonpath: "$[?(@.destinationPortRange=='3389')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+    validation_rule: "^[Tt][Cc][Pp]$"
+    description: >
+      IANA Port 3389 (RDP) must use TCP protocol for Remote Desktop connections.
+
+  - jsonpath: "$[?(@.destinationPortRange=='53')].protocol"
+    expected_values:
+      - "Tcp"
+      - "TCP"
+      - "Udp"
+      - "UDP"
+      - "*"
+    validation_rule: "^([Tt][Cc][Pp]|[Uu][Dd][Pp]|\\*)$"
+    description: >
+      IANA Port 53 (DNS) may use either TCP or UDP. Both are valid per IANA.
+
+  - jsonpath: "$[?(@.destinationPortRange=='123')].protocol"
+    expected_values:
+      - "Udp"
+      - "UDP"
+    validation_rule: "^[Uu][Dd][Pp]$"
+    description: >
+      IANA Port 123 (NTP) must use UDP protocol for time synchronization.

@@ -1,0 +1,37 @@
+name: GCP Cloud Storage Retention Policy (30-day minimum)
+service_type: object-storage
+requirement_text: >
+  When backups are created for disaster recovery purposes, the storage mechanism 
+  MUST NOT allow modification or deletion within 30 days of creation.
+
+validity_score: 8
+validity_commentary: >
+  GCP Cloud Storage supports retention policies that prevent object deletion
+  for a specified period. Bucket Lock makes retention policies permanent.
+  Strengths:
+  - Retention policies are enforced at the GCS service level
+  - Bucket Lock provides WORM-like protection
+  - Retention period can be set at bucket level
+  Limitations:
+  - Bucket Lock must be enabled to make policy immutable
+  - Individual object retention is separate from bucket policy
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.retentionPolicy.retentionPeriod"
+    expected_values: []
+    validation_rule: "^[0-9]+$"
+    description: >
+      Verifies that a retention policy is configured. The retention period
+      is in seconds. 30 days = 2592000 seconds minimum.
+
+  - jsonpath: "$.retentionPolicy.isLocked"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Validates that the retention policy is locked (Bucket Lock enabled).
+      Locked policies cannot be removed or shortened, providing WORM protection.

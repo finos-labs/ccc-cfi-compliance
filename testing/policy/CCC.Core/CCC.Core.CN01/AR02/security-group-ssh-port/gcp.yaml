@@ -1,0 +1,35 @@
+name: GCP Firewall Rule SSH Port Configuration
+service_type: security-group
+requirement_text: >
+  When a port is exposed for SSH network traffic, all traffic MUST include a SSH 
+  handshake AND be encrypted using SSHv2 or higher.
+
+validity_score: 4
+validity_commentary: >
+  This query has significant limitations for validating SSHv2 enforcement:
+  - SSH protocol version is configured at the OS level, not in GCP API
+  - This query only verifies that port 22 is exposed via TCP
+  - Cannot detect if SSH is running on non-standard ports
+  - GCP IAP (Identity-Aware Proxy) provides a more secure SSH alternative
+  - A behavioral test would be needed for full validation
+
+query: |
+  gcloud compute firewall-rules list \
+    --project=${GCPProjectID} \
+    --filter="allowed.ports:22 AND direction:INGRESS" \
+    --format=json
+
+rules:
+  - jsonpath: "$[*].allowed[?(@.ports[*]=='22')].IPProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      Verifies that port 22 ingress rules use TCP protocol, which is required for SSH.
+
+  - jsonpath: "$[*].sourceRanges"
+    expected_values: []
+    validation_rule: "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.).*$"
+    description: >
+      Validates that SSH access is restricted to private IP ranges.
+      Public SSH access (0.0.0.0/0) represents a security risk.

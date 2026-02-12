@@ -120,19 +120,31 @@ func (f *OCSFFormatter) Feature(gd *messages.GherkinDocument, uri string, c []by
 
 // Pickle captures pickle (scenario) information
 func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
+	// Save the previous scenario if one was in progress
+	if f.scenarioStarted && f.currentScenario != nil {
+		f.findings = append(f.findings, *f.currentScenario)
+	}
+
 	// Initialize a new finding for this scenario
 	now := time.Now()
+
+	// Extract tags from pickle
+	var tagNames []string
+	for _, tag := range pickle.Tags {
+		tagNames = append(tagNames, tag.Name)
+	}
+
 	finding := &OCSFFinding{
 		Message: pickle.Name,
 		Metadata: OCSFMetadata{
 			EventCode: "ccc_compliance_test",
 			Product: OCSFProduct{
-				Name:       "CCC-Destructive",
-				UID:        "CCC-Destructive",
+				Name:       "CCC-Complete",
+				UID:        "CCC-Complete",
 				VendorName: "FINOS",
 				Version:    "0.1",
 			},
-			Profiles: []string{"cloud", "datetime"},
+			Profiles: tagNames,
 			Version:  "1.4.0",
 		},
 		SeverityID: 1,
@@ -257,7 +269,10 @@ func (f *OCSFFormatter) Passed(pickle *messages.Pickle, step *messages.PickleSte
 // Skipped is required by the formatters.Formatter interface
 func (f *OCSFFormatter) Skipped(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {
 	if f.currentScenario != nil {
-		f.currentScenario.StatusCode = "SKIP"
+		// Only set SKIP if not already FAIL (don't overwrite failure status)
+		if f.currentScenario.StatusCode == "PASS" {
+			f.currentScenario.StatusCode = "SKIP"
+		}
 		if f.currentScenario.StatusDetail != "" {
 			f.currentScenario.StatusDetail += "\n"
 		}
@@ -268,9 +283,12 @@ func (f *OCSFFormatter) Skipped(pickle *messages.Pickle, step *messages.PickleSt
 // Undefined is required by the formatters.Formatter interface
 func (f *OCSFFormatter) Undefined(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {
 	if f.currentScenario != nil {
-		f.currentScenario.StatusCode = "FAIL"
-		f.currentScenario.SeverityID = 3
-		f.currentScenario.Severity = "Medium"
+		// Undefined steps are failures - always set to FAIL
+		if f.currentScenario.StatusCode != "FAIL" {
+			f.currentScenario.StatusCode = "FAIL"
+			f.currentScenario.SeverityID = 3
+			f.currentScenario.Severity = "Medium"
+		}
 		if f.currentScenario.StatusDetail != "" {
 			f.currentScenario.StatusDetail += "\n"
 		}
@@ -298,7 +316,10 @@ func (f *OCSFFormatter) Failed(pickle *messages.Pickle, step *messages.PickleSte
 // Pending is required by the formatters.Formatter interface
 func (f *OCSFFormatter) Pending(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {
 	if f.currentScenario != nil {
-		f.currentScenario.StatusCode = "PENDING"
+		// Only set PENDING if not already FAIL (don't overwrite failure status)
+		if f.currentScenario.StatusCode != "FAIL" {
+			f.currentScenario.StatusCode = "PENDING"
+		}
 		if f.currentScenario.StatusDetail != "" {
 			f.currentScenario.StatusDetail += "\n"
 		}

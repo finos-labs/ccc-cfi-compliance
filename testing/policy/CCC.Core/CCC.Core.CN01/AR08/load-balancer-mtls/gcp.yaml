@@ -1,0 +1,35 @@
+name: GCP HTTPS Load Balancer mTLS Configuration
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 8
+validity_commentary: >
+  This query validates mTLS configuration on GCP HTTPS Load Balancers using
+  ServerTlsPolicy. GCP supports mTLS through Certificate Manager and
+  Network Security resources. Gaps include:
+  - Does not validate the trust config contents
+  - Cannot verify clients actually present valid certificates at runtime
+  - Backend connections are not covered
+
+query: |
+  gcloud network-security server-tls-policies describe ${ResourceName} \
+    --location=global \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.mtlsPolicy.clientValidationMode"
+    expected_values:
+      - "REJECT_INVALID"
+    validation_rule: "^REJECT_INVALID$"
+    description: >
+      Verifies that client certificate validation is set to reject invalid
+      certificates. ALLOW_INVALID_OR_MISSING_CLIENT_CERT would not enforce mTLS.
+
+  - jsonpath: "$.mtlsPolicy.clientValidationTrustConfig"
+    expected_values: []
+    validation_rule: "^projects/.+/locations/.+/trustConfigs/.+$"
+    description: >
+      Validates that a trust config is specified for client certificate validation.

@@ -1494,4 +1494,18 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameter "([^"]*)"$`, pw.iWaitForObjectWithMethodWithParameter)
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameters "([^"]*)" and "([^"]*)"$`, pw.iWaitForObjectWithMethodWithTwoParameters)
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameters "([^"]*)", "([^"]*)" and "([^"]*)"$`, pw.iWaitForObjectWithMethodWithThreeParameters)
+
+	// Stub/no-op patterns for controls that don't require policy checks
+	s.Step(`^no-op required$`, pw.noOpRequired)
+}
+
+// noOpRequired is a stub step for controls that don't need automated verification
+func (pw *PropsWorld) noOpRequired() error {
+	// This step intentionally does nothing - it marks scenarios where
+	// the control either:
+	// - Requires behavioral testing not implementable as a policy check
+	// - Is enforced at the identity provider level
+	// - Is inherently satisfied by another control
+	// - Requires runtime verification
+	return nil
 }

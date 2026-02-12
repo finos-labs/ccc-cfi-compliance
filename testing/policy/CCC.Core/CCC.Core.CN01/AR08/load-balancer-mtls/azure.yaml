@@ -1,0 +1,47 @@
+name: Azure Application Gateway Mutual TLS (mTLS) Configuration
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 8
+validity_commentary: >
+  This query validates mTLS configuration at the Azure Application Gateway level.
+  Application Gateway supports client certificate authentication through
+  SSL profiles and trusted client certificates. Gaps include:
+  - Does not validate the trusted CA certificate contents
+  - Cannot verify that all clients actually present valid certificates at runtime
+  - Backend connections are not covered by this check
+  - API Management mTLS would require a separate query
+  - Certificate revocation is handled separately
+
+query: |
+  az network application-gateway show \
+    --name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{sslProfiles: sslProfiles, trustedClientCertificates: trustedClientCertificates}" \
+    --output json
+
+rules:
+  - jsonpath: "$.sslProfiles[*].clientAuthConfiguration.verifyClientCertIssuerDN"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that client certificate issuer DN verification is enabled.
+      This ensures only certificates from trusted CAs are accepted.
+
+  - jsonpath: "$.trustedClientCertificates[*].name"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Validates that at least one trusted client certificate CA is configured.
+      The trust store contains the CA certificates used to validate client certs.
+
+  - jsonpath: "$.sslProfiles[*].clientAuthConfiguration.verifyClientRevocation"
+    expected_values:
+      - "OCSP"
+    validation_rule: "^(OCSP|None)$"
+    description: >
+      Checks if client certificate revocation checking is configured.
+      OCSP provides real-time revocation status checking.

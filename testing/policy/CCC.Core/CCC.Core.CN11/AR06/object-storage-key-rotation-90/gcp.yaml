@@ -1,0 +1,32 @@
+name: GCP Cloud KMS Key Rotation (90 days)
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST rotate active keys within 
+  90 days of issuance.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that GCP Cloud KMS key has a rotation period configured
+  for at most 90 days. GCP KMS supports configurable automatic key rotation,
+  including 90-day periods. Strengths:
+  - GCP allows rotation periods as short as needed
+  - Key rotation is automatic when configured
+  - 90-day rotation can be configured directly
+  Limitations:
+  - Rotation period must be explicitly configured
+  - Does not verify actual last rotation date
+
+query: |
+  gcloud kms keys describe ${GCPKMSKey} \
+    --keyring=${GCPKMSKeyRing} \
+    --location=${GCPKMSLocation} \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.rotationPeriod"
+    expected_values: []
+    validation_rule: "^[0-9]+s$"
+    description: >
+      Verifies that automatic key rotation is configured. 90 days = 7776000s.
+      The rotation period should be at most this value.

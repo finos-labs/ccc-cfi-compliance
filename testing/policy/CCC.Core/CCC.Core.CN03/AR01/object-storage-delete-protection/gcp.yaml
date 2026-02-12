@@ -1,0 +1,38 @@
+name: GCP Cloud Storage Soft Delete and Versioning Configuration
+service_type: object-storage
+requirement_text: >
+  When an entity attempts to modify the service through a user interface, the 
+  authentication process MUST require multiple identifying factors for authentication.
+
+validity_score: 5
+validity_commentary: >
+  GCP does not have a direct equivalent to S3 MFA Delete at the storage level.
+  MFA in GCP is enforced at the IAM/Identity Platform level.
+  This check validates soft delete and versioning as compensating controls.
+  Strengths:
+  - Soft delete allows recovery of deleted objects
+  - Object versioning preserves all object versions
+  - GCP Identity Platform supports MFA for all operations
+  Limitations:
+  - This is NOT a direct MFA-for-delete check
+  - MFA enforcement is at the identity layer, not storage layer
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.softDeletePolicy.retentionDurationSeconds"
+    expected_values: []
+    validation_rule: "^[0-9]+$"
+    description: >
+      Verifies that soft delete is configured with a retention duration.
+      This allows recovery of deleted objects within the retention period.
+
+  - jsonpath: "$.versioning.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that object versioning is enabled. Versioning preserves all
+      previous versions of objects, enabling recovery from modifications.

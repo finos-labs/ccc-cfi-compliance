@@ -1,0 +1,46 @@
+name: S3 Replication Status Visibility
+service_type: object-storage
+requirement_text: >
+  When data is replicated into a second location, the service MUST be able to
+  accurately represent the replication locations, replication status, and data
+  synchronization status.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that S3 replication metrics and status are available.
+  S3 Replication Time Control (RTC) provides detailed replication metrics.
+  Strengths:
+  - Validates replication configuration exists
+  - RTC provides 15-minute SLA with metrics
+  - Replication metrics are available in CloudWatch
+  Limitations:
+  - RTC is optional and costs extra
+  - Without RTC, replication timing is best-effort
+  - Does not validate actual replication success
+
+query: |
+  aws s3api get-bucket-replication \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Verifies that replication rules are enabled and actively replicating.
+
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Destination.Metrics.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Validates that replication metrics are enabled, providing visibility
+      into replication status and timing.
+
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Destination.ReplicationTime.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^(Enabled|Disabled)$"
+    description: >
+      Checks if Replication Time Control is enabled for predictable replication.
