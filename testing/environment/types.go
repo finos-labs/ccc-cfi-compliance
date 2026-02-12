@@ -9,7 +9,7 @@ type TestParams struct {
 	ServiceType         string      // Type of service (e.g., "s3", "rds", "storage") - DEPRECATED, use ProviderServiceType
 	ProviderServiceType string      // Cloud provider-specific service type (e.g., "s3", "rds", "Microsoft.Storage/storageAccounts")
 	CatalogTypes        []string    // CCC catalog types to test with (e.g., "CCC.ObjStor", "CCC.RDMS", "CCC.VM", "CCC.Core")
-	TagFilter           string      // Godog tag filter expression (e.g., "@CCC.Core && @CCC.ObjStor")
+	TagFilter           []string    // Tag filters to AND together (e.g., ["@CCC.Core", "@CCC.ObjStor"])
 	Labels              []string    // Tags/labels from the resource
 	UID                 string      // Unique identifier (ARN, resource ID, etc.)
 	ResourceName        string      // Human-readable resource name extracted from ARN or resource ID

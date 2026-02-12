@@ -365,13 +365,15 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 
 	// Convert buckets to TestParams
 	resources := make([]environment.TestParams, 0, len(buckets))
+	catalogTypes := []string{"CCC.ObjStor"}
 	for _, bucket := range buckets {
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor"},
+			CatalogTypes:        catalogTypes,
+			TagFilter:           []string{"@CCC.ObjStor"},
 			CloudParams:         s.cloudParams,
 		})
 	}

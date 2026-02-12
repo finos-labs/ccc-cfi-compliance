@@ -11,7 +11,7 @@ import (
 
 	"github.com/cucumber/godog/formatters"
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // HTMLFormatter is a godog formatter that generates HTML reports
@@ -34,11 +34,11 @@ type HTMLFormatter struct {
 	bodyBuffer         bytes.Buffer
 	scenarioOpened     bool
 	featureOpened      bool
-	stepKeywords       map[string]string    // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
-	backgroundSteps    map[string]bool      // Maps step AST node IDs to whether they're from Background
-	attachmentProvider attachments.Provider // Provider for accessing attachments from PropsWorld
-	params             *TestParams          // Optional test parameters
-	allTags            map[string]bool      // Tracks all unique tags seen
+	stepKeywords       map[string]string              // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
+	backgroundSteps    map[string]bool                // Maps step AST node IDs to whether they're from Background
+	attachmentProvider environment.AttachmentProvider // Provider for accessing attachments from PropsWorld
+	params             *TestParams                    // Optional test parameters
+	allTags            map[string]bool                // Tracks all unique tags seen
 }
 
 // Feature captures feature information
@@ -47,6 +47,14 @@ func (f *HTMLFormatter) Feature(gd *messages.GherkinDocument, uri string, c []by
 	if f.featureOpened {
 		// Close scenario if open
 		if f.scenarioOpened {
+			// Render any attachments collected during the scenario
+			if f.attachmentProvider != nil {
+				attachments := f.attachmentProvider.GetAttachments()
+				if len(attachments) > 0 {
+					f.bodyBuffer.WriteString(formatAttachments(attachments))
+					f.attachmentProvider.ClearAttachments()
+				}
+			}
 			fmt.Fprintf(&f.bodyBuffer, `</div>`)
 			f.scenarioOpened = false
 		}
@@ -286,7 +294,7 @@ func formatStepArgument(arg *messages.PickleStepArgument) string {
 }
 
 // formatAttachments renders attachments as HTML
-func formatAttachments(attachments []attachments.Attachment) string {
+func formatAttachments(attachments []environment.Attachment) string {
 	if len(attachments) == 0 {
 		return ""
 	}
@@ -533,7 +541,7 @@ func NewHTMLFormatterWithParams(suite string, out io.Writer, params TestParams) 
 }
 
 // NewHTMLFormatterWithAttachments creates a new HTML formatter with test parameters and attachment provider
-func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider attachments.Provider) formatters.Formatter {
+func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider environment.AttachmentProvider) formatters.Formatter {
 	f := &HTMLFormatter{
 		out:                out,
 		title:              suite,

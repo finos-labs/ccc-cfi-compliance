@@ -1,4 +1,4 @@
-package environment
+package cloud
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,13 +27,13 @@ func NewPolicyChecker(baseDir string) *PolicyChecker {
 }
 
 // LoadPolicy loads a policy definition from a YAML file
-func (c *PolicyChecker) LoadPolicy(policyPath string) (*PolicyDefinition, error) {
+func (c *PolicyChecker) LoadPolicy(policyPath string) (*environment.PolicyDefinition, error) {
 	data, err := os.ReadFile(policyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read policy file %s: %w", policyPath, err)
 	}
 
-	var policy PolicyDefinition
+	var policy environment.PolicyDefinition
 	if err := yaml.Unmarshal(data, &policy); err != nil {
 		return nil, fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
 	}
@@ -41,7 +42,7 @@ func (c *PolicyChecker) LoadPolicy(policyPath string) (*PolicyDefinition, error)
 }
 
 // SubstituteParams replaces parameter placeholders in a query string
-func (c *PolicyChecker) SubstituteParams(query string, params TestParams) string {
+func (c *PolicyChecker) SubstituteParams(query string, params environment.TestParams) string {
 	result := query
 
 	// Map TestParams fields
@@ -86,8 +87,8 @@ func (c *PolicyChecker) ExecuteQuery(query string) (string, error) {
 }
 
 // EvaluateRule checks if a single rule passes against the query output
-func (c *PolicyChecker) EvaluateRule(rule Rule, queryOutput string) RuleResult {
-	result := RuleResult{
+func (c *PolicyChecker) EvaluateRule(rule environment.Rule, queryOutput string) environment.RuleResult {
+	result := environment.RuleResult{
 		JSONPath:       rule.JSONPath,
 		ExpectedValues: make([]string, len(rule.ExpectedValues)),
 		ValidationRule: rule.ValidationRule,
@@ -145,14 +146,14 @@ func (c *PolicyChecker) EvaluateRule(rule Rule, queryOutput string) RuleResult {
 }
 
 // RunPolicy executes a complete policy check
-func (c *PolicyChecker) RunPolicy(params TestParams, policyPath string) (*PolicyResult, error) {
+func (c *PolicyChecker) RunPolicy(params environment.TestParams, policyPath string) (*environment.PolicyResult, error) {
 	// Load the policy
 	policyDef, err := c.LoadPolicy(policyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &PolicyResult{
+	result := &environment.PolicyResult{
 		PolicyPath:      policyPath,
 		Name:            policyDef.Name,
 		ServiceType:     policyDef.ServiceType,
@@ -176,7 +177,7 @@ func (c *PolicyChecker) RunPolicy(params TestParams, policyPath string) (*Policy
 	}
 
 	// Evaluate each rule
-	result.RuleResults = make([]RuleResult, len(policyDef.Rules))
+	result.RuleResults = make([]environment.RuleResult, len(policyDef.Rules))
 	for i, rule := range policyDef.Rules {
 		ruleResult := c.EvaluateRule(rule, output)
 		result.RuleResults[i] = ruleResult

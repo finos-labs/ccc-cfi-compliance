@@ -534,13 +534,15 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 	// UID is the storage account resource ID (for RBAC scope)
 	// ResourceName is the container name (for test identification)
 	resources := make([]environment.TestParams, 0, len(buckets))
+	catalogTypes := []string{"CCC.ObjStor"}
 	for _, bucket := range buckets {
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 storageAccountResourceID, // Use storage account resource ID for RBAC
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor"},
+			CatalogTypes:        catalogTypes,
+			TagFilter:           []string{"@CCC.ObjStor"},
 			CloudParams:         s.cloudParams,
 		})
 	}

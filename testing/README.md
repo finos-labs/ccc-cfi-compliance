@@ -66,8 +66,9 @@ There is one file per assessment requirement defined in CCC. Where we have diffe
 Step definitions and utilities for BDD tests:
 
 - **`generic/`**: Generic BDD steps for Gherkin tests, allowing you to call API methods and test results. See [`language/generic/README.md`](language/generic/README.md) for details
-- **`cloud/`**: Cloud-specific test steps. See [`language/cloud/README.md`](language/cloud/README.md) for details.
-- **`attachments/`**: Test attachment handling
+- **`cloud/`**: Cloud-specific test steps and policy checking. See [`language/cloud/README.md`](language/cloud/README.md) for details.
+  - `cloud_steps.go`: Cloud-specific step definitions
+  - `policy-checker.go`: Policy loading and evaluation engine
 - **`reporters/`**: HTML and OCSF formatters for test output
   - `html-formatter.go`: HTML report generation
   - `ocsf-formatter.go`: OCSF-compliant JSON output
@@ -81,6 +82,7 @@ Core data structures and configuration:
   - `CloudParams`: Cloud provider configuration
   - `ServiceTypes`: List of supported service types
   - `PolicyDefinition`, `PolicyResult`: Policy evaluation structures
+- **`attachments.go`**: Test attachment types and interfaces
 
 ### 6. Policy (`policy/`)
 

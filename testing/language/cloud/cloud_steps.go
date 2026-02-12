@@ -474,7 +474,7 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 	}
 
 	// Create policy checker and run the policy
-	checker := environment.NewPolicyChecker(policyBaseDir)
+	checker := NewPolicyChecker(policyBaseDir)
 	result, err := checker.RunPolicy(testParams, policyPath)
 	if err != nil {
 		cw.Props["result"] = false

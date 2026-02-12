@@ -1,4 +1,4 @@
-package attachments
+package environment
 
 // Attachment represents a file or data attached to a test
 type Attachment struct {
@@ -7,8 +7,8 @@ type Attachment struct {
 	Data      []byte
 }
 
-// Provider is an interface for accessing attachments from the test world
-type Provider interface {
+// AttachmentProvider is an interface for accessing attachments from the test world
+type AttachmentProvider interface {
 	GetAttachments() []Attachment
 	ClearAttachments()
 }

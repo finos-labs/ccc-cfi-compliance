@@ -16,10 +16,11 @@ import (
 
 var (
 	provider       = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
+	service        = flag.String("service", "", "Service type to test (object-storage, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services.")
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
-	tag            = flag.String("tag", "", "Tag filter to override automatic catalog type filtering (e.g., 'CCC.ObjStor.CN04')")
+	tag            = flag.String("tag", "", "Additional tag filter ANDed with service tags to narrow tests (e.g., '@Policy' or '@CCC.Core.CN06')")
 
 	// Cloud configuration flags
 	region              = flag.String("region", "", "Cloud region")
@@ -75,9 +76,28 @@ func main() {
 	log.Printf("✅ Output directory ready")
 	log.Println()
 
+	// Determine which services to run
+	serviceTypes := environment.ServiceTypes
+	if *service != "" {
+		// Validate the service type
+		validService := false
+		for _, st := range environment.ServiceTypes {
+			if st == *service {
+				validService = true
+				break
+			}
+		}
+		if !validService {
+			log.Fatalf("Error: invalid service '%s'. Valid services are: %s", *service, strings.Join(environment.ServiceTypes, ", "))
+		}
+		serviceTypes = []string{*service}
+		log.Printf("   Service: %s", *service)
+		log.Println()
+	}
+
 	// Assemble list of service runners - one for each service type
 	var runners []ServiceRunner
-	for _, serviceName := range environment.ServiceTypes {
+	for _, serviceName := range serviceTypes {
 		runners = append(runners, NewBasicServiceRunner(RunConfig{
 			ServiceName:    serviceName,
 			CloudParams:    cloudParams,

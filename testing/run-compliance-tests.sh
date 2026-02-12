@@ -16,6 +16,7 @@ fi
 
 # Default values
 PROVIDER=""
+SERVICE=""
 OUTPUT_DIR=""
 TIMEOUT="30m"
 RESOURCE_FILTER=""
@@ -31,6 +32,10 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     -p|--provider)
       PROVIDER="$2"
+      shift 2
+      ;;
+    -s|--service)
+      SERVICE="$2"
       shift 2
       ;;
     -o|--output)
@@ -76,9 +81,12 @@ while [[ $# -gt 0 ]]; do
       echo "  -p, --provider PROVIDER              Cloud provider (aws, azure, or gcp)"
       echo ""
       echo "Optional Options:"
+      echo "  -s, --service SERVICE                Service type to test. If not specified, tests all services."
+      echo "                                       Valid values: object-storage, block-storage, relational-database,"
+      echo "                                                     iam, load-balancer, security-group, vpc"
       echo "  -o, --output DIR                     Output directory (default: testing/output)"
       echo "  -r, --resource RESOURCE              Filter to specific resource name"
-      echo "  -g, --tag TAG                        Tag filter for feature files (e.g., 'CCC.ObjStor.CN04')"
+      echo "  -g, --tag TAG                        Additional tag filter ANDed with service tags (e.g., '@Policy')"
       echo "  -t, --timeout DURATION               Timeout for all tests (default: 30m)"
       echo "  --region REGION                      Cloud region"
       echo ""
@@ -101,6 +109,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Examples:"
       echo "  $0 --provider aws --region us-east-1"
+      echo "  $0 --provider aws --service object-storage --region us-east-1"
       echo "  $0 --provider azure    # uses values from compliance-testing.env"
       echo "  $0 --provider gcp --gcp-project-id my-project"
       exit 0
@@ -151,6 +160,10 @@ echo ""
 CMD="./ccc-compliance -provider=\"$PROVIDER\" -timeout=\"$TIMEOUT\""
 
 # Add optional flags only if set
+if [ -n "$SERVICE" ]; then
+  CMD="$CMD -service=\"$SERVICE\""
+fi
+
 if [ -n "$OUTPUT_DIR" ]; then
   CMD="$CMD -output=\"$OUTPUT_DIR\""
 fi

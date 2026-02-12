@@ -182,12 +182,17 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 			continue
 		}
 
-		// Set the tag filter - use provided tag or auto-generate from catalog types
+		// Combine user-provided tag with service's tag filter using AND
+		// This allows narrowing down tests (e.g., ["@CCC.ObjStor", "@Policy"])
 		if r.Config.Tag != "" {
-			resource.TagFilter = r.Config.Tag
-		} else {
-			resource.TagFilter = buildTagFilter(resource.CatalogTypes)
+			userTag := r.Config.Tag
+			// Ensure user tag has @ prefix if it looks like a simple tag name
+			if !strings.HasPrefix(userTag, "@") && !strings.Contains(userTag, " ") {
+				userTag = "@" + userTag
+			}
+			resource.TagFilter = append(resource.TagFilter, userTag)
 		}
+		// Otherwise, use the TagFilter already set by GetOrProvisionTestableResources()
 
 		log.Printf("\n🔬 Running tests for resource %d/%d:", i+1, len(resources))
 		if resourceJSON, err := json.MarshalIndent(resource, "   ", "  "); err == nil {
@@ -246,12 +251,13 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	godog.Format(ocsfFormat, "OCSF report", formatterFactory.GetOCSFFormatterFunc())
 
 	// Log the tag filter (already set in runTests)
-	log.Printf("   Tag Filter: %s", params.TagFilter)
+	tagFilterExpr := strings.Join(params.TagFilter, " && ")
+	log.Printf("   Tag Filter: %s", tagFilterExpr)
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
 		Paths:       featuresPaths,
-		Tags:        params.TagFilter,
+		Tags:        tagFilterExpr,
 		Concurrency: 1,
 		Strict:      true,
 		NoColors:    false,
@@ -272,11 +278,6 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 		return "skipped"
 	}
 	return "failed"
-}
-
-// buildTagFilter builds tag expression for filtering tests
-func buildTagFilter(catalogTypes []string) string {
-	return strings.Join(catalogTypes, ",")
 }
 
 // printSummary prints test execution summary

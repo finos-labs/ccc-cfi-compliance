@@ -12,7 +12,7 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/cucumber/godog"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AsyncTask represents an asynchronous operation
@@ -103,7 +103,7 @@ type PropsWorld struct {
 	Props        map[string]interface{}
 	T            TestingT // Interface for assertions
 	AsyncManager *AsyncTaskManager
-	Attachments  []attachments.Attachment // Store attachments for the current scenario
+	Attachments  []environment.Attachment // Store attachments for the current scenario
 	mutex        sync.RWMutex
 }
 
@@ -118,7 +118,7 @@ func NewPropsWorld() *PropsWorld {
 	return &PropsWorld{
 		Props:        make(map[string]interface{}),
 		AsyncManager: NewAsyncTaskManager(),
-		Attachments:  make([]attachments.Attachment, 0),
+		Attachments:  make([]environment.Attachment, 0),
 	}
 }
 
@@ -126,7 +126,7 @@ func NewPropsWorld() *PropsWorld {
 func (pw *PropsWorld) Attach(name, mediaType string, data []byte) {
 	pw.mutex.Lock()
 	defer pw.mutex.Unlock()
-	pw.Attachments = append(pw.Attachments, attachments.Attachment{
+	pw.Attachments = append(pw.Attachments, environment.Attachment{
 		Name:      name,
 		MediaType: mediaType,
 		Data:      data,
@@ -134,22 +134,22 @@ func (pw *PropsWorld) Attach(name, mediaType string, data []byte) {
 	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
 }
 
-// GetAttachments returns a copy of the current attachments (implements attachments.Provider)
-func (pw *PropsWorld) GetAttachments() []attachments.Attachment {
+// GetAttachments returns a copy of the current attachments (implements environment.AttachmentProvider)
+func (pw *PropsWorld) GetAttachments() []environment.Attachment {
 	pw.mutex.RLock()
 	defer pw.mutex.RUnlock()
 
 	// Return a copy to avoid race conditions
-	attachmentsCopy := make([]attachments.Attachment, len(pw.Attachments))
+	attachmentsCopy := make([]environment.Attachment, len(pw.Attachments))
 	copy(attachmentsCopy, pw.Attachments)
 	return attachmentsCopy
 }
 
-// ClearAttachments clears all attachments (implements attachments.Provider)
+// ClearAttachments clears all attachments (implements environment.AttachmentProvider)
 func (pw *PropsWorld) ClearAttachments() {
 	pw.mutex.Lock()
 	defer pw.mutex.Unlock()
-	pw.Attachments = make([]attachments.Attachment, 0)
+	pw.Attachments = make([]environment.Attachment, 0)
 }
 
 // formatValueForComparison formats a value for display in comparisons
