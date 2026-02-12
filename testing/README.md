@@ -100,7 +100,7 @@ Test results are written here:
 
 ## Usage
 
-### Prerequisites
+#### 1. Cloud Provider Login
 
 **Cloud credentials** must be configured for the provider you're testing:
 
@@ -108,40 +108,9 @@ Test results are written here:
 - Azure: `az login`
 - GCP: `gcloud auth login`
 
-### Quick Start: Object Storage Testing
-
-Quick reference for setting up cloud storage infrastructure for CCC compliance testing.
-
-#### 1. Cloud Provider Login
-
-**AWS**
-
-```bash
-aws configure
-# Or verify existing session:
-aws sts get-caller-identity
-```
-
-**Azure**
-
-```bash
-az login
-# Verify:
-az account show
-```
-
-**GCP**
-
-```bash
-gcloud auth login
-gcloud auth application-default login
-# Verify:
-gcloud auth list
-```
-
----
-
 #### 2. Deploy Object Storage Terraform Modules
+
+Install some terraform to test against. Some examples below:
 
 **AWS S3 Bucket**
 
@@ -176,8 +145,6 @@ terraform plan
 terraform apply
 ```
 
----
-
 #### 3. Run Compliance Tests
 
 After deploying infrastructure:
@@ -188,31 +155,15 @@ After deploying infrastructure:
 ./testing/run-compliance-tests.sh --provider gcp
 ```
 
-All required variables are auto-loaded from `compliance-testing.env`.
-
-### Command Line Options
+All required variables are auto-loaded from `compliance-testing.env`, but you can override with command-line options if you want.
 
 ```
-Usage: ./run-compliance-tests.sh [OPTIONS]
-
-Required Options:
-  -p, --provider PROVIDER              Cloud provider (aws, azure, or gcp)
-
-Optional Options:
-  -o, --output DIR                     Output directory (default: testing/output)
-  -r, --resource RESOURCE              Filter to specific resource name
-  -g, --tag TAG                        Tag filter for feature files (e.g., 'CCC.ObjStor.CN04')
-  -t, --timeout DURATION               Timeout for all tests (default: 30m)
-  --region REGION                      Cloud region
-
-Azure-specific Options (required for Azure):
-  --azure-subscription-id ID           Azure subscription ID
-  --azure-resource-group RG            Azure resource group
-  --azure-storage-account NAME         Azure storage account name
-
-GCP-specific Options (required for GCP):
-  --gcp-project-id PROJECT             GCP project ID
+./run-compliance-tests.sh --help
 ```
+
+#### 4. Review outputs
+
+After completion, the `output` directory will contain an HTML and OCSF for each resource tested.
 
 ## Adding Support for New Services
 
@@ -220,77 +171,46 @@ To add support for a new cloud service:
 
 1. **Add the service type** to `ServiceTypes` in `environment/types.go`:
 
-   ```go
-   var ServiceTypes = []string{
-       // ... existing types ...
-       "new-service", // Your new service type
-   }
-   ```
+```go
+var ServiceTypes = []string{
+    // ... existing types ...
+    "new-service", // Your new service type
+}
+```
 
 2. **Implement the Service interface** in `api/new-service/`:
 
-   ```go
-   type NewService struct {
-       // provider-specific clients
-   }
+```go
+type NewService struct {
+    // provider-specific clients
+}
 
-   func (s *NewService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-       // Discover resources and return TestParams
-   }
-   ```
+func (s *NewService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+    // Discover resources and return TestParams
+}
+```
 
 3. **Register in the factory** (`api/factory/`):
 
-   ```go
-   func (f *AWSFactory) GetServiceAPI(serviceName string) (generic.Service, error) {
-       switch serviceName {
-       case "new-service":
-           return NewAWSNewService(f.cloudParams), nil
-       // ...
-       }
-   }
-   ```
+```go
+func (f *AWSFactory) GetServiceAPI(serviceName string) (generic.Service, error) {
+    switch serviceName {
+    case "new-service":
+        return NewAWSNewService(f.cloudParams), nil
+    // ...
+    }
+}
+```
 
 4. **Add feature files** in `features/CCC.NewCatalog/`:
 
-   ```gherkin
-   @CCC.NewCatalog
-   Feature: CCC.NewCatalog.CN01 - Control Name
-     Scenario: AR01 - Validation scenario
-       Given the resource is configured
-       Then the control requirement should be met
-   ```
-
-## Troubleshooting
-
-### Authentication Errors
-
-If you encounter authentication errors, ensure your cloud credentials are properly configured:
-
-- AWS: `aws sts get-caller-identity`
-- Azure: `az account show`
-- GCP: `gcloud auth list`
-
-### No Resources Found
-
+```gherkin
+@CCC.NewCatalog
+Feature: CCC.NewCatalog.CN01 - Control Name
+  Scenario: AR01 - Validation scenario
+    Given the resource is configured
+    Then the control requirement should be met
 ```
-Warning: Found 0 accessible port(s)
-Warning: Found 0 service(s)
-```
-
-**Solution**:
-
-1. Verify cloud credentials are configured correctly
-2. Ensure resources exist in the cloud provider
-3. Check that your IAM permissions allow listing resources
-
-### No Tests Run
-
-If tests pass but no scenarios execute, check:
-
-1. Feature files exist in `features/` for your catalog type
-2. Tags in feature files match the resource's `CatalogTypes`
-3. Use `--tag` flag to explicitly specify which tests to run
 
 ## Development
 
@@ -312,7 +232,7 @@ go build -o ccc-compliance ./runner/
 
 ### Adding New Test Steps
 
-Test step definitions are in:
+Ordinarily, you shouldn't need to add new steps to the framework as you can use the ones in generic to call all the API functions you need. Test step definitions are in:
 
 - `language/cloud/cloud_steps.go` - Cloud-specific steps
 - `language/generic/generic_steps.go` - Reusable generic steps

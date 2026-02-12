@@ -96,7 +96,7 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// Register generic steps first
 	cw.PropsWorld.RegisterSteps(ctx)
 
-	// Cloud-specific steps matching Cucumber-Cloud-Language.md
+	// Cloud-specific steps matching README.md
 
 	// OpenSSL connections
 	ctx.Step(`^an openssl s_client request to "([^"]*)" on "([^"]*)" protocol "([^"]*)"$`, cw.opensslClientRequestWithProtocol)

@@ -53,6 +53,16 @@ For the complete list of controls and their implementation details, see the [CCC
 
 You can review the results of testing the above configurations on the [CCC Website](ccc.finos.org/cfi)
 
+### 3. Compliance Testing
+
+The testing system:
+
+- **Discovers resources** automatically using cloud provider APIs
+- **Runs Gherkin tests** filtered by catalog type (CCC.ObjStor, CCC.Core, etc.)
+- **Generates reports** in HTML and OCSF JSON formats
+
+See the [Testing README](testing/README.md) for full documentation on architecture, adding new services, and writing tests.
+
 ## How To Contribute
 
 ### 1. Improving or Contributing CFI Code

@@ -44,7 +44,7 @@ echo "=================================================="
 echo ""
 
 # Array of test types and their corresponding flags
-# Based on Cucumber-Cloud-Language.md documentation
+# Based on README.md documentation
 declare -a tests=(
     "each-cipher:--each-cipher"
     "cipher-per-proto:--cipher-per-proto"
