@@ -30,4 +30,15 @@ type Service interface {
 	// SummarizePublicSubnets returns a human-readable summary of what will be checked
 	// for CN02, including an explicit N/A marker when no public subnets are found.
 	SummarizePublicSubnets(vpcID string) (string, error)
+
+	// ListVpcFlowLogs returns flow log records configured for the given VPC.
+	// Each returned object includes core fields used by CN04 checks.
+	ListVpcFlowLogs(vpcID string) ([]interface{}, error)
+
+	// HasActiveAllTrafficFlowLogs returns true when the VPC has at least one flow log
+	// and all discovered flow logs are ACTIVE with TrafficType=ALL.
+	HasActiveAllTrafficFlowLogs(vpcID string) (bool, error)
+
+	// SummarizeVpcFlowLogs returns a human-readable CN04 summary for test evidence.
+	SummarizeVpcFlowLogs(vpcID string) (string, error)
 }
