@@ -155,6 +155,53 @@ func (s *AWSVPCService) SummarizePublicSubnets(vpcID string) (string, error) {
 	return fmt.Sprintf("CCC.VPC.CN02.AR01: checking %d public subnet(s) for VPC %s", len(publicSubnets), vpcIDStr), nil
 }
 
+func (s *AWSVPCService) ListVpcFlowLogs(vpcID string) ([]interface{}, error) {
+	return s.listVpcFlowLogs(vpcID)
+}
+
+func (s *AWSVPCService) HasActiveAllTrafficFlowLogs(vpcID string) (bool, error) {
+	flowLogs, err := s.listVpcFlowLogs(vpcID)
+	if err != nil {
+		return false, err
+	}
+	if len(flowLogs) == 0 {
+		return false, nil
+	}
+
+	for _, item := range flowLogs {
+		row, ok := item.(map[string]interface{})
+		if !ok {
+			return false, fmt.Errorf("unexpected flow log record type")
+		}
+
+		status := fmt.Sprintf("%v", row["FlowLogStatus"])
+		trafficType := fmt.Sprintf("%v", row["TrafficType"])
+		if status != "ACTIVE" || trafficType != "ALL" {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (s *AWSVPCService) SummarizeVpcFlowLogs(vpcID string) (string, error) {
+	vpcIDStr := fmt.Sprintf("%v", vpcID)
+	if vpcIDStr == "" {
+		return "", fmt.Errorf("vpcID is required")
+	}
+
+	flowLogs, err := s.listVpcFlowLogs(vpcIDStr)
+	if err != nil {
+		return "", err
+	}
+
+	if len(flowLogs) == 0 {
+		return fmt.Sprintf("CCC.VPC.CN04.AR01: N/A (no VPC flow logs configured for VPC %s)", vpcIDStr), nil
+	}
+
+	return fmt.Sprintf("CCC.VPC.CN04.AR01: checking %d flow log record(s) for VPC %s", len(flowLogs), vpcIDStr), nil
+}
+
 func (s *AWSVPCService) listPublicSubnets(vpcID string) ([]interface{}, error) {
 	vpcIDStr := fmt.Sprintf("%v", vpcID)
 	if vpcIDStr == "" {
@@ -197,6 +244,39 @@ func (s *AWSVPCService) listPublicSubnets(vpcID string) ([]interface{}, error) {
 	}
 
 	return publicSubnets, nil
+}
+
+func (s *AWSVPCService) listVpcFlowLogs(vpcID string) ([]interface{}, error) {
+	vpcIDStr := fmt.Sprintf("%v", vpcID)
+	if vpcIDStr == "" {
+		return nil, fmt.Errorf("vpcID is required")
+	}
+
+	out, err := s.client.DescribeFlowLogs(s.ctx, &ec2.DescribeFlowLogsInput{
+		Filter: []types.Filter{
+			{
+				Name:   aws.String("resource-id"),
+				Values: []string{vpcIDStr},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe flow logs for vpc %s: %w", vpcIDStr, err)
+	}
+
+	flowLogs := make([]interface{}, 0, len(out.FlowLogs))
+	for _, fl := range out.FlowLogs {
+		flowLogs = append(flowLogs, map[string]interface{}{
+			"VpcId":              vpcIDStr,
+			"FlowLogId":          aws.ToString(fl.FlowLogId),
+			"FlowLogStatus":      aws.ToString(fl.FlowLogStatus),
+			"TrafficType":        string(fl.TrafficType),
+			"LogDestinationType": string(fl.LogDestinationType),
+			"LogDestination":     aws.ToString(fl.LogDestination),
+		})
+	}
+
+	return flowLogs, nil
 }
 
 func (s *AWSVPCService) isSubnetPublic(vpcID, subnetID string) (bool, string, error) {
