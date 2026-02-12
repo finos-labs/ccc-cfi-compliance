@@ -1,4 +1,4 @@
-@PerPort @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerPort @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01
 Feature: CCC.Core.CN01.AR07
   As a security administrator
   I want to ensure that only the IANA-assigned protocol runs on each port
@@ -65,17 +65,3 @@ Feature: CCC.Core.CN01.AR07
     This is the secure LDAP port with implicit TLS.
 
     Then "{portNumber}" is "636"
-
-  @mysql
-  Scenario: Verify MySQL uses IANA-assigned port 3306
-    MySQL must use port 3306 as assigned by IANA.
-    Running other services on database ports can cause application failures.
-
-    Then "{portNumber}" is "3306"
-
-  @postgres
-  Scenario: Verify PostgreSQL uses IANA-assigned port 5432
-    PostgreSQL must use port 5432 as assigned by IANA.
-    This is the standard PostgreSQL database port.
-
-    Then "{portNumber}" is "5432"

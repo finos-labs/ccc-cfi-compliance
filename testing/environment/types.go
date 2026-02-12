@@ -13,6 +13,8 @@ type TestParams struct {
 	Labels              []string    // Tags/labels from the resource
 	UID                 string      // Unique identifier (ARN, resource ID, etc.)
 	ResourceName        string      // Human-readable resource name extracted from ARN or resource ID
+	ReportFile          string      // Base filename for output report (without extension), e.g., "bucket-name-service"
+	ReportTitle         string      // Human-readable title for reports, e.g., "my-bucket" or "my-bucket.s3.us-east-1.amazonaws.com:443"
 	CloudParams         CloudParams // details of the cloud environment
 }
 

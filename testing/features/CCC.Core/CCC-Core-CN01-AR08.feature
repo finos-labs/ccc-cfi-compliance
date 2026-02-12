@@ -1,4 +1,4 @@
-@PerPort @tls @tlp-amber @tlp-red
+@PerPort @tls @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01
 Feature: CCC.Core.CN01.AR08
   As a security administrator
   I want to ensure mutual TLS is implemented for all TLS connections

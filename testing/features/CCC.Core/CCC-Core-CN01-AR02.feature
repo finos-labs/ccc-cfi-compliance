@@ -1,4 +1,4 @@
-@PerPort @ssh @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerPort @ssh @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01 @tls
 Feature: CCC.Core.CN01.AR02
   As a security administrator
   I want to ensure all SSH network traffic uses SSHv2 or higher

@@ -510,6 +510,9 @@ func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objec
 }
 
 // GetOrProvisionTestableResources returns all Azure storage containers as testable resources
+// Returns two TestParams per container:
+// 1. PerService - for policy/configuration checks
+// 2. PerPort - for TLS/endpoint connectivity tests
 func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// Validate that storage account name is set
 	if s.cloudParams.AzureStorageAccount == "" {
@@ -530,19 +533,38 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	// Convert containers to TestParams
+	// Convert containers to TestParams (2 per container: service + port)
 	// UID is the storage account resource ID (for RBAC scope)
 	// ResourceName is the container name (for test identification)
-	resources := make([]environment.TestParams, 0, len(buckets))
-	catalogTypes := []string{"CCC.ObjStor"}
+	resources := make([]environment.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
+		// PerService: Resource-level tests (policy checks, configuration validation)
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
-			UID:                 storageAccountResourceID, // Use storage account resource ID for RBAC
+			UID:                 storageAccountResourceID,
+			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
+			ReportTitle:         bucket.Name,
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        catalogTypes,
-			TagFilter:           []string{"@CCC.ObjStor"},
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
+			CloudParams:         s.cloudParams,
+		})
+
+		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
+		endpoint := fmt.Sprintf("%s.blob.core.windows.net", s.cloudParams.AzureStorageAccount)
+		resources = append(resources, environment.TestParams{
+			ResourceName:        bucket.Name,
+			UID:                 storageAccountResourceID,
+			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
+			ReportTitle:         fmt.Sprintf("%s:443", endpoint),
+			HostName:            endpoint,
+			PortNumber:          "443",
+			Protocol:            "https",
+			ServiceType:         "object-storage",
+			ProviderServiceType: "Microsoft.Storage/storageAccounts",
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			CloudParams:         s.cloudParams,
 		})
 	}

@@ -1,4 +1,4 @@
-@PerPort @tlp-green @tlp-amber @tlp-red
+@PerPort @tlp-green @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01 @tls
 Feature: CCC.Core.CN01.AR03
   As a security administrator
   I want unencrypted traffic to be blocked or redirected to secure equivalents
@@ -9,7 +9,7 @@ Feature: CCC.Core.CN01.AR03
     If HTTP is accessible, it should immediately redirect to HTTPS (301/302 status codes).
     This ensures that all web traffic is encrypted.
 
-    Given a client connects to "{hostName}" with protocol "http" on port "{portNumber}"
+    Given a client connects to "{hostName}" with protocol "http" on port "80"
     And I refer to "{result}" as "connection"
     Then "{connection}" is not an error
     And "{connection.output}" contains "301"
@@ -21,7 +21,7 @@ Feature: CCC.Core.CN01.AR03
     Unencrypted FTP should not be accessible. The service should either refuse connections
     or not expose FTP on standard ports (21).
 
-    Given a client connects to "{hostName}" with protocol "ftp" on port "{portNumber}"
+    Given a client connects to "{hostName}" with protocol "ftp" on port "21"
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 
@@ -30,7 +30,7 @@ Feature: CCC.Core.CN01.AR03
     Telnet transmits credentials in plaintext and should be completely disabled.
     SSH should be used instead for remote shell access.
 
-    Given a client connects to "{hostName}" with protocol "telnet" on port "{portNumber}"
+    Given a client connects to "{hostName}" with protocol "telnet" on port "23"
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 

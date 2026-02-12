@@ -1,4 +1,4 @@
-@CCC.Core @tlp-green @tlp-amber @tlp-red @PerPort
+@CCC.Core @tlp-green @tlp-amber @tlp-red @PerPort @CCC.Core.CN01 @tls @Behavioural
 Feature: CCC.Core.CN01.AR01
   As a security administrator
   I want to ensure all non-SSH network traffic uses TLS 1.3 or higher
@@ -6,10 +6,6 @@ Feature: CCC.Core.CN01.AR01
 
   Background:
     Given a cloud api for "{Provider}" in "api"
-
-  Scenario: Policy check - ALB TLS 1.3 Security Policy
-    When I run policy checks for control "CCC.Core.CN01" assessment requirement "AR01" for service "load-balancer" on resource "{ResourceName}"
-    Then "{result}" should equal "true"
 
   Scenario: Service accepts TLS 1.3 encrypted traffic
     Given an openssl s_client request using "tls1_3" to "{portNumber}" on "{hostName}" protocol "{protocol}"

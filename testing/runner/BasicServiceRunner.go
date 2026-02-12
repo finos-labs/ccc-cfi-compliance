@@ -222,8 +222,12 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 
 // runResourceTest runs tests for a single resource
 func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environment.TestParams, featuresPaths []string, catalogTypes []string) string {
-	// Create a safe filename from the resource name
-	filename := fmt.Sprintf("resource-%s", sanitizeFilename(params.ResourceName))
+	// Create a safe filename from ReportFile or fall back to ResourceName
+	baseName := params.ReportFile
+	if baseName == "" {
+		baseName = params.ResourceName
+	}
+	filename := sanitizeFilename(baseName)
 	reportPath := filepath.Join(r.Config.OutputDir, filename)
 
 	// Create output directory if it doesn't exist
@@ -244,8 +248,8 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	formatterFactory := reporters.NewFormatterFactory(params, suite.CloudWorld)
 
 	// Generate unique format names
-	htmlFormat := fmt.Sprintf("html-resource-%s", sanitizeFilename(params.ResourceName))
-	ocsfFormat := fmt.Sprintf("ocsf-resource-%s", sanitizeFilename(params.ResourceName))
+	htmlFormat := fmt.Sprintf("html-%s", filename)
+	ocsfFormat := fmt.Sprintf("ocsf-%s", filename)
 
 	godog.Format(htmlFormat, "HTML report", formatterFactory.GetHTMLFormatterFunc())
 	godog.Format(ocsfFormat, "OCSF report", formatterFactory.GetOCSFFormatterFunc())

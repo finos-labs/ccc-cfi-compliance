@@ -356,6 +356,9 @@ func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID 
 }
 
 // GetOrProvisionTestableResources returns all S3 buckets as testable resources
+// Returns two TestParams per bucket:
+// 1. PerService - for policy/configuration checks
+// 2. PerPort - for TLS/endpoint connectivity tests
 func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// List all buckets and ensure at least one exists
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
@@ -363,17 +366,36 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
-	// Convert buckets to TestParams
-	resources := make([]environment.TestParams, 0, len(buckets))
-	catalogTypes := []string{"CCC.ObjStor"}
+	// Convert buckets to TestParams (2 per bucket: service + port)
+	resources := make([]environment.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
+		// PerService: Resource-level tests (policy checks, configuration validation)
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
+			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
+			ReportTitle:         bucket.Name,
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
-			CatalogTypes:        catalogTypes,
-			TagFilter:           []string{"@CCC.ObjStor"},
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
+			CloudParams:         s.cloudParams,
+		})
+
+		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
+		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.cloudParams.Region)
+		resources = append(resources, environment.TestParams{
+			ResourceName:        bucket.Name,
+			UID:                 bucket.ID,
+			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
+			ReportTitle:         fmt.Sprintf("%s:443", endpoint),
+			HostName:            endpoint,
+			PortNumber:          "443",
+			Protocol:            "https",
+			ProviderServiceType: "s3",
+			ServiceType:         "object-storage",
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			CloudParams:         s.cloudParams,
 		})
 	}
