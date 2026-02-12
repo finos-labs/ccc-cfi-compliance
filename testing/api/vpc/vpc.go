@@ -41,4 +41,20 @@ type Service interface {
 
 	// SummarizeVpcFlowLogs returns a human-readable CN04 summary for test evidence.
 	SummarizeVpcFlowLogs(vpcID string) (string, error)
+
+	// AttemptDisallowedPeeringDryRun attempts a dry-run VPC peering request to a
+	// configured disallowed peer and returns normalized evidence.
+	AttemptDisallowedPeeringDryRun(requesterVpcID string) (map[string]interface{}, error)
+
+	// IsDisallowedPeeringPrevented returns true when dry-run indicates the
+	// disallowed peering request was denied by policy/guardrails.
+	IsDisallowedPeeringPrevented(requesterVpcID string) (bool, error)
+
+	// EvaluateDisallowedPeeringDryRun evaluates normalized dry-run evidence and
+	// returns true when the request was prevented.
+	EvaluateDisallowedPeeringDryRun(evidence map[string]interface{}) (bool, error)
+
+	// SummarizePeeringOutcomeCompact returns compact structured CN03 evidence for
+	// clear visual reporting (mode, verdict, reason, key IDs, and dry-run result).
+	SummarizePeeringOutcomeCompact(evidence map[string]interface{}, mode string) (map[string]interface{}, error)
 }

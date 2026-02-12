@@ -27,15 +27,38 @@ validity_commentary: >
   - The exact failure mode varies (IAM AccessDenied, SCP denial, org guardrail, etc.)
   - If the environment allows the action, AWS returns a `DryRunOperation` error (which should be treated as a failure for this control)
 
+input_contract:
+  required_external:
+    - AWS_REGION
+    - PEER_VPC_ID
+  derived_in_executable_test:
+    - REQUESTER_VPC_ID (from in-scope resource UID)
+  optional:
+    - PEER_OWNER_ID
+  execution_notes:
+    - REQUESTER_VPC_ID is the in-scope VPC under test (typically mapped from test UID).
+    - PEER_VPC_ID must refer to a VPC that is intentionally not authorized for peering.
+    - Missing required external inputs should be treated as test setup failure (not N/A).
+  outcome_mapping:
+    denied_result_examples:
+      - AccessDenied
+      - UnauthorizedOperation
+      - AuthFailure
+      - explicit deny
+    allowed_result_indicator:
+      - DryRunOperation
+    decision:
+      - Denied result => PASS
+      - DryRunOperation (would be allowed) => FAIL
+
 query: |
   # Attempt to create a VPC peering connection to a peer VPC that is NOT allowed.
-  #
-  # Required inputs:
-  # - AWS_REGION
-  # - REQUESTER_VPC_ID
-  # - PEER_VPC_ID
-  #
-  # Output is normalized to JSON so it can be validated with simple JSONPath rules.
+  # Output is normalized to JSON for rule evaluation.
+
+  if [ -z "${AWS_REGION}" ] || [ -z "${REQUESTER_VPC_ID}" ] || [ -z "${PEER_VPC_ID}" ]; then
+    echo "{\"ExitCode\":2,\"DryRunAllowed\":false,\"Stderr\":\"Missing required input(s): AWS_REGION, REQUESTER_VPC_ID, PEER_VPC_ID\"}"
+    exit 0
+  fi
 
   set +e
   STDERR_FILE=$(mktemp)
@@ -43,6 +66,7 @@ query: |
     --region ${AWS_REGION} \
     --vpc-id ${REQUESTER_VPC_ID} \
     --peer-vpc-id ${PEER_VPC_ID} \
+    ${PEER_OWNER_ID:+--peer-owner-id ${PEER_OWNER_ID}} \
     --dry-run \
     1>/dev/null 2>"${STDERR_FILE}"
   EXIT_CODE=$?
@@ -62,15 +86,14 @@ rules:
     expected_values: []
     validation_rule: "^[1-9][0-9]*$"
     description: >
-      The create peering request must be prevented; the CLI should exit non-zero.
+      The create peering request must be prevented; command should exit non-zero.
 
   - jsonpath: "$.DryRunAllowed"
     expected_values:
       - false
     validation_rule: "^false$"
     description: >
-      The request must not be allowed. If AWS returns DryRunOperation, it indicates
-      the action would have succeeded (failure for this control).
+      DryRunOperation means the action would have been allowed, which is a failure.
 
   - jsonpath: "$.Stderr"
     expected_values: []
