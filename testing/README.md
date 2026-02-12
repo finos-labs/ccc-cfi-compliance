@@ -84,11 +84,17 @@ Core data structures and configuration:
 
 ### 6. Policy (`policy/`)
 
-Policy definitions for compliance checks:
+Policy definitions for compliance checks, organized by:
 
-- **`CCC.Core/`**: Core control policies organized by control number
+```
+policy/<catalog>/<control>/<AR>/<check-name>/<provider>.yaml
+```
+
+Example: `policy/CCC.Core/CCC.Core.CN06/AR01/s3-bucket-region/aws.yaml`
+
+- **`CCC.Core/`**: Core control policies
 - **`CCC.VPC/`**: VPC-specific policies
-- Each policy is a YAML file specifying queries and validation rules
+- Each YAML file specifies a query and validation rules for a specific provider
 
 ### 7. Output (`output/`)
 

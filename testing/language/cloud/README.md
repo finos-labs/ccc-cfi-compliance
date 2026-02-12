@@ -275,36 +275,39 @@ Response in `result.output`:
 ### 8. Policy Checks
 
 ```gherkin
-When I run policy checks for control "CCC.Core.CN14" assessment requirement "AR01" for service "object-storage" on resource "{ResourceName}"
+When I attempt policy check "{check-name}" for control "{control}" assessment requirement "{AR}" for service "{service}" on resource "{resource}" and provider "{provider}"
 ```
 
-Runs policy validation against a cloud resource by loading YAML policy definitions.
+Runs a specific policy check against a cloud resource.
 
 **Parameters:**
 
+- `check-name`: The policy check name (e.g., `s3-bucket-region`, `s3-object-lock`)
 - `control`: The CCC control ID (e.g., `CCC.Core.CN14`, `CCC.ObjStor.CN01`)
-- `assessment requirement`: The AR identifier (e.g., `AR01`, `AR02`)
+- `AR`: The assessment requirement identifier (e.g., `AR01`, `AR02`)
 - `service`: The service type (e.g., `object-storage`, `iam`, `vpc`)
 - `resource`: The resource name or identifier (supports variable references like `{ResourceName}`)
+- `provider`: The cloud provider (e.g., `aws`, `azure`, `gcp`)
 
 **How it works:**
 
-1. Locates policy files in `policy/{CatalogType}/{Control}/{provider}/{AR}/*.yaml`
-2. Filters policies by `service_type` field in the YAML
-3. Executes each matching policy's query against the resource
-4. Validates results against defined rules
-5. Attaches individual policy results as JSON to the test report
+1. Constructs the policy path directly: `policy/{CatalogType}/{Control}/{AR}/{check-name}/{provider}.yaml`
+2. If the file is missing, returns **fail**
+3. If the policy's `service_type` doesn't match the resource, returns **pass** (not applicable)
+4. Executes the policy's query against the resource
+5. Validates results against defined rules
+6. Attaches policy result as JSON to the test report
 
 **Result:**
 
-- Sets `result` to `true` if all policies pass, `false` otherwise
-- Returns an error with details if any policy fails
+- Sets `result` to `true` if policy passes or is not applicable
+- Sets `result` to `false` and returns error if policy fails or file is missing
 
 **Example:**
 
 ```gherkin
 Given a cloud api for "{Provider}" in "api"
-When I run policy checks for control "CCC.Core.CN14" assessment requirement "AR01" for service "object-storage" on resource "{ResourceName}"
+When I attempt policy check "s3-bucket-region" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
 Then "{result}" is true
 ```
 

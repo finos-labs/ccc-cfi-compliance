@@ -120,7 +120,7 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a cloud api for "([^"]*)" in "([^"]*)"$`, cw.aCloudAPIForProviderIn)
 
 	// Policy assessment steps
-	ctx.Step(`^I run policy checks for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)"$`, cw.runPolicyChecks)
+	ctx.Step(`^I attempt policy check "([^"]*)" for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)" and provider "([^"]*)"$`, cw.attemptPolicyCheck)
 }
 
 // opensslClientRequest creates an OpenSSL s_client connection with optional TLS version
@@ -394,14 +394,20 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 	return nil
 }
 
-// runPolicyChecks runs policy checks for a control assessment requirement against a resource
-// Example: I run policy checks for control "CCC.Core.CN14" assessment requirement "AR01" for service "object-storage" on resource "{ResourceName}"
-func (cw *CloudWorld) runPolicyChecks(control, ar, serviceType, resourceName string) error {
-	// Resolve any variable references (handles {Provider}, {ResourceName}, {ServiceType}, etc.)
+// attemptPolicyCheck runs a specific policy check by name
+// Example: I attempt policy check "s3-object-lock" for control "CCC.Core.CN14" assessment requirement "AR01" for service "object-storage" on resource "{ResourceName}" and provider "aws"
+// Returns:
+//   - Pass if service type doesn't match (policy not applicable)
+//   - Fail if policy file is missing
+//   - Pass/Fail based on policy evaluation otherwise
+func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, resourceName, provider string) error {
+	// Resolve any variable references
+	checkNameResolved := fmt.Sprintf("%v", cw.HandleResolve(checkName))
 	controlResolved := fmt.Sprintf("%v", cw.HandleResolve(control))
 	arResolved := fmt.Sprintf("%v", cw.HandleResolve(ar))
 	serviceTypeResolved := fmt.Sprintf("%v", cw.HandleResolve(serviceType))
 	resourceNameResolved := fmt.Sprintf("%v", cw.HandleResolve(resourceName))
+	providerResolved := fmt.Sprintf("%v", cw.HandleResolve(provider))
 
 	// Get CloudParams from Props
 	cloudParams, ok := cw.Props["CloudParams"].(environment.CloudParams)
@@ -421,9 +427,9 @@ func (cw *CloudWorld) runPolicyChecks(control, ar, serviceType, resourceName str
 		testParams.UID = fmt.Sprintf("%v", uid)
 	}
 
-	// Find the policy file
-	// Directory structure: policy/{CatalogType}/{Control}/{provider}/{AR}/*.yaml
-	// Example: policy/CCC.Core/CCC.Core.CN14/aws/AR01/s3-object-lock.yaml
+	// Build the policy file path directly
+	// Directory structure: policy/{CatalogType}/{Control}/{AR}/{check-name}/{provider}.yaml
+	// Example: policy/CCC.Core/CCC.Core.CN14/AR01/s3-object-lock/aws.yaml
 
 	// Extract catalog type from control (e.g., "CCC.Core" from "CCC.Core.CN14")
 	catalogType := extractCatalogType(controlResolved)
@@ -434,55 +440,56 @@ func (cw *CloudWorld) runPolicyChecks(control, ar, serviceType, resourceName str
 	testingDir := filepath.Dir(filepath.Dir(cloudDir)) // Go up from language/cloud to testing
 	policyBaseDir := filepath.Join(testingDir, "policy")
 
-	// Build the policy directory path
-	policyDir := filepath.Join(policyBaseDir, catalogType, controlResolved, cloudParams.Provider, arResolved)
+	// Build the exact policy file path
+	policyPath := filepath.Join(policyBaseDir, catalogType, controlResolved, arResolved, checkNameResolved, providerResolved+".yaml")
 
-	// Find all YAML files in the directory
-	policyFiles, err := findPolicyFilesForService(policyDir, serviceTypeResolved)
+	// Check if the policy file exists
+	if _, err := os.Stat(policyPath); os.IsNotExist(err) {
+		cw.Props["result"] = false
+		return fmt.Errorf("policy file not found: %s", policyPath)
+	}
+
+	// Load the policy to check service_type
+	data, err := os.ReadFile(policyPath)
 	if err != nil {
-		return fmt.Errorf("failed to find policy files: %w", err)
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to read policy file %s: %w", policyPath, err)
 	}
 
-	if len(policyFiles) == 0 {
-		return fmt.Errorf("no policy files found for control %s, AR %s, provider %s, service %s in %s",
-			controlResolved, arResolved, cloudParams.Provider, serviceTypeResolved, policyDir)
+	// Parse the YAML to get the service_type
+	var policyDef struct {
+		ServiceType string `yaml:"service_type"`
+	}
+	if err := yaml.Unmarshal(data, &policyDef); err != nil {
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
 	}
 
-	// Create policy checker
+	// If service type doesn't match, return pass (policy not applicable to this service)
+	if policyDef.ServiceType != serviceTypeResolved {
+		cw.Props["result"] = true
+		fmt.Printf("Policy %s skipped: service type %s doesn't match resource service type %s\n",
+			checkNameResolved, policyDef.ServiceType, serviceTypeResolved)
+		return nil
+	}
+
+	// Create policy checker and run the policy
 	checker := environment.NewPolicyChecker(policyBaseDir)
-
-	// Run each matching policy and collect results
-	var allResults []*environment.PolicyResult
-	var overallPassed = true
-
-	for _, policyFile := range policyFiles {
-		result, err := checker.RunPolicy(testParams, policyFile)
-		if err != nil {
-			return fmt.Errorf("failed to run policy %s: %w", policyFile, err)
-		}
-
-		allResults = append(allResults, result)
-		if !result.Passed {
-			overallPassed = false
-		}
-
-		// Attach individual policy result as JSON
-		resultJSON, _ := json.MarshalIndent(result, "", "  ")
-		policyFileName := filepath.Base(policyFile)
-		cw.Attach(fmt.Sprintf("policy-result-%s.json", policyFileName), "application/json", resultJSON)
+	result, err := checker.RunPolicy(testParams, policyPath)
+	if err != nil {
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to run policy %s: %w", policyPath, err)
 	}
 
-	cw.Props["result"] = overallPassed
+	// Attach policy result as JSON
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	cw.Attach(fmt.Sprintf("policy-result-%s.json", checkNameResolved), "application/json", resultJSON)
 
-	// If any policy failed, return an error with details
-	if !overallPassed {
-		var failedPolicies []string
-		for _, r := range allResults {
-			if !r.Passed {
-				failedPolicies = append(failedPolicies, fmt.Sprintf("%s: %s", r.Name, r.QueryError))
-			}
-		}
-		return fmt.Errorf("policy check failed: %s", strings.Join(failedPolicies, "; "))
+	cw.Props["result"] = result.Passed
+
+	// If policy failed, return an error with details
+	if !result.Passed {
+		return fmt.Errorf("policy check failed: %s: %s", result.Name, result.QueryError)
 	}
 
 	return nil
@@ -496,55 +503,4 @@ func extractCatalogType(control string) string {
 		return parts[0] + "." + parts[1]
 	}
 	return control
-}
-
-// findPolicyFilesForService finds all policy YAML files in a directory that match the service type
-func findPolicyFilesForService(policyDir, serviceType string) ([]string, error) {
-	var matchingFiles []string
-
-	// Check if directory exists
-	if _, err := os.Stat(policyDir); os.IsNotExist(err) {
-		return nil, nil // Return empty list, not an error
-	}
-
-	// Read all files in the directory
-	entries, err := os.ReadDir(policyDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read policy directory %s: %w", policyDir, err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
-			continue
-		}
-
-		policyPath := filepath.Join(policyDir, entry.Name())
-
-		// Load the policy to check service_type
-		data, err := os.ReadFile(policyPath)
-		if err != nil {
-			continue // Skip files we can't read
-		}
-
-		// Quick check for service_type in the YAML
-		// We do a simple string check first for performance
-		if !strings.Contains(string(data), "service_type:") {
-			continue
-		}
-
-		// Parse the YAML to get the actual service_type
-		var policyDef struct {
-			ServiceType string `yaml:"service_type"`
-		}
-		if err := yaml.Unmarshal(data, &policyDef); err != nil {
-			continue
-		}
-
-		// Check if service type matches
-		if policyDef.ServiceType == serviceType {
-			matchingFiles = append(matchingFiles, policyPath)
-		}
-	}
-
-	return matchingFiles, nil
 }

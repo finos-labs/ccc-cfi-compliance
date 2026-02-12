@@ -7,7 +7,12 @@ Feature: CCC.Core.CN06.AR01 - Resource Location Compliance
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy
-  Scenario: Policy checks
-    When I run policy checks for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}"
+  @Policy @CCC.ObjStor
+  Scenario: S3 bucket region compliance
+    When I attempt policy check "s3-bucket-region" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
+  @Policy @CCC.VPC
+  Scenario: VPC region compliance
+    When I attempt policy check "vpc-region-compliance" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
