@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN03 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN03 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN03.AR01 - Multi-Factor Authentication for Destructive Operations
   As a security administrator
   I want to ensure destructive operations require multi-factor authentication

@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN04 @tlp-red
+@PerService @CCC.Core @CCC.Core.CN04 @tlp-red
 Feature: CCC.Core.CN04.AR03 - Log Data Read Attempts
   As a security administrator
   I want to ensure all data read attempts are logged

@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN04 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN04 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
   As a security administrator
   I want to ensure all administrative access attempts are logged

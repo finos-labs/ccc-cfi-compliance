@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN14 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN14 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN14.AR02 - Backup Recency
   As a security administrator
   I want to ensure the most recent backup is within the required timeframe

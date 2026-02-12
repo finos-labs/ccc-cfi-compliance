@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
   As a security administrator
   I want to ensure unauthorized entities cannot modify data

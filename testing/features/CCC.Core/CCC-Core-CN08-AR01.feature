@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN08 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN08 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN08.AR01 - Data Replication and Redundancy
   As a security administrator
   I want to ensure data is replicated to a physically separate data center

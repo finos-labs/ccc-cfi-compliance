@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN09 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN09 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN09.AR01 - Access Logging Separation
   As a security administrator
   I want to ensure access logs are stored separately from the resources they monitor

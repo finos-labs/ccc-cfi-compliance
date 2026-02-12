@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN09 @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN09 @tlp-amber @tlp-red
 Feature: CCC.Core.CN09.AR03 - Log Redirection Requires Service Halt
   As a security administrator
   I want to ensure log redirection requires halting the resource

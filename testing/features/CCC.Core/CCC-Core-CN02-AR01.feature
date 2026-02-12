@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN02 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN02 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
   As a security administrator
   I want to ensure all stored data is encrypted using industry-standard methods

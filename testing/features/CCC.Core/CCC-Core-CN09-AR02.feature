@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN09 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN09 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN09.AR02 - Logs Cannot Be Disabled
   As a security administrator
   I want to ensure logging cannot be disabled without disabling the resource

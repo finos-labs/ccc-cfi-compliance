@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN05 @tlp-red
+@PerService @CCC.Core @CCC.Core.CN05 @tlp-red
 Feature: CCC.Core.CN05.AR05 - Hide Service Existence from External Requests
   As a security administrator
   I want to ensure external requests receive no indication that service exists

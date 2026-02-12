@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN11.AR04 - Encryption Key Access Control
   As a security administrator
   I want to ensure encryption key access follows least privilege principles

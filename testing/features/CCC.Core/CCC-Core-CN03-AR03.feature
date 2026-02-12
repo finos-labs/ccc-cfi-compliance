@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN03 @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN03 @tlp-amber @tlp-red
 Feature: CCC.Core.CN03.AR03 - MFA for UI Viewing
   As a security administrator
   I want to ensure viewing information through UI requires MFA

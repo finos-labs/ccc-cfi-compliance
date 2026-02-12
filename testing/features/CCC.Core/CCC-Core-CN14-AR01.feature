@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN14 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN14 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN14.AR01 - Data Immutability for Disaster Recovery
   As a security administrator
   I want to ensure backup data cannot be modified or deleted within retention period

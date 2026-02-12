@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN13 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@CCC.Core @CCC.Core.CN13 @tlp-clear @tlp-green @tlp-amber @tlp-red @PerPort
 Feature: CCC.Core.CN13.AR01 - Valid Unexpired Certificates
   As a security administrator
   I want to ensure only valid, unexpired certificates are used

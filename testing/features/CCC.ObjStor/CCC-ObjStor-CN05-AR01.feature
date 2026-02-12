@@ -1,4 +1,4 @@
-@CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.ObjStor.CN05.AR01 - Versioning with Unique Identifiers
   As a security administrator
   I want to ensure objects are stored with unique identifiers

@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.ObjStor.CN04.AR02
+@PerService @CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.ObjStor.CN04.AR02
 Feature: CCC.ObjStor.CN04.AR02
   As a security administrator
   I want to prevent deletion or modification of objects under active retention

@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR02
+@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR02
 Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
   When an attempt is made to modify the retention policy for an object storage bucket,
   the service MUST prevent the policy from being modified.

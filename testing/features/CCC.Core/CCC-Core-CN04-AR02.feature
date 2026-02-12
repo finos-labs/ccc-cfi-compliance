@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN04 @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN04 @tlp-amber @tlp-red
 Feature: CCC.Core.CN04.AR02 - Log Data Modification Attempts
   As a security administrator
   I want to ensure all data modification attempts are logged

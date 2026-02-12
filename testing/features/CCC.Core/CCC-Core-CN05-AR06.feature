@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN05 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN05 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN05.AR06 - Block All Unauthorized Requests
   As a security administrator
   I want to ensure all unauthorized requests are blocked

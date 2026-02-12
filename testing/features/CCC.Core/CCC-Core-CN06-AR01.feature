@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN06 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN06 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN06.AR01 - Resource Location Compliance
   As a security administrator
   I want to ensure cloud resources are deployed in approved regions

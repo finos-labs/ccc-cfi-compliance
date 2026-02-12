@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN03 @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN03 @tlp-amber @tlp-red
 Feature: CCC.Core.CN03.AR04 - API Authentication for Viewing
   As a security administrator
   I want to ensure API viewing requires credentials from within trust perimeter

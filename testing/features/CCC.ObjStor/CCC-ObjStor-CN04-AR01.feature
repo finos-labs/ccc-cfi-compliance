@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.ObjStor.CN04.AR01
+@PerService @CCC.ObjStor @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.ObjStor.CN04.AR01
 Feature: CCC.ObjStor.CN04.AR01
   As a security administrator
   I want objects to automatically receive a default retention policy upon upload

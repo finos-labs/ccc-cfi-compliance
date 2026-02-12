@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN06 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN06 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN06.AR02 - Child Resource Location Compliance
   As a security administrator
   I want to ensure child resources are deployed in approved regions

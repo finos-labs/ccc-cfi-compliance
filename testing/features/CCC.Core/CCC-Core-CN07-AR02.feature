@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN07 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN07 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN07.AR02 - Log Enumeration Activities
   As a security administrator
   I want to ensure enumeration activities are logged

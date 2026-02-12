@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN10 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN10 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN10.AR01 - Replication Destination Trust
   As a security administrator
   I want to ensure data replication only occurs to trusted destinations

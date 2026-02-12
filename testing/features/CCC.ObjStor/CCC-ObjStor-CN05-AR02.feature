@@ -1,4 +1,4 @@
-@CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.ObjStor.CN05.AR02 - New Version ID on Modification
   As a security administrator
   I want to ensure modified objects receive new version identifiers

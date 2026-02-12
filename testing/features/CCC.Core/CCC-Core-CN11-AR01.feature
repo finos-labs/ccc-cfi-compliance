@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN11.AR01 - Encryption Key Algorithm Validation
   As a security administrator
   I want to ensure encryption keys use industry-standard cryptographic algorithms

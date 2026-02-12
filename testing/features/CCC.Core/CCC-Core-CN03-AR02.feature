@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN03 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN03 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN03.AR02 - API Authentication with Credentials
   As a security administrator
   I want to ensure API modifications require credentials from within trust perimeter

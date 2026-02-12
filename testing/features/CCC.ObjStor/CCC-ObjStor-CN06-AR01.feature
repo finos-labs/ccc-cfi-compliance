@@ -1,4 +1,4 @@
-@CCC.ObjStor @CCC.ObjStor.CN06 @tlp-amber @tlp-red
+@PerService @CCC.ObjStor @CCC.ObjStor.CN06 @tlp-amber @tlp-red
 Feature: CCC.ObjStor.CN06.AR01 - Access Logs in Separate Data Store
   As a security administrator
   I want to ensure access logs are stored separately from the bucket they monitor

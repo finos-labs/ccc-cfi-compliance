@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR01
+@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR01
 Feature: CCC.ObjStor.CN03.AR01 - Bucket Soft Delete and Recovery
   When an object storage bucket deletion is attempted,
   the bucket MUST be fully recoverable for a set time-frame after deletion is requested.

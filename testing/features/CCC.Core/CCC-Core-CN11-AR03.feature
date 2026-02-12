@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN11.AR03 - Customer-Managed Encryption Keys
   As a security administrator
   I want to ensure customer-managed encryption keys (CMEKs) are used

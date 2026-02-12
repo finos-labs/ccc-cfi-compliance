@@ -1,4 +1,4 @@
-@CCC.Core @tlp-green @tlp-amber @tlp-red
+@CCC.Core @tlp-green @tlp-amber @tlp-red @PerPort
 Feature: CCC.Core.CN01.AR01
   As a security administrator
   I want to ensure all non-SSH network traffic uses TLS 1.3 or higher
@@ -10,28 +10,32 @@ Feature: CCC.Core.CN01.AR01
   Scenario: Policy check - ALB TLS 1.3 Security Policy
     When I run policy checks for control "CCC.Core.CN01" assessment requirement "AR01" for service "load-balancer" on resource "{ResourceName}"
     Then "{result}" should equal "true"
-  # Scenario: Service accepts TLS 1.3 encrypted traffic
-  #   Given an openssl s_client request using "tls1_3" to "{portNumber}" on "{hostName}" protocol "{protocol}"
-  #   And I refer to "{result}" as "connection"
-  #   And "{connection}" state is open
-  #   And "{connection.State}" is "open"
-  #   And I close connection "{connection}"
-  #   Then "{connection}" state is closed
-  # Scenario: Service rejects TLS 1.2 traffic
-  #   Given an openssl s_client request using "tls1_2" to "{portNumber}" on "{hostName}" protocol "{protocol}"
-  #   And I refer to "{result}" as "connection"
-  #   And we wait for a period of "40" ms
-  #   Then "{connection.State}" is "closed"
-  # Scenario: Service rejects TLS 1.1 traffic
-  #   Given an openssl s_client request using "tls1_1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
-  #   And I refer to "{result}" as "connection"
-  #   And we wait for a period of "40" ms
-  #   Then "{connection.State}" is "closed"
-  # Scenario: Service rejects TLS 1.0 traffic
-  #   Given an openssl s_client request using "tls1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
-  #   And I refer to "{result}" as "connection"
-  #   And we wait for a period of "40" ms
-  #   Then "{connection.State}" is "closed"
+
+  Scenario: Service accepts TLS 1.3 encrypted traffic
+    Given an openssl s_client request using "tls1_3" to "{portNumber}" on "{hostName}" protocol "{protocol}"
+    And I refer to "{result}" as "connection"
+    And "{connection}" state is open
+    And "{connection.State}" is "open"
+    And I close connection "{connection}"
+    Then "{connection}" state is closed
+
+  Scenario: Service rejects TLS 1.2 traffic
+    Given an openssl s_client request using "tls1_2" to "{portNumber}" on "{hostName}" protocol "{protocol}"
+    And I refer to "{result}" as "connection"
+    And we wait for a period of "40" ms
+    Then "{connection.State}" is "closed"
+
+  Scenario: Service rejects TLS 1.1 traffic
+    Given an openssl s_client request using "tls1_1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
+    And I refer to "{result}" as "connection"
+    And we wait for a period of "40" ms
+    Then "{connection.State}" is "closed"
+
+  Scenario: Service rejects TLS 1.0 traffic
+    Given an openssl s_client request using "tls1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
+    And I refer to "{result}" as "connection"
+    And we wait for a period of "40" ms
+    Then "{connection.State}" is "closed"
 
   Scenario: Verify SSL/TLS protocol support
     Given "report" contains details of SSL Support type "protocols" for "{hostName}" on port "{portNumber}"

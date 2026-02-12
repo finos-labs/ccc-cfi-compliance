@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN08 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN08 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN08.AR02 - Replication Status Visibility
   As a security administrator
   I want to ensure replication status is accurately represented

@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN13 @tlp-red
+@PerService @CCC.Core @CCC.Core.CN13 @tlp-red
 Feature: CCC.Core.CN13.AR03 - Certificate Rotation within 90 Days
   As a security administrator
   I want to ensure certificates are rotated within 90 days

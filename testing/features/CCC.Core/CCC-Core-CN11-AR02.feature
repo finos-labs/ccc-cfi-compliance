@@ -1,4 +1,4 @@
-@CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
+@PerService @CCC.Core @CCC.Core.CN11 @tlp-green @tlp-amber @tlp-red
 Feature: CCC.Core.CN11.AR02 - Encryption Key Rotation (180 days)
   As a security administrator
   I want to ensure encryption keys are rotated within 180 days
