@@ -294,10 +294,14 @@ func (cw *CloudWorld) runTestSSL(reportName, testType, hostName, port string, us
 	tempFile += ".json"
 
 	// Build testssl.sh command
-	// Get the directory where this Go file is located
-	_, filename, _, _ := runtime.Caller(0)
-	cloudDir := filepath.Dir(filename)
-	testsslPath := filepath.Join(cloudDir, "testssl.sh")
+	// Try system-installed testssl.sh first, fall back to local copy
+	testsslPath := "testssl.sh" // Use PATH lookup
+	if _, err := exec.LookPath("testssl.sh"); err != nil {
+		// Fall back to local copy
+		_, filename, _, _ := runtime.Caller(0)
+		cloudDir := filepath.Dir(filename)
+		testsslPath = filepath.Join(cloudDir, "testssl.sh")
+	}
 
 	args := []string{testsslPath, "--" + fmt.Sprintf("%v", testTypeResolved)}
 

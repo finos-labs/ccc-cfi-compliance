@@ -42,5 +42,4 @@ Feature: CCC.Core.CN01.AR03
     Then "{report}" is a slice of objects with at least the following contents
       | id     | finding            |
       | TLS1_2 | offered            |
-      | id     | finding            |
       | TLS1_3 | offered with final |

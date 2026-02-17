@@ -2,6 +2,27 @@
 
 This package provides cloud-specific Cucumber/Godog step definitions for CCC (Common Cloud Controls) compliance testing. It extends the generic steps with cloud provider integrations, SSL/TLS testing capabilities, and protocol-specific connection handling.
 
+## Prerequisites
+
+### testssl.sh
+
+SSL/TLS analysis steps require [testssl.sh](https://github.com/drwetter/testssl.sh) to be installed:
+
+**macOS:**
+```bash
+brew install testssl
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+apt-get install testssl.sh
+# or install from source:
+git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl
+sudo ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
+```
+
+The code will automatically use the system-installed `testssl.sh` if available, or fall back to a local copy in this directory.
+
 ## Features
 
 - Cloud provider API initialization (AWS, Azure, GCP)

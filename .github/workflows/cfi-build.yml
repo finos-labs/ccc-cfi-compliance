@@ -112,21 +112,13 @@ jobs:
         with:
           go-version: "1.21"
 
-      - name: Install Steampipe
+      - name: Install testssl.sh
         run: |
-          echo "📦 Installing Steampipe..."
-          sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
-          steampipe --version
-
-          echo "📦 Installing Steampipe plugins..."
-          steampipe plugin install aws
-          steampipe plugin install azure
-          steampipe plugin install gcp
-
-          echo "🚀 Starting Steampipe service..."
-          steampipe service start
-
-          echo "✅ Steampipe installed and configured successfully"
+          echo "📦 Installing testssl.sh..."
+          git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl
+          sudo ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
+          testssl.sh --version || true
+          echo "✅ testssl.sh installed"
 
       - name: Cache Python Poetry virtualenv
         uses: actions/cache@v4
