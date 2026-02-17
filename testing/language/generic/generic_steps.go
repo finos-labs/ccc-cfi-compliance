@@ -197,6 +197,12 @@ func (pw *PropsWorld) HandleResolve(name string) interface{} {
 				return val
 			}
 
+			// Try with PascalCase (e.g., "portNumber" -> "PortNumber")
+			pascalCase := strings.ToUpper(stripped[:1]) + stripped[1:]
+			if val, exists := pw.Props[pascalCase]; exists {
+				return val
+			}
+
 			// Try struct field access (e.g., "connection.state")
 			if strings.Contains(stripped, ".") {
 				parts := strings.Split(stripped, ".")
