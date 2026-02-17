@@ -7,12 +7,15 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // GCPFactory implements the Factory interface for GCP
 type GCPFactory struct {
-	ctx        context.Context
-	iamService generic.Service
+	ctx         context.Context
+	cloudParams environment.CloudParams
+	iamService  generic.Service
 }
 
 // NewGCPFactory creates a new GCP factory
@@ -23,6 +26,24 @@ func NewGCPFactory() *GCPFactory {
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	if projectID == "" {
 		projectID = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	}
+	if projectID == "" {
+		projectID = os.Getenv("TF_VAR_gcp_project_id")
+	}
+
+	// Get region from environment
+	region := os.Getenv("GCP_REGION")
+	if region == "" {
+		region = os.Getenv("TF_VAR_gcp_region")
+	}
+	if region == "" {
+		region = "us-central1"
+	}
+
+	cloudParams := environment.CloudParams{
+		Provider:     "gcp",
+		Region:       region,
+		GCPProjectID: projectID,
 	}
 
 	// Create IAM service once and cache it
@@ -37,8 +58,9 @@ func NewGCPFactory() *GCPFactory {
 	}
 
 	return &GCPFactory{
-		ctx:        ctx,
-		iamService: iamService,
+		ctx:         ctx,
+		cloudParams: cloudParams,
+		iamService:  iamService,
 	}
 }
 
@@ -49,8 +71,7 @@ func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 		return f.iamService, nil
 
 	case "object-storage":
-		// TODO: Implement GCS service creation
-		return nil, fmt.Errorf("object-storage not yet implemented for GCP")
+		return objstorage.NewGCPStorageService(f.ctx, f.cloudParams)
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
@@ -69,10 +90,16 @@ func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		return f.iamService, nil
 
 	case "object-storage":
-		// TODO: Implement GCS service with credentials
-		// credentialsJSON := identity.Credentials["service_account_key"]
-		// service, err = objstorage.NewGCSServiceWithCredentials(f.ctx, projectID, []byte(credentialsJSON))
-		return nil, fmt.Errorf("object-storage with identity not yet implemented for GCP")
+		service, err := objstorage.NewGCPStorageServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCS service with credentials: %w", err)
+		}
+		if testAccess {
+			if err := service.CheckUserProvisioned(); err != nil {
+				return nil, fmt.Errorf("credentials not ready: %w", err)
+			}
+		}
+		return service, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)
