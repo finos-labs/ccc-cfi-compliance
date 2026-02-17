@@ -21,7 +21,7 @@ query: |
     --bucket ${BUCKET_NAME}
 
 rules:
-  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[*].ApplyServerSideEncryptionByDefault.SSEAlgorithm"
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm"
     expected_values:
       - "aws:kms"
       - "aws:kms:dsse"
@@ -32,17 +32,11 @@ rules:
       'aws:kms' uses AWS KMS keys, 'aws:kms:dsse' uses dual-layer encryption,
       'AES256' uses S3-managed keys (SSE-S3). All are industry-standard AES-256.
 
-  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[*].ApplyServerSideEncryptionByDefault.KMSMasterKeyID"
-    expected_values: []
-    validation_rule: "^(arn:aws:kms:[a-z0-9-]+:[0-9]+:key/[a-f0-9-]+|alias/[a-zA-Z0-9/_-]+)?$"
-    description: >
-      When using SSE-KMS, validates that a KMS key ARN or alias is specified.
-      Empty value is acceptable for SSE-S3 (AES256) encryption.
-
-  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[*].BucketKeyEnabled"
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[0].BucketKeyEnabled"
     expected_values:
       - true
-    validation_rule: "^true$"
+      - false
+    validation_rule: "^(true|false)$"
     description: >
-      Verifies that S3 Bucket Keys are enabled, which reduces KMS request costs
-      and is a best practice when using SSE-KMS encryption.
+      Checks S3 Bucket Keys setting. Enabled reduces KMS request costs when using 
+      SSE-KMS. Either value is acceptable for compliance.

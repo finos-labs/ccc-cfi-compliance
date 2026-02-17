@@ -172,9 +172,15 @@ func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 
 // CreateObject creates a new object in a bucket
 func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
-	// Create a regional client
+	// Get the bucket's actual region
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket region: %w", err)
+	}
+
+	// Create a regional client for the bucket's region
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = bucketRegion
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Convert string to []byte
@@ -240,12 +246,18 @@ func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, er
 
 // DeleteObject deletes an object from a bucket
 func (s *AWSS3Service) DeleteObject(bucketID string, objectID string) error {
-	// Create a regional client
+	// Get the bucket's actual region
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return fmt.Errorf("failed to get bucket region: %w", err)
+	}
+
+	// Create a regional client for the bucket's region
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = bucketRegion
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
-	_, err := regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
+	_, err = regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 	})
