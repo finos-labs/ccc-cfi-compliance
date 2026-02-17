@@ -20,7 +20,7 @@ var (
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
-	tag            = flag.String("tag", "", "Additional tag filter ANDed with service tags to narrow tests (e.g., '@Policy' or '@CCC.Core.CN06')")
+	tags           = flag.String("tags", "", "Space-separated tag filters ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')")
 
 	// Cloud configuration flags
 	region              = flag.String("region", "", "Cloud region")
@@ -104,7 +104,7 @@ func main() {
 			OutputDir:      *outputDir,
 			Timeout:        *timeout,
 			ResourceFilter: *resourceFilter,
-			Tag:            *tag,
+			Tags:           parseTags(*tags),
 		}))
 	}
 
@@ -233,6 +233,27 @@ func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup,
 	}
 
 	return params
+}
+
+// parseTags parses a space-separated tags string into a slice of tags
+// Ensures each tag has @ prefix if it's a simple tag name
+func parseTags(tagsStr string) []string {
+	if tagsStr == "" {
+		return nil
+	}
+
+	parts := strings.Fields(tagsStr)
+	tags := make([]string, 0, len(parts))
+
+	for _, tag := range parts {
+		// Ensure tag has @ prefix if it's a simple tag name (not negated with ~)
+		if !strings.HasPrefix(tag, "@") && !strings.HasPrefix(tag, "~") {
+			tag = "@" + tag
+		}
+		tags = append(tags, tag)
+	}
+
+	return tags
 }
 
 // validateCloudParams validates that required parameters are set for the provider

@@ -182,15 +182,10 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 			continue
 		}
 
-		// Combine user-provided tag with service's tag filter using AND
-		// This allows narrowing down tests (e.g., ["@CCC.ObjStor", "@Policy"])
-		if r.Config.Tag != "" {
-			userTag := r.Config.Tag
-			// Ensure user tag has @ prefix if it looks like a simple tag name
-			if !strings.HasPrefix(userTag, "@") && !strings.Contains(userTag, " ") {
-				userTag = "@" + userTag
-			}
-			resource.TagFilter = append(resource.TagFilter, userTag)
+		// Combine user-provided tags with service's tag filter using AND
+		// This allows narrowing down tests (e.g., "--tags '@CCC.Core.CN01 @Policy'")
+		if len(r.Config.Tags) > 0 {
+			resource.TagFilter = append(resource.TagFilter, r.Config.Tags...)
 		}
 		// Otherwise, use the TagFilter already set by GetOrProvisionTestableResources()
 

@@ -20,7 +20,7 @@ SERVICE=""
 OUTPUT_DIR=""
 TIMEOUT="30m"
 RESOURCE_FILTER=""
-TAG=""
+TAGS=""
 REGION=""
 AZURE_SUBSCRIPTION_ID_FLAG=""
 AZURE_RESOURCE_GROUP_FLAG=""
@@ -50,8 +50,8 @@ while [[ $# -gt 0 ]]; do
       RESOURCE_FILTER="$2"
       shift 2
       ;;
-    -g|--tag)
-      TAG="$2"
+    -g|--tags)
+      TAGS="$2"
       shift 2
       ;;
     --region)
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
       echo "                                                     iam, load-balancer, security-group, vpc"
       echo "  -o, --output DIR                     Output directory (default: testing/output)"
       echo "  -r, --resource RESOURCE              Filter to specific resource name"
-      echo "  -g, --tag TAG                        Additional tag filter ANDed with service tags (e.g., '@Policy')"
+      echo "  -g, --tags 'TAG1 TAG2 ...'           Space-separated tags ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')"
       echo "  -t, --timeout DURATION               Timeout for all tests (default: 30m)"
       echo "  --region REGION                      Cloud region"
       echo ""
@@ -172,8 +172,8 @@ if [ -n "$RESOURCE_FILTER" ]; then
   CMD="$CMD -resource=\"$RESOURCE_FILTER\""
 fi
 
-if [ -n "$TAG" ]; then
-  CMD="$CMD -tag=\"$TAG\""
+if [ -n "$TAGS" ]; then
+  CMD="$CMD -tags=\"$TAGS\""
 fi
 
 if [ -n "$REGION" ]; then
