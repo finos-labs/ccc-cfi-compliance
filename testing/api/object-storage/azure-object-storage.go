@@ -261,17 +261,31 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data s
 	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
 
 	// Upload blob
-	_, err = blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content), nil)
+	uploadResp, err := blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload blob %s: %w", objectID, err)
 	}
 
+	// Azure encrypts all blobs by default
+	// Check if the response indicates encryption (IsServerEncrypted)
+	encryption := "Microsoft"
+	encryptionAlgorithm := "AES256"
+	if uploadResp.IsServerEncrypted != nil && *uploadResp.IsServerEncrypted {
+		encryption = "Microsoft"
+		// Check for customer-managed key
+		if uploadResp.EncryptionKeySHA256 != nil {
+			encryptionAlgorithm = "CMEK"
+		}
+	}
+
 	return &Object{
-		ID:       objectID,
-		BucketID: bucketID,
-		Name:     objectID,
-		Size:     int64(len(content)),
-		Data:     []string{data},
+		ID:                  objectID,
+		BucketID:            bucketID,
+		Name:                objectID,
+		Size:                int64(len(content)),
+		Data:                []string{data},
+		Encryption:          encryption,
+		EncryptionAlgorithm: encryptionAlgorithm,
 	}, nil
 }
 

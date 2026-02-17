@@ -180,7 +180,7 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 	// Convert string to []byte
 	content := []byte(data)
 
-	_, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
+	putResult, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 		Body:   bytes.NewReader(content),
@@ -189,12 +189,21 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		return nil, fmt.Errorf("failed to create object %s in bucket %s: %w", objectID, bucketID, err)
 	}
 
+	// Extract encryption information from response
+	encryption := string(putResult.ServerSideEncryption)
+	encryptionAlgorithm := encryption
+	if putResult.SSEKMSKeyId != nil {
+		encryptionAlgorithm = "aws:kms"
+	}
+
 	return &Object{
-		ID:       objectID,
-		BucketID: bucketID,
-		Name:     objectID,
-		Size:     int64(len(content)),
-		Data:     []string{data},
+		ID:                  objectID,
+		BucketID:            bucketID,
+		Name:                objectID,
+		Size:                int64(len(content)),
+		Data:                []string{data},
+		Encryption:          encryption,
+		EncryptionAlgorithm: encryptionAlgorithm,
 	}, nil
 }
 

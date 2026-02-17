@@ -974,6 +974,38 @@ func (pw *PropsWorld) fieldContains(field, substring string) error {
 	return nil
 }
 
+func (pw *PropsWorld) fieldIsStringContainingOneOf(field string, table *godog.Table) error {
+	actual := pw.HandleResolve(field)
+
+	var actualStr string
+	if err, ok := actual.(error); ok {
+		actualStr = err.Error()
+	} else {
+		actualStr = fmt.Sprintf("%v", actual)
+	}
+
+	// Build expected values from data table (single column)
+	expectedValues := make([]string, 0, len(table.Rows)-1)
+	for i := 1; i < len(table.Rows); i++ {
+		if len(table.Rows[i].Cells) > 0 {
+			expectedValues = append(expectedValues, table.Rows[i].Cells[0].Value)
+		}
+	}
+
+	fmt.Printf("EXPECTED: string containing one of %v\n", expectedValues)
+	fmt.Printf("ACTUAL:   %s\n", actualStr)
+
+	// Check if the actual string contains any of the expected values
+	for _, expected := range expectedValues {
+		if strings.Contains(actualStr, expected) {
+			fmt.Printf("✓ String contains '%s'\n", expected)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("expected %s to contain one of %v, but got '%s'", field, expectedValues, actualStr)
+}
+
 // parseNumber converts a value to float64 for numeric comparisons
 func parseNumber(val interface{}) (float64, error) {
 	switch v := val.(type) {
@@ -1465,6 +1497,7 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^"([^"]*)" is an error$`, pw.fieldIsError)
 	s.Step(`^"([^"]*)" is not an error$`, pw.fieldIsNotError)
 	s.Step(`^"([^"]*)" contains "([^"]*)"$`, pw.fieldContains)
+	s.Step(`^"([^"]*)" is a string containing one of$`, pw.fieldIsStringContainingOneOf)
 
 	// Numeric comparisons
 	s.Step(`^"([^"]*)" should be greater than "([^"]*)"$`, pw.fieldShouldBeGreaterThan)
