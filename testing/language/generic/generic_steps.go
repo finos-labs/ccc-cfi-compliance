@@ -174,91 +174,129 @@ func formatValueForComparison(value interface{}) string {
 	}
 }
 
-// HandleResolve resolves variables and literals from string references
+// HandleResolve resolves variables and literals from string references.
+// If the entire string is a single variable like "{varName}", returns the actual value (any type).
+// If the string contains embedded variables like "text {varName} more", does string replacement.
 func (pw *PropsWorld) HandleResolve(name string) interface{} {
-	if strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}") {
-		stripped := name[1 : len(name)-1]
+	// Check if the entire string is a single variable reference
+	if strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}") && strings.Count(name, "{") == 1 {
+		return pw.resolveSingleVar(name)
+	}
 
-		switch stripped {
-		case "nil":
-			return nil
-		case "true":
-			return true
-		case "false":
-			return false
-		default:
-			// Try to parse as number
-			if val, err := strconv.ParseFloat(stripped, 64); err == nil {
-				return val
+	// Check if string contains any {var} patterns - do string interpolation
+	if strings.Contains(name, "{") && strings.Contains(name, "}") {
+		result := name
+		for {
+			start := strings.Index(result, "{")
+			if start == -1 {
+				break
 			}
-
-			// Try direct property lookup first
-			if val, exists := pw.Props[stripped]; exists {
-				return val
+			end := strings.Index(result[start:], "}")
+			if end == -1 {
+				break
 			}
+			end += start
 
-			// Try with PascalCase (e.g., "portNumber" -> "PortNumber")
-			pascalCase := strings.ToUpper(stripped[:1]) + stripped[1:]
-			if val, exists := pw.Props[pascalCase]; exists {
-				return val
+			varRef := result[start : end+1]
+			resolved := pw.resolveSingleVar(varRef)
+			if resolved != nil {
+				result = result[:start] + fmt.Sprintf("%v", resolved) + result[end+1:]
+			} else {
+				// Can't resolve this var, skip past it to avoid infinite loop
+				break
 			}
+		}
+		return result
+	}
 
-			// Try struct field access (e.g., "connection.state")
-			if strings.Contains(stripped, ".") {
-				parts := strings.Split(stripped, ".")
-				if len(parts) == 2 {
-					objName := parts[0]
-					fieldName := parts[1]
+	return name
+}
 
-					if obj, exists := pw.Props[objName]; exists {
-						// Try to access the field using reflection
-						v := reflect.ValueOf(obj)
+// resolveSingleVar resolves a single {varName} reference
+func (pw *PropsWorld) resolveSingleVar(name string) interface{} {
+	if !strings.HasPrefix(name, "{") || !strings.HasSuffix(name, "}") {
+		return name
+	}
 
-						// Handle pointer types
-						if v.Kind() == reflect.Ptr {
-							v = v.Elem()
+	stripped := name[1 : len(name)-1]
+
+	switch stripped {
+	case "nil":
+		return nil
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		// Try to parse as number
+		if val, err := strconv.ParseFloat(stripped, 64); err == nil {
+			return val
+		}
+
+		// Try direct property lookup first
+		if val, exists := pw.Props[stripped]; exists {
+			return val
+		}
+
+		// Try with PascalCase (e.g., "portNumber" -> "PortNumber")
+		pascalCase := strings.ToUpper(stripped[:1]) + stripped[1:]
+		if val, exists := pw.Props[pascalCase]; exists {
+			return val
+		}
+
+		// Try struct field access (e.g., "connection.state")
+		if strings.Contains(stripped, ".") {
+			parts := strings.Split(stripped, ".")
+			if len(parts) == 2 {
+				objName := parts[0]
+				fieldName := parts[1]
+
+				if obj, exists := pw.Props[objName]; exists {
+					// Try to access the field using reflection
+					v := reflect.ValueOf(obj)
+
+					// Handle pointer types
+					if v.Kind() == reflect.Ptr {
+						v = v.Elem()
+					}
+
+					if v.Kind() == reflect.Struct {
+						// Try the field name as-is (case-sensitive)
+						field := v.FieldByName(fieldName)
+						if field.IsValid() {
+							return field.Interface()
 						}
 
-						if v.Kind() == reflect.Struct {
-							// Try the field name as-is (case-sensitive)
-							field := v.FieldByName(fieldName)
-							if field.IsValid() {
-								return field.Interface()
-							}
+						// Try with capitalized first letter
+						capitalizedFieldName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
+						field = v.FieldByName(capitalizedFieldName)
+						if field.IsValid() {
+							return field.Interface()
+						}
 
-							// Try with capitalized first letter
-							capitalizedFieldName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
-							field = v.FieldByName(capitalizedFieldName)
-							if field.IsValid() {
-								return field.Interface()
-							}
-
-							// Check if the object has a getter method for this field
-							// e.g., GetState() for State field
-							getterName := "Get" + capitalizedFieldName
-							method := reflect.ValueOf(obj).MethodByName(getterName)
-							if method.IsValid() {
-								results := method.Call(nil)
-								if len(results) > 0 {
-									return results[0].Interface()
-								}
+						// Check if the object has a getter method for this field
+						// e.g., GetState() for State field
+						getterName := "Get" + capitalizedFieldName
+						method := reflect.ValueOf(obj).MethodByName(getterName)
+						if method.IsValid() {
+							results := method.Call(nil)
+							if len(results) > 0 {
+								return results[0].Interface()
 							}
 						}
 					}
 				}
 			}
-
-			// Try JSONPath query
-			if result, err := jsonpath.Get("$."+stripped, pw.Props); err == nil {
-				return result
-			}
-
-			// Return original if nothing matches
-			return nil
 		}
-	}
 
-	return name
+		// Try JSONPath query
+		if result, err := jsonpath.Get("$."+stripped, pw.Props); err == nil {
+			return result
+		}
+
+		// Return nil if nothing matches
+		return nil
+	}
 }
 
 // callFunction safely calls a function with error handling

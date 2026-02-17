@@ -11,11 +11,12 @@ Feature: CCC.Core.CN01.AR03
 
     Given a client connects to "{hostName}" with protocol "http" on port "80"
     And I refer to "{result}" as "connection"
-    Then "{connection}" is not an error
+    And "{connection}" is not an error
+    And I transmit "GET / HTTP/1.1\r\nHost: {hostName}\r\n\r\n" to "{connection}"
     And I attach "{connection}" to the test output as "HTTP response"
-    And "{connection.output}" contains "301"
+    And "{connection.Output}" contains "301"
     And I call "{connection}" with "Close"
-    Then "{connection.state}" is "closed"
+    Then "{connection.State}" is "closed"
 
   @ftp
   Scenario: FTP traffic is blocked or not exposed

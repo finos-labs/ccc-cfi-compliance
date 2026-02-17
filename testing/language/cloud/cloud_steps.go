@@ -220,24 +220,45 @@ func (cw *CloudWorld) clientConnectsWithProtocol(hostName, protocol, port string
 }
 
 // transmitToConnection sends data to a connection's input field
-func (cw *CloudWorld) transmitToConnection(data, connectionInputPath string) error {
-	dataResolved := cw.HandleResolve(data)
-
-	if dataResolved == nil {
-		return fmt.Errorf("data %s not found", data)
+func (cw *CloudWorld) transmitToConnection(data, connectionName string) error {
+	// Resolve the connection object
+	connInterface := cw.HandleResolve(connectionName)
+	if connInterface == nil {
+		return fmt.Errorf("connection %s not found", connectionName)
 	}
 
-	// The connectionInputPath should be something like "{connection.input}"
-	// We need to extract the connection variable and set its Input field
-	// The generic HandleResolve will handle the field access
-	// For now, we'll use a simplified approach and directly set the input
+	conn, ok := connInterface.(*Connection)
+	if !ok {
+		return fmt.Errorf("%s is not a valid Connection object", connectionName)
+	}
 
-	// Extract connection name from path like "{connection.input}"
-	// This is handled by the generic PropsWorld field resolution
-	inputStr := fmt.Sprintf("%v", dataResolved)
+	if conn.Input == nil {
+		return fmt.Errorf("connection has no writable input")
+	}
 
-	// Store the transmission - in real implementation this would send over socket
-	cw.Props["result"] = fmt.Sprintf("Transmitted: %v", inputStr)
+	// Resolve any variables in the data string (e.g., {hostName})
+	dataStr := fmt.Sprintf("%v", cw.HandleResolve(data))
+	// Handle escape sequences for HTTP requests
+	dataStr = strings.ReplaceAll(dataStr, "\\r", "\r")
+	dataStr = strings.ReplaceAll(dataStr, "\\n", "\n")
+
+	fmt.Printf("DEBUG: Transmitting %d bytes to connection: %q\n", len(dataStr), dataStr)
+
+	// Write to the connection's input
+	_, err := conn.Input.Write([]byte(dataStr))
+	if err != nil {
+		return fmt.Errorf("failed to write to connection: %v", err)
+	}
+
+	// Give time for response to arrive
+	time.Sleep(500 * time.Millisecond)
+
+	// Update Output from the buffer
+	conn.mu.Lock()
+	conn.Output = conn.outputBuf.String()
+	conn.mu.Unlock()
+
+	fmt.Printf("DEBUG: Output now contains %d bytes\n", len(conn.Output))
 	return nil
 }
 
