@@ -216,7 +216,65 @@ func (cw *CloudWorld) opensslClientRequestWithTLSAndProtocol(tlsVersion, port, h
 
 // clientConnectsWithProtocol establishes a plain client connection to a host with a specific protocol
 func (cw *CloudWorld) clientConnectsWithProtocol(hostName, protocol, port string) error {
-	return cw.opensslClientRequest("", port, hostName, "")
+	hostResolved := fmt.Sprintf("%v", cw.HandleResolve(hostName))
+	portResolved := fmt.Sprintf("%v", cw.HandleResolve(port))
+
+	// Use netcat for raw TCP connections (protocol-agnostic)
+	cmd := exec.Command("nc", hostResolved, portResolved)
+
+	// Create buffer for output
+	outputBuffer := &bytes.Buffer{}
+
+	// Get stdout pipe
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to get stdout pipe: %v", err)
+		return nil
+	}
+
+	// Connect command's stdin to our input buffer
+	stdinPipe, err := cmd.StdinPipe()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to get stdin pipe: %v", err)
+		return nil
+	}
+
+	fmt.Printf("DEBUG: Executing: nc %s %s\n", hostResolved, portResolved)
+
+	// Start the command
+	err = cmd.Start()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to start nc: %v", err)
+		return nil
+	}
+
+	// Create Connection object
+	conn := &Connection{
+		State:      "open",
+		Input:      stdinPipe,
+		Output:     "",
+		cmd:        cmd,
+		outputBuf:  outputBuffer,
+		stopReader: make(chan struct{}),
+	}
+
+	// Start goroutine to read stdout
+	conn.startOutputReader(stdout)
+
+	// Monitor the command and set state to closed when it exits
+	go func() {
+		cmd.Wait()
+		conn.stateMu.Lock()
+		conn.State = "closed"
+		conn.stateMu.Unlock()
+		fmt.Printf("DEBUG: nc exited, connection state set to closed\n")
+	}()
+
+	// Store in result
+	cw.Props["result"] = conn
+	fmt.Printf("DEBUG: Created nc connection with State=open, stored in result\n")
+
+	return nil
 }
 
 // transmitToConnection sends data to a connection's input field
