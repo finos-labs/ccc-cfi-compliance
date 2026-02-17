@@ -12,6 +12,7 @@ Feature: CCC.Core.CN01.AR03
     Given a client connects to "{hostName}" with protocol "http" on port "80"
     And I refer to "{result}" as "connection"
     Then "{connection}" is not an error
+    And I attach "{connection}" to the test output as "HTTP response"
     And "{connection.output}" contains "301"
     And I call "{connection}" with "Close"
     Then "{connection.state}" is "closed"
@@ -22,6 +23,7 @@ Feature: CCC.Core.CN01.AR03
     or not expose FTP on standard ports (21).
 
     Given a client connects to "{hostName}" with protocol "ftp" on port "21"
+    And I attach "{connection}" to the test output as "FTP response"
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 
@@ -31,6 +33,7 @@ Feature: CCC.Core.CN01.AR03
     SSH should be used instead for remote shell access.
 
     Given a client connects to "{hostName}" with protocol "telnet" on port "23"
+    And I attach "{connection}" to the test output as "Telnet response"
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 
@@ -40,6 +43,6 @@ Feature: CCC.Core.CN01.AR03
 
     Given "report" contains details of SSL Support type "protocols" for "{hostName}" on port "{portNumber}"
     Then "{report}" is a slice of objects with at least the following contents
-      | id     | finding            |
-      | TLS1_2 | offered            |
-      | TLS1_3 | offered with final |
+      | id     | severity |
+      | TLS1_2 | OK       |
+      | TLS1_3 | OK       |

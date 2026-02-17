@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
@@ -303,7 +306,11 @@ func (cw *CloudWorld) runTestSSL(reportName, testType, hostName, port string, us
 		testsslPath = filepath.Join(cloudDir, "testssl.sh")
 	}
 
-	args := []string{testsslPath, "--" + fmt.Sprintf("%v", testTypeResolved)}
+	args := []string{
+		testsslPath,
+		"--" + fmt.Sprintf("%v", testTypeResolved),
+		"--ip", "one", // Only test first IP to avoid scanning all IPs (e.g., S3 has 8)
+	}
 
 	if useSTARTTLS {
 		// Determine STARTTLS protocol from port
@@ -319,12 +326,21 @@ func (cw *CloudWorld) runTestSSL(reportName, testType, hostName, port string, us
 	// Remove the temporary JSON file if it exists from a previous run
 	os.Remove(tempFile)
 
-	cmd := exec.Command("bash", args...)
+	// Use Go context timeout (120 seconds) - vulnerable/server-defaults scans take longer
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", args...)
+	// Set process group so we can kill all children
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Debug: Print the command being executed
 	fmt.Printf("DEBUG: Executing: bash %v\n", strings.Join(args, " "))
 
 	_, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("testssl.sh timed out")
+	}
 	if err != nil {
 		// testssl.sh might return non-zero exit code even on success
 		// Continue to try reading the JSON file

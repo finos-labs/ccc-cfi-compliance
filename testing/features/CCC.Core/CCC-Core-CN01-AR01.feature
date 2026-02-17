@@ -55,20 +55,20 @@ Feature: CCC.Core.CN01.AR01
   Scenario: Verify no known SSL/TLS vulnerabilities
     Given "report" contains details of SSL Support type "vulnerable" for "{hostName}" on port "{portNumber}"
     Then "{report}" is a slice of objects with at least the following contents
-      | id            | finding                                |
-      | heartbleed    | not vulnerable, no heartbeat extension |
-      | CCS           | not vulnerable                         |
-      | ticketbleed   | not vulnerable                         |
-      | ROBOT         | not vulnerable                         |
-      | secure_renego | supported                              |
+      | id            | severity |
+      | heartbleed    | OK       |
+      | CCS           | OK       |
+      | ticketbleed   | OK       |
+      | ROBOT         | OK       |
+      | secure_renego | OK       |
 
   @Behavioural @PerPort
   Scenario: Verify TLS 1.3 only certificate validity
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
     Then "{report}" is a slice of objects with at least the following contents
-      | id                    | finding |
-      | cert_expirationStatus | ok      |
-      | cert_chain_of_trust   | passed. |
+      | id                    | severity |
+      | cert_expirationStatus | OK       |
+      | cert_chain_of_trust   | OK       |
 
   @Policy @PerService @CCC.ObjStor
   Scenario: Storage account enforces minimum TLS version
