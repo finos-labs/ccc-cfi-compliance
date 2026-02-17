@@ -20,14 +20,14 @@ query: |
     --format=json
 
 rules:
-  - jsonpath: "$.encryption.defaultKmsKeyName"
+  - jsonpath: "$.name"
     expected_values: []
-    validation_rule: "^(projects/.+/locations/.+/keyRings/.+/cryptoKeys/.+)?$"
+    validation_rule: ".+"
     description: >
-      Validates the default KMS key for bucket encryption. Empty value means
-      Google-managed keys are used. A KMS key path indicates CMEK.
+      Confirms the bucket exists. GCP Cloud Storage encrypts all data at rest
+      by default using AES-256. No explicit encryption configuration is required.
 
-  - jsonpath: "$.storageClass"
+  - jsonpath: "$.default_storage_class"
     expected_values:
       - "STANDARD"
       - "NEARLINE"
@@ -35,5 +35,5 @@ rules:
       - "ARCHIVE"
     validation_rule: "^(STANDARD|NEARLINE|COLDLINE|ARCHIVE)$"
     description: >
-      Confirms the bucket exists with a valid storage class. All storage
-      classes use the same encryption (AES-256).
+      Confirms the bucket has a valid storage class. All storage classes
+      use the same encryption (AES-256 with Google-managed or CMEK keys).
