@@ -19,6 +19,10 @@ type Service interface {
 	// IsDefaultVpc reports whether the specified VPC is a "default VPC".
 	IsDefaultVpc(vpcID string) (bool, error)
 
+	// EvaluateDefaultVpcControl evaluates CN01 for a VPC and returns a compact
+	// structured outcome (verdict, result class, and reason).
+	EvaluateDefaultVpcControl(vpcID string) (map[string]interface{}, error)
+
 	// ListDefaultVpcs returns basic metadata for default VPCs in the configured region.
 	ListDefaultVpcs() ([]DefaultVPC, error)
 
@@ -31,6 +35,41 @@ type Service interface {
 	// for CN02, including an explicit N/A marker when no public subnets are found.
 	SummarizePublicSubnets(vpcID string) (string, error)
 
+	// EvaluatePublicSubnetDefaultIPControl evaluates CN02 for a VPC and returns
+	// a compact structured outcome (verdict, result class, reason, and counts).
+	EvaluatePublicSubnetDefaultIPControl(vpcID string) (map[string]interface{}, error)
+
+	// SelectPublicSubnetForTest selects one public subnet in the given VPC for
+	// active/behavioral CN02 and CN04 checks.
+	SelectPublicSubnetForTest(vpcID string) (map[string]interface{}, error)
+
+	// CreateTestResourceInSubnet creates a short-lived test resource in the
+	// specified subnet and returns a resource identifier.
+	CreateTestResourceInSubnet(subnetID string) (map[string]interface{}, error)
+
+	// GetResourceExternalIpAssignment reports whether the given test resource has
+	// an external/public IP assigned.
+	GetResourceExternalIpAssignment(resourceID string) (map[string]interface{}, error)
+
+	// DeleteTestResource deletes a previously created test resource.
+	DeleteTestResource(resourceID string) (map[string]interface{}, error)
+
+	// EvaluatePeerAgainstAllowList classifies whether a candidate peer/requester VPC
+	// appears in the configured CN03 allow-list inputs.
+	EvaluatePeerAgainstAllowList(peerVpcID string) (map[string]interface{}, error)
+
+	// AttemptVpcPeeringDryRun attempts a dry-run CreateVpcPeeringConnection from
+	// requesterVpcID to peerVpcID and returns normalized evidence.
+	AttemptVpcPeeringDryRun(requesterVpcID, peerVpcID string) (map[string]interface{}, error)
+
+	// LoadVpcPeeringTrialMatrix loads a CN03 trial matrix JSON file with receiver,
+	// allowed requester list, and disallowed requester list.
+	LoadVpcPeeringTrialMatrix(filePath string) (map[string]interface{}, error)
+
+	// RunVpcPeeringDryRunTrialsFromFile executes CN03 dry-run trials for all
+	// requesters listed in a trial matrix JSON file.
+	RunVpcPeeringDryRunTrialsFromFile(filePath string) (map[string]interface{}, error)
+
 	// ListVpcFlowLogs returns flow log records configured for the given VPC.
 	// Each returned object includes core fields used by CN04 checks.
 	ListVpcFlowLogs(vpcID string) ([]interface{}, error)
@@ -42,19 +81,19 @@ type Service interface {
 	// SummarizeVpcFlowLogs returns a human-readable CN04 summary for test evidence.
 	SummarizeVpcFlowLogs(vpcID string) (string, error)
 
-	// AttemptDisallowedPeeringDryRun attempts a dry-run VPC peering request to a
-	// configured disallowed peer and returns normalized evidence.
-	AttemptDisallowedPeeringDryRun(requesterVpcID string) (map[string]interface{}, error)
+	// EvaluateVpcFlowLogsControl evaluates CN04 for a VPC and returns a compact
+	// structured outcome (verdict, result class, reason, and counts).
+	EvaluateVpcFlowLogsControl(vpcID string) (map[string]interface{}, error)
 
-	// IsDisallowedPeeringPrevented returns true when dry-run indicates the
-	// disallowed peering request was denied by policy/guardrails.
-	IsDisallowedPeeringPrevented(requesterVpcID string) (bool, error)
+	// PrepareFlowLogDeliveryObservation validates CN04 observation preconditions
+	// and returns setup details before active traffic generation.
+	PrepareFlowLogDeliveryObservation(vpcID string) (map[string]interface{}, error)
 
-	// EvaluateDisallowedPeeringDryRun evaluates normalized dry-run evidence and
-	// returns true when the request was prevented.
-	EvaluateDisallowedPeeringDryRun(evidence map[string]interface{}) (bool, error)
+	// GenerateTestTraffic produces best-effort short-lived traffic evidence for
+	// CN04 behavioral checks.
+	GenerateTestTraffic(vpcID string) (map[string]interface{}, error)
 
-	// SummarizePeeringOutcomeCompact returns compact structured CN03 evidence for
-	// clear visual reporting (mode, verdict, reason, key IDs, and dry-run result).
-	SummarizePeeringOutcomeCompact(evidence map[string]interface{}, mode string) (map[string]interface{}, error)
+	// ObserveRecentFlowLogDelivery returns compact evidence indicating whether
+	// flow-log delivery appears healthy after active checks.
+	ObserveRecentFlowLogDelivery(vpcID string) (map[string]interface{}, error)
 }

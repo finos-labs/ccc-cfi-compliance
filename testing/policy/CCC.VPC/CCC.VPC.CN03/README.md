@@ -26,50 +26,63 @@ This control is **behavioral/negative** on AWS: it requires attempting a peering
 
 - AWS does not provide a single native “allowed peering destinations” list at the VPC level; enforcement is typically via IAM/SCP/guardrails.
 - This requires a test setup with:
-  - a local VPC (requester) and
-  - a peer VPC ID/account that is intentionally *not* authorized.
+  - a local in-scope VPC (receiver) and
+  - requester VPC IDs that are intentionally split across allowed and disallowed sets.
 
 ### Executable test inputs
 
 For the executable CN03 feature/API test:
 
-- `REQUESTER_VPC_ID` is derived from the in-scope VPC resource UID.
-- Set `PEER_VPC_ID` (or `CN03_PEER_VPC_ID`) to a disallowed peer VPC.
-- Optionally set `PEER_OWNER_ID` (or `CN03_PEER_OWNER_ID`) for cross-account tests.
+- `ReceiverVpcId` is derived from the in-scope VPC resource UID.
+- Set requester VPC list inputs:
+  - `CN03_ALLOWED_REQUESTER_VPC_ID_1..N`
+  - `CN03_DISALLOWED_REQUESTER_VPC_ID_1..N`
+  - optional CSV: `CN03_ALLOWED_REQUESTER_VPC_IDS`
+- Optional file-driven batch input:
+  - `CN03_PEER_TRIAL_MATRIX_FILE` (JSON with receiver + requester allow/disallow lists)
+- Optional cross-account input:
+  - `PEER_OWNER_ID` (or `CN03_PEER_OWNER_ID`)
 
 ## How to demonstrate this test works
 
 Use the same account/region and run these cases:
 
-1. **AR01 compliance case (disallowed peer, expected PASS)**
-   - Set `PEER_VPC_ID` to a VPC that is not allowed by your IAM/SCP guardrails.
+1. **AR01 compliance case (disallowed requester, expected PASS)**
+   - Set `CN03_DISALLOWED_REQUESTER_VPC_ID_1` to a requester VPC that is not allowed by your IAM/SCP guardrails.
    - Run:
-     - `./testing/run-compliance-tests.sh --provider aws --region <region> --service vpc --tag 'CCC.VPC.CN03.AR01 && CN03.DISALLOWED'`
+     - `./testing/run-compliance-tests.sh --provider aws --region <region> --service vpc --tag 'CCC.VPC.CN03.AR01 && MAIN'`
    - Expected evidence:
-     - `cn03-disallowed-peering-dry-run.json` shows `DryRunAllowed=false`
-     - `cn03-disallowed-summary-compact.json` includes `Mode`, `Verdict`, `ResultClass`, `Reason`, and key IDs
+     - Dry-run evidence returns `DryRunAllowed=false`
+     - `ExitCode` is non-zero
      - Error code/message indicates deny (`AccessDenied`, `UnauthorizedOperation`, etc.)
 
-2. **Optional sanity case (allowed peer, not AR01 compliance proof)**
-   - Set `PEER_VPC_ID` to a VPC that is explicitly allowed by guardrails.
-   - Set `CN03_ALLOWED_LIST_REFERENCE` to your allowlist basis (example: `scp-0abc1234`).
+2. **Optional sanity case (allowed requester, not AR01 compliance proof)**
+   - Set `CN03_ALLOWED_REQUESTER_VPC_ID_1` to a requester VPC that is explicitly allowed by guardrails.
    - Run:
-     - `./testing/run-compliance-tests.sh --provider aws --region <region> --service vpc --tag 'CCC.VPC && CN03.ALLOWED'`
+     - `./testing/run-compliance-tests.sh --provider aws --region <region> --service vpc --tag 'CCC.VPC.CN03.AR01 && SANITY && OPT_IN'`
    - Expected evidence:
-     - `cn03-allowed-peering-dry-run.json` shows `DryRunAllowed=true`
-     - `cn03-allowed-summary-compact.json` includes `Mode`, `Verdict`, `ResultClass`, `Reason`, and key IDs
+     - Dry-run evidence returns `DryRunAllowed=true`
      - Error code/message is `DryRunOperation` (action would be allowed)
-   - If `CN03_ALLOWED_LIST_REFERENCE` is missing, this scenario returns `ResultClass=SETUP_ERROR`.
+
+3. **Optional batch case (file input, all items checked)**
+   - Export trial matrix from IaC:
+     - `terraform output -json cn03_peer_trial_matrix > cn03-peer-trials.json`
+   - Set:
+     - `export CN03_PEER_TRIAL_MATRIX_FILE=$(pwd)/cn03-peer-trials.json`
+   - Run:
+     - `./testing/run-compliance-tests.sh --provider aws --region <region> --service vpc --tag 'CCC.VPC.CN03.AR01 && OPT_IN'`
+   - Expected evidence:
+     - `TotalTrials` is greater than `0`
+     - `UnexpectedCount` is `0`
 
 ### What to share with collaborators
 
 - Guardrail definition source (IAM/SCP policy statement controlling peering)
-- Exact env inputs used (`AWS_REGION`, `PEER_VPC_ID`, optional `PEER_OWNER_ID`)
+- Exact env inputs used (`AWS_REGION`, requester IDs/lists, optional `PEER_OWNER_ID`, optional `CN03_PEER_TRIAL_MATRIX_FILE`)
 - Test command executed
 - Result artifacts from `testing/output/`:
   - `resource-<vpc>.html`
   - `resource-<vpc>.ocsf.json`
-  - attached `cn03-disallowed-peering-dry-run.json` / `cn03-allowed-peering-dry-run.json`
-  - attached `cn03-disallowed-summary-compact.json` / `cn03-allowed-summary-compact.json`
+  - attached dry-run evidence from CN03 scenarios
 
 This gives a reproducible, auditable proof that the test logic is functioning and that guardrails drive pass/fail outcomes.

@@ -4,6 +4,8 @@ metadata:
   assessment_requirement_id: CCC.VPC.CN03.AR01
   test_type: Destructive
   test_requirement_category: D
+  enforcement_model: targeted_guardrail
+  enforcement_source: iac_policy_attachment
 service_type: vpc
 requirement_text: >
   When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed.
@@ -22,6 +24,7 @@ validity_commentary: >
   - Requires a known "disallowed" peer VPC ID (and potentially peer account ID)
   - The exact failure mode varies (IAM AccessDenied, SCP denial, org guardrail, etc.)
   - If the environment allows the action, AWS returns a `DryRunOperation` error (which should be treated as a failure for this control)
+  - Deterministic results require the deny policy definition and attachment to be managed and applied (typically via IaC) before execution
 
 query: |
   # Attempt to create a VPC peering connection to a peer VPC that is NOT allowed.
