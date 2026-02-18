@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyPeeringFromNonAllowlistedRequesterVpc",
+      "Effect": "Deny",
+      "Action": "ec2:CreateVpcPeeringConnection",
+      "Resource": "*",
+      "Condition": {
+        "Null": {
+          "ec2:RequesterVpc": "false"
+        },
+        "ArnNotEquals": {
+          "ec2:RequesterVpc": ${allowed_requester_vpc_arns_json}
+        }
+      }
+    }
+  ]
+}

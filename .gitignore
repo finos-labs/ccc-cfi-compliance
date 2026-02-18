@@ -15,6 +15,7 @@ crash.*.log
 # to change depending on the environment.
 *.tfvars
 *.tfvars.json
+remote/aws/vpc/local.tfvars
 
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
@@ -86,3 +87,12 @@ cucumber-report.html
 report.json
 coverage.out
 coverage.html
+out.txt
+
+# CN03 generated local artifacts (do not commit environment-specific IDs)
+remote/aws/vpc/cn03-feature.env
+remote/aws/vpc/cn03-peer-trials.json
+
+# Local IaC scratch files
+remote/aws/vpc/plan
+remote/aws/vpc/*(mktemp)
