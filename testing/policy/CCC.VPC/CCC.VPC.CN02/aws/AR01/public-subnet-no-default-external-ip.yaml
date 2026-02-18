@@ -1,16 +1,12 @@
 name: Limit Resource Creation in Public Subnet
-family: Network Security
-control_id: CCC.VPC.CN02
-control_title: Limit Resource Creation in Public Subnet
-control_objective: >
-  Restrict the creation of resources in the public subnet with direct access to the internet to minimize attack surfaces.
-assessment_requirement_id: CCC.VPC.CN02.AR01
-assessment_requirement_text: "When a resource is created in a public subnet, that resource MUST NOT be assigned an external IP address by default."
-test_requirement_category: P
-test_rationale: "Default external IP assignment behavior for public subnets is declarative and verifiable via subnet and resource configuration policies."
-
+metadata:
+  control_id: CCC.VPC.CN02
+  assessment_requirement_id: CCC.VPC.CN02.AR01
+  test_type: Policy
+  test_requirement_category: P
 service_type: vpc
-requirement_text: "When a resource is created in a public subnet, that resource MUST NOT be assigned an external IP address by default."
+requirement_text: >
+  When a resource is created in a public subnet, that resource MUST NOT be assigned an external IP address by default.
 
 validity_score: 7
 validity_commentary: >

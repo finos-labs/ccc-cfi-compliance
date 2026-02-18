@@ -1,16 +1,12 @@
 name: Enforce VPC Flow Logs on VPCs
-family: Network Security
-control_id: CCC.VPC.CN04
-control_title: Enforce VPC Flow Logs on VPCs
-control_objective: >
-  Ensure VPCs are configured with flow logs enabled to capture traffic information.
-assessment_requirement_id: CCC.VPC.CN04.AR01
-assessment_requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
-test_requirement_category: B
-test_rationale: "Flow log enablement requires observing that network traffic generates corresponding log records; this involves runtime observation but no misuse or disruption."
-
+metadata:
+  control_id: CCC.VPC.CN04
+  assessment_requirement_id: CCC.VPC.CN04.AR01
+  test_type: Policy
+  test_requirement_category: P
 service_type: vpc
-requirement_text: "When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information."
+requirement_text: >
+  When any network traffic goes to or from an interface in the VPC, the service MUST capture and log all relevant information.
 
 validity_score: 7
 validity_commentary: >
@@ -44,4 +40,3 @@ rules:
     validation_rule: "^(ALL)$"
     description: >
       Flow logs should be configured to capture ALL traffic to/from interfaces in the VPC.
-

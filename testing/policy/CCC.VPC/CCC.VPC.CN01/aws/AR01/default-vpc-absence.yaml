@@ -1,25 +1,22 @@
-name: Restrict Default Network Creation  - Default VPC
-family: Network Security
-control_id: CCC.VPC.CN01
-control_title: Restrict Default Network Creation
-control_objective: >
-  Restrict the automatic creation of default virtual networks and related resources during subscription initialization to avoid insecure default configurations and enforce custom network policies.
-assessment_requirement_id: CCC.VPC.CN01.AR01
-assessment_requirement_text: "When a subscription is created, the subscription MUST NOT contain default network resources."
-test_requirement_category: P
-test_rationale: "Presence or absence of default network resources at subscription creation can be verified via control-plane configuration and inventory metadata without generating traffic or inducing failure."
-
+name: Restrict Default Network Creation - Default VPC
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
 service_type: vpc
 requirement_text: >
   When a subscription is created, the subscription MUST NOT contain default network resources.
 
 validity_score: 6
 validity_commentary: >
-  This query checks for the presence of an AWS "default VPC" in a given region.
-
-  Strengths: - Uses control-plane inventory (DescribeVpcs) and does not generate traffic - Directly identifies default VPCs via the is-default filter
-
-  Limitations: - AWS accounts commonly include a default VPC per region unless removed - This check is region-scoped; it must be repeated for all in-scope regions - "Subscription creation" is not directly observable after the fact; this is effectively a current-state validation
+  This query checks whether a default VPC exists in the target AWS region.
+  Strengths:
+  - Uses control-plane inventory only and does not generate traffic
+  - Directly filters default VPCs with `is-default=true`
+  Limitations:
+  - This is a current-state check, not a direct proof at subscription-creation time
+  - Must run for every in-scope region
 
 query: |
   aws ec2 describe-vpcs \
@@ -27,8 +24,8 @@ query: |
     --filters Name=is-default,Values=true
 
 rules:
-- jsonpath: "$.Vpcs"
-  expected_values: []
-  validation_rule: "^\\[\\]$"
-  description: >
-    A compliant environment should return an empty Vpcs array for default VPCs. If any default VPC is present, the control is not satisfied for that region.
+  - jsonpath: "$.Vpcs"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Compliant when no default VPC is returned for the region.
