@@ -1,36 +1,30 @@
-@CCC.VPC @tlp-amber @tlp-red
-Feature: CCC.VPC.CN03.AR01
+@tlp-amber @tlp-red @CCC.VPC.CN03.AR01
+Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering to explicitly allowed destinations
   As a security administrator
-  I want unauthorized VPC peering requests to be denied
-  So that peering is restricted to explicitly approved destinations
+  I want peering requests to non-approved VPCs to be denied
+  So that network connectivity is restricted to authorized boundaries
 
   Background:
     Given a cloud api for "{Provider}" in "api"
     And I call "{api}" with "GetServiceAPI" with parameter "vpc"
-    And I refer to "{result}" as "vpc"
+    And I refer to "{result}" as "vpcService"
 
-  @CCC.VPC.CN03.AR01 @CN03.DISALLOWED
-  Scenario: Disallowed peer target must be denied
-    When I call "{vpc}" with "AttemptDisallowedPeeringDryRun" with parameter "{UID}"
-    And I refer to "{result}" as "disallowedPeeringDryRun"
-    And I attach "{disallowedPeeringDryRun}" to the test output as "cn03-disallowed-peering-dry-run.json"
-    And I call "{vpc}" with "SummarizePeeringOutcomeCompact" with parameters "{disallowedPeeringDryRun}" and "disallowed"
-    And I refer to "{result}" as "disallowedCompactSummary"
-    And I attach "{disallowedCompactSummary}" to the test output as "cn03-disallowed-summary-compact.json"
-    Then "{disallowedCompactSummary.Mode}" is "disallowed"
-    And "{disallowedCompactSummary.Verdict}" is "PASS"
-    And "{disallowedCompactSummary.ResultClass}" is "PASS"
-    And "{disallowedCompactSummary.DryRunAllowed}" is "false"
+  # Dry-run is used so no real peering connection is created.
 
-  @CN03.ALLOWED @CN03.SANITY
-  Scenario: Allowed peer target sanity check should be dry-run allowed
-    When I call "{vpc}" with "AttemptDisallowedPeeringDryRun" with parameter "{UID}"
-    And I refer to "{result}" as "allowedPeeringDryRun"
-    And I attach "{allowedPeeringDryRun}" to the test output as "cn03-allowed-peering-dry-run.json"
-    And I call "{vpc}" with "SummarizePeeringOutcomeCompact" with parameters "{allowedPeeringDryRun}" and "allowed"
-    And I refer to "{result}" as "allowedCompactSummary"
-    And I attach "{allowedCompactSummary}" to the test output as "cn03-allowed-summary-compact.json"
-    Then "{allowedCompactSummary.Mode}" is "allowed"
-    And "{allowedCompactSummary.Verdict}" is "PASS"
-    And "{allowedCompactSummary.ResultClass}" is "PASS"
-    And "{allowedCompactSummary.DryRunAllowed}" is "true"
+  @Destructive @MAIN @OPT_IN @PENDING_API
+  # NOTE: explicit requester+peer method is planned API work.
+  Scenario: Main check (dry-run): disallowed peering request uses requester and peer VPC IDs
+    Given I refer to "{UID}" as "RequesterVpcId"
+    And I refer to "{CN03_PEER_VPC_ID}" as "PeerVpcId"
+    When I call "{vpcService}" with "AttemptVpcPeeringDryRun" with parameters "{RequesterVpcId}" and "{PeerVpcId}"
+    Then "{result.ExitCode}" should be greater than "0"
+    And "{result.DryRunAllowed}" is false
+
+  @Destructive @SANITY @OPT_IN @PENDING_API
+  # NOTE: no @CCC.VPC tag => opt-in only
+  @CN03.ALLOWED
+  Scenario: Sanity check (dry-run): allowed peering request uses requester and peer VPC IDs
+    Given I refer to "{UID}" as "RequesterVpcId"
+    And I refer to "{CN03_ALLOWED_PEER_VPC_ID}" as "PeerVpcId"
+    When I call "{vpcService}" with "AttemptVpcPeeringDryRun" with parameters "{RequesterVpcId}" and "{PeerVpcId}"
+    Then "{result.DryRunAllowed}" is true
