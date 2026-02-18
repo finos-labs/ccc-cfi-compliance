@@ -1,30 +1,22 @@
 name: Restrict Default Network Creation - Default Network ACL
-family: Network Security
-control_id: CCC.VPC.CN01
-control_title: Restrict Default Network Creation
-control_objective: >
-  Restrict the automatic creation of default virtual networks and related resources during subscription initialization to avoid insecure default configurations and enforce custom network policies.
-assessment_requirement_id: CCC.VPC.CN01.AR01
-assessment_requirement_text: "When a subscription is created, the subscription MUST NOT contain default network resources."
-test_requirement_category: P
-test_rationale: "Presence or absence of default network resources at subscription creation can be verified via control-plane configuration and inventory metadata without generating traffic or inducing failure."
-
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
 service_type: vpc
 requirement_text: >
   When a subscription is created, the subscription MUST NOT contain default network resources.
 
 validity_score: 6
 validity_commentary: >
-  This query checks for the default Network ACL associated with the AWS default VPC in a given region.
-
+  This query checks whether the default VPC has a default network ACL.
   Strengths:
-  - Uses control-plane inventory (DescribeNetworkAcls) and does not generate traffic
-  - Identifies the default ACL via the `default=true` flag
-
+  - Uses control-plane inventory only and does not generate traffic
+  - Verifies ACL state scoped to the derived default VPC ID
   Limitations:
-  - Every VPC has a default Network ACL; this check is only meaningful in the context of the default VPC
-  - The query derives the default VPC ID first; if no default VPC exists, the check returns an empty list
-  - This is a current-state check, not a direct subscription-creation-time proof
+  - Meaningful only when a default VPC exists
+  - This is a current-state check, not a direct proof at subscription-creation time
 
 query: |
   DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
@@ -46,5 +38,4 @@ rules:
     expected_values: []
     validation_rule: "^\\[\\]$"
     description: >
-      A compliant environment should return an empty NetworkAcls array for the default VPC.
-      If a default Network ACL exists for the default VPC, it indicates the default VPC still exists in that region.
+      Compliant when no default network ACL is returned for the default VPC.

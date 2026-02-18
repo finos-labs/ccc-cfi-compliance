@@ -1,16 +1,12 @@
 name: Restrict VPC Peering to Authorized Accounts
-family: Network Security
-control_id: CCC.VPC.CN03
-control_title: Restrict VPC Peering to Authorized Accounts
-control_objective: >
-  Ensure VPC peering connections are only established with explicitly authorized destinations to limit network exposure and enforce boundary controls.
-assessment_requirement_id: CCC.VPC.CN03.AR01
-assessment_requirement_text: "When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed."
-test_requirement_category: D
-test_rationale: "Verifying that unauthorized VPC peering requests are prevented requires attempting a disallowed peering request to observe enforcement behavior."
-
+metadata:
+  control_id: CCC.VPC.CN03
+  assessment_requirement_id: CCC.VPC.CN03.AR01
+  test_type: Destructive
+  test_requirement_category: D
 service_type: vpc
-requirement_text: "When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed."
+requirement_text: >
+  When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed.
 
 validity_score: 7
 validity_commentary: >
@@ -26,30 +22,6 @@ validity_commentary: >
   - Requires a known "disallowed" peer VPC ID (and potentially peer account ID)
   - The exact failure mode varies (IAM AccessDenied, SCP denial, org guardrail, etc.)
   - If the environment allows the action, AWS returns a `DryRunOperation` error (which should be treated as a failure for this control)
-
-input_contract:
-  required_external:
-    - AWS_REGION
-    - PEER_VPC_ID
-  derived_in_executable_test:
-    - REQUESTER_VPC_ID (from in-scope resource UID)
-  optional:
-    - PEER_OWNER_ID
-  execution_notes:
-    - REQUESTER_VPC_ID is the in-scope VPC under test (typically mapped from test UID).
-    - PEER_VPC_ID must refer to a VPC that is intentionally not authorized for peering.
-    - Missing required external inputs should be treated as test setup failure (not N/A).
-  outcome_mapping:
-    denied_result_examples:
-      - AccessDenied
-      - UnauthorizedOperation
-      - AuthFailure
-      - explicit deny
-    allowed_result_indicator:
-      - DryRunOperation
-    decision:
-      - Denied result => PASS
-      - DryRunOperation (would be allowed) => FAIL
 
 query: |
   # Attempt to create a VPC peering connection to a peer VPC that is NOT allowed.
