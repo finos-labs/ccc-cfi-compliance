@@ -58,7 +58,7 @@ This project is part of the broader CCC initiative. Join the **Compliant Financi
 
 Find meetings on the [FINOS Community Calendar](https://finos.org/calendar) and browse [Past Meeting Minutes](https://github.com/finos/common-cloud-controls/labels/meeting).
 
-### 3. DCO Required
+### 3. DCO Required.
 
 #### Using DCO to sign your commits
 
