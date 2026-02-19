@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -195,6 +196,12 @@ func (pw *PropsWorld) HandleResolve(name string) interface{} {
 			// Try direct property lookup first
 			if val, exists := pw.Props[stripped]; exists {
 				return val
+			}
+
+			// Fall back to environment variables so placeholders
+			// like {CN03_RECEIVER_VPC_ID} can be injected from shell exports.
+			if envVal, exists := os.LookupEnv(stripped); exists {
+				return envVal
 			}
 
 			// Try struct field access (e.g., "connection.state")

@@ -43,7 +43,12 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     Given "<RequesterVpcId>" is not nil
     When I call "{vpcService}" with "AttemptVpcPeeringDryRun" with parameters "<RequesterVpcId>" and "{ReceiverVpcId}"
     Then "{result.DryRunAllowed}" is false
+    And "{result.AllowListDefined}" is true
+    And "{result.RequesterInAllowList}" is false
+    And "{result.GuardrailExpectation}" is "deny"
+    And "{result.GuardrailMismatch}" is false
     And "{result.ExitCode}" should be greater than "0"
+    And "{result.Reason}" contains "guardrail aligned"
 
     Examples:
       | RequesterVpcId                       |
@@ -59,7 +64,12 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.Allowed}" is false
     When I call "{vpcService}" with "AttemptVpcPeeringDryRun" with parameters "{CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID}" and "{ReceiverVpcId}"
     Then "{result.DryRunAllowed}" is false
+    And "{result.AllowListDefined}" is true
+    And "{result.RequesterInAllowList}" is false
+    And "{result.GuardrailExpectation}" is "deny"
+    And "{result.GuardrailMismatch}" is false
     And "{result.ExitCode}" should be greater than "0"
+    And "{result.Reason}" contains "guardrail aligned"
 
   @Destructive @SANITY @OPT_IN
   # NOTE: no @CCC.VPC tag => opt-in only
@@ -67,6 +77,11 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     Given "<RequesterVpcId>" is not nil
     When I call "{vpcService}" with "AttemptVpcPeeringDryRun" with parameters "<RequesterVpcId>" and "{ReceiverVpcId}"
     Then "{result.DryRunAllowed}" is true
+    And "{result.AllowListDefined}" is true
+    And "{result.RequesterInAllowList}" is true
+    And "{result.GuardrailExpectation}" is "allow"
+    And "{result.GuardrailMismatch}" is false
+    And "{result.Reason}" contains "guardrail aligned"
 
     Examples:
       | RequesterVpcId                    |
@@ -80,3 +95,4 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     When I call "{vpcService}" with "RunVpcPeeringDryRunTrialsFromFile" with parameter "{CN03_PEER_TRIAL_MATRIX_FILE}"
     Then "{result.TotalTrials}" should be greater than "0"
     And "{result.UnexpectedCount}" is "0"
+    And "{result.Compliant}" is true

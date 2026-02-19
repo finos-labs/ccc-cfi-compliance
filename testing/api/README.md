@@ -217,6 +217,16 @@ Opt-in sanity and matrix checks:
 IaC note:
 - Strongly recommended. CN03 depends on controlled requester sets and guardrail policy behavior.
 
+CN03 result diagnostics (for failure reasoning):
+
+- `AllowListDefined`: whether CN03 allow-list input was resolved.
+- `RequesterInAllowList`: whether tested requester VPC is in the allow-list.
+- `GuardrailExpectation`: expected runtime decision from allow-list (`allow` or `deny`).
+- `GuardrailMismatch`: `true` when dry-run runtime outcome does not match allow-list expectation.
+- `Reason`: includes explicit suffix:
+  - `CN03 guardrail aligned: ...` when behavior matches expectation.
+  - `CN03 guardrail mismatch: ...` when behavior differs (missing/misconfigured enforcement).
+
 ### CN04 - Flow logs capture all traffic (`CCC.VPC.CN04.AR01`)
 
 Main policy check:
@@ -250,6 +260,8 @@ IaC note:
   - Re-check `AWS_PROFILE`, session/token expiry, and `aws sts get-caller-identity`.
 - `UnauthorizedOperation` with explicit deny on `CN03PeeringGuardrail`:
   - Expected for disallowed/non-allowlisted CN03 requester tests.
+- CN03 `GuardrailMismatch=true`:
+  - Runtime peering enforcement does not match declared allow-list input; verify IAM/SCP guardrail policy and attachment to the executing identity.
 - CN03 nil env placeholders in feature run:
   - Re-run `./export-cn03-artifacts.sh`, then `source ./cn03-feature.env`.
 - CN04 behavior check fails to observe records:
