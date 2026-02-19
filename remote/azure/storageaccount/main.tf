@@ -1,7 +1,13 @@
 variable "storage_account_name" {
   description = "Azure storage account name"
   type        = string
-  default     = "storagecfitesting2025"
+  default     = "storagecfitesting2026"
+}
+
+# Resource group for CFI testing
+resource "azurerm_resource_group" "cfi_test" {
+  name     = "cfi_test"
+  location = "eastus"
 }
 
 variable "location" {
