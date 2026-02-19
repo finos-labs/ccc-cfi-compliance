@@ -1,0 +1,36 @@
+name: S3 Bucket MFA Delete Configuration
+service_type: object-storage
+requirement_text: >
+  When an entity attempts to modify the service through a user interface, the 
+  authentication process MUST require multiple identifying factors for authentication.
+
+validity_score: 6
+validity_commentary: >
+  MFA Delete requires MFA to permanently delete object versions or change versioning
+  state. This provides MFA protection for destructive operations on S3. Limitations:
+  - Only protects delete operations, not all modifications
+  - Requires versioning to be enabled
+  - Does not enforce MFA for uploading or overwriting objects
+  - Console/UI access MFA is controlled at IAM level, not bucket level
+  - This is a partial control - IAM MFA policies provide broader coverage
+
+query: |
+  aws s3api get-bucket-versioning \
+    --bucket ${BUCKET_NAME}
+
+rules:
+  - jsonpath: "$.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Verifies that versioning is enabled, which is required for MFA Delete
+      to function.
+
+  - jsonpath: "$.MFADelete"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Verifies that MFA Delete is enabled on the bucket. When enabled,
+      MFA is required to delete object versions or change versioning state.

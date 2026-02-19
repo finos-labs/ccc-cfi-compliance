@@ -1,0 +1,42 @@
+name: Azure Key Vault Key Algorithm Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST verify that all encryption 
+  keys use the latest industry-standard cryptographic algorithms.
+
+validity_score: 7
+validity_commentary: >
+  This query validates the Azure Key Vault key used for Storage Account encryption.
+  Azure Key Vault supports RSA and EC keys for encryption. Strengths:
+  - Validates key type and size meet minimum requirements
+  - Key Vault keys are FIPS 140-2 Level 2 validated (Premium SKU)
+  - Supports both software and HSM-protected keys
+  Limitations:
+  - Requires key name and vault name to be known
+  - Does not validate key access policies
+  - Storage uses key wrapping, not direct encryption
+
+query: |
+  az keyvault key show \
+    --vault-name $(az storage account show --name ${AzureStorageAccount} --resource-group ${AzureResourceGroup} --query "encryption.keyVaultProperties.keyVaultUri" -o tsv | sed 's|https://||;s|.vault.azure.net/||') \
+    --name $(az storage account show --name ${AzureStorageAccount} --resource-group ${AzureResourceGroup} --query "encryption.keyVaultProperties.keyName" -o tsv) \
+    --query "{keyType: key.kty, keySize: key.n, enabled: attributes.enabled}" \
+    --output json
+
+rules:
+  - jsonpath: "$.keyType"
+    expected_values:
+      - "RSA"
+      - "RSA-HSM"
+    validation_rule: "^RSA(-HSM)?$"
+    description: >
+      Validates that the key uses RSA algorithm, which is industry-standard
+      for key encryption. RSA-HSM indicates HSM-protected key.
+
+  - jsonpath: "$.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Confirms the Key Vault key is enabled and can be used for
+      cryptographic operations.

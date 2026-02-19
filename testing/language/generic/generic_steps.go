@@ -12,7 +12,7 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/cucumber/godog"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AsyncTask represents an asynchronous operation
@@ -103,7 +103,7 @@ type PropsWorld struct {
 	Props        map[string]interface{}
 	T            TestingT // Interface for assertions
 	AsyncManager *AsyncTaskManager
-	Attachments  []attachments.Attachment // Store attachments for the current scenario
+	Attachments  []environment.Attachment // Store attachments for the current scenario
 	mutex        sync.RWMutex
 }
 
@@ -118,7 +118,7 @@ func NewPropsWorld() *PropsWorld {
 	return &PropsWorld{
 		Props:        make(map[string]interface{}),
 		AsyncManager: NewAsyncTaskManager(),
-		Attachments:  make([]attachments.Attachment, 0),
+		Attachments:  make([]environment.Attachment, 0),
 	}
 }
 
@@ -126,7 +126,7 @@ func NewPropsWorld() *PropsWorld {
 func (pw *PropsWorld) Attach(name, mediaType string, data []byte) {
 	pw.mutex.Lock()
 	defer pw.mutex.Unlock()
-	pw.Attachments = append(pw.Attachments, attachments.Attachment{
+	pw.Attachments = append(pw.Attachments, environment.Attachment{
 		Name:      name,
 		MediaType: mediaType,
 		Data:      data,
@@ -134,22 +134,22 @@ func (pw *PropsWorld) Attach(name, mediaType string, data []byte) {
 	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
 }
 
-// GetAttachments returns a copy of the current attachments (implements attachments.Provider)
-func (pw *PropsWorld) GetAttachments() []attachments.Attachment {
+// GetAttachments returns a copy of the current attachments (implements environment.AttachmentProvider)
+func (pw *PropsWorld) GetAttachments() []environment.Attachment {
 	pw.mutex.RLock()
 	defer pw.mutex.RUnlock()
 
 	// Return a copy to avoid race conditions
-	attachmentsCopy := make([]attachments.Attachment, len(pw.Attachments))
+	attachmentsCopy := make([]environment.Attachment, len(pw.Attachments))
 	copy(attachmentsCopy, pw.Attachments)
 	return attachmentsCopy
 }
 
-// ClearAttachments clears all attachments (implements attachments.Provider)
+// ClearAttachments clears all attachments (implements environment.AttachmentProvider)
 func (pw *PropsWorld) ClearAttachments() {
 	pw.mutex.Lock()
 	defer pw.mutex.Unlock()
-	pw.Attachments = make([]attachments.Attachment, 0)
+	pw.Attachments = make([]environment.Attachment, 0)
 }
 
 // formatValueForComparison formats a value for display in comparisons
@@ -174,85 +174,129 @@ func formatValueForComparison(value interface{}) string {
 	}
 }
 
-// HandleResolve resolves variables and literals from string references
+// HandleResolve resolves variables and literals from string references.
+// If the entire string is a single variable like "{varName}", returns the actual value (any type).
+// If the string contains embedded variables like "text {varName} more", does string replacement.
 func (pw *PropsWorld) HandleResolve(name string) interface{} {
-	if strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}") {
-		stripped := name[1 : len(name)-1]
+	// Check if the entire string is a single variable reference
+	if strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}") && strings.Count(name, "{") == 1 {
+		return pw.resolveSingleVar(name)
+	}
 
-		switch stripped {
-		case "nil":
-			return nil
-		case "true":
-			return true
-		case "false":
-			return false
-		default:
-			// Try to parse as number
-			if val, err := strconv.ParseFloat(stripped, 64); err == nil {
-				return val
+	// Check if string contains any {var} patterns - do string interpolation
+	if strings.Contains(name, "{") && strings.Contains(name, "}") {
+		result := name
+		for {
+			start := strings.Index(result, "{")
+			if start == -1 {
+				break
 			}
-
-			// Try direct property lookup first
-			if val, exists := pw.Props[stripped]; exists {
-				return val
+			end := strings.Index(result[start:], "}")
+			if end == -1 {
+				break
 			}
+			end += start
 
-			// Try struct field access (e.g., "connection.state")
-			if strings.Contains(stripped, ".") {
-				parts := strings.Split(stripped, ".")
-				if len(parts) == 2 {
-					objName := parts[0]
-					fieldName := parts[1]
+			varRef := result[start : end+1]
+			resolved := pw.resolveSingleVar(varRef)
+			if resolved != nil {
+				result = result[:start] + fmt.Sprintf("%v", resolved) + result[end+1:]
+			} else {
+				// Can't resolve this var, skip past it to avoid infinite loop
+				break
+			}
+		}
+		return result
+	}
 
-					if obj, exists := pw.Props[objName]; exists {
-						// Try to access the field using reflection
-						v := reflect.ValueOf(obj)
+	return name
+}
 
-						// Handle pointer types
-						if v.Kind() == reflect.Ptr {
-							v = v.Elem()
+// resolveSingleVar resolves a single {varName} reference
+func (pw *PropsWorld) resolveSingleVar(name string) interface{} {
+	if !strings.HasPrefix(name, "{") || !strings.HasSuffix(name, "}") {
+		return name
+	}
+
+	stripped := name[1 : len(name)-1]
+
+	switch stripped {
+	case "nil":
+		return nil
+	case "true":
+		return true
+	case "false":
+		return false
+	default:
+		// Try to parse as number
+		if val, err := strconv.ParseFloat(stripped, 64); err == nil {
+			return val
+		}
+
+		// Try direct property lookup first
+		if val, exists := pw.Props[stripped]; exists {
+			return val
+		}
+
+		// Try with PascalCase (e.g., "portNumber" -> "PortNumber")
+		pascalCase := strings.ToUpper(stripped[:1]) + stripped[1:]
+		if val, exists := pw.Props[pascalCase]; exists {
+			return val
+		}
+
+		// Try struct field access (e.g., "connection.state")
+		if strings.Contains(stripped, ".") {
+			parts := strings.Split(stripped, ".")
+			if len(parts) == 2 {
+				objName := parts[0]
+				fieldName := parts[1]
+
+				if obj, exists := pw.Props[objName]; exists {
+					// Try to access the field using reflection
+					v := reflect.ValueOf(obj)
+
+					// Handle pointer types
+					if v.Kind() == reflect.Ptr {
+						v = v.Elem()
+					}
+
+					if v.Kind() == reflect.Struct {
+						// Try the field name as-is (case-sensitive)
+						field := v.FieldByName(fieldName)
+						if field.IsValid() {
+							return field.Interface()
 						}
 
-						if v.Kind() == reflect.Struct {
-							// Try the field name as-is (case-sensitive)
-							field := v.FieldByName(fieldName)
-							if field.IsValid() {
-								return field.Interface()
-							}
+						// Try with capitalized first letter
+						capitalizedFieldName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
+						field = v.FieldByName(capitalizedFieldName)
+						if field.IsValid() {
+							return field.Interface()
+						}
 
-							// Try with capitalized first letter
-							capitalizedFieldName := strings.ToUpper(fieldName[:1]) + fieldName[1:]
-							field = v.FieldByName(capitalizedFieldName)
-							if field.IsValid() {
-								return field.Interface()
-							}
-
-							// Check if the object has a getter method for this field
-							// e.g., GetState() for State field
-							getterName := "Get" + capitalizedFieldName
-							method := reflect.ValueOf(obj).MethodByName(getterName)
-							if method.IsValid() {
-								results := method.Call(nil)
-								if len(results) > 0 {
-									return results[0].Interface()
-								}
+						// Check if the object has a getter method for this field
+						// e.g., GetState() for State field
+						getterName := "Get" + capitalizedFieldName
+						method := reflect.ValueOf(obj).MethodByName(getterName)
+						if method.IsValid() {
+							results := method.Call(nil)
+							if len(results) > 0 {
+								return results[0].Interface()
 							}
 						}
 					}
 				}
 			}
-
-			// Try JSONPath query
-			if result, err := jsonpath.Get("$."+stripped, pw.Props); err == nil {
-				return result
-			}
-
-			// Return original if nothing matches
-			return nil
 		}
-	}
 
-	return name
+		// Try JSONPath query
+		if result, err := jsonpath.Get("$."+stripped, pw.Props); err == nil {
+			return result
+		}
+
+		// Return nil if nothing matches
+		return nil
+	}
 }
 
 // callFunction safely calls a function with error handling
@@ -968,6 +1012,38 @@ func (pw *PropsWorld) fieldContains(field, substring string) error {
 	return nil
 }
 
+func (pw *PropsWorld) fieldIsStringContainingOneOf(field string, table *godog.Table) error {
+	actual := pw.HandleResolve(field)
+
+	var actualStr string
+	if err, ok := actual.(error); ok {
+		actualStr = err.Error()
+	} else {
+		actualStr = fmt.Sprintf("%v", actual)
+	}
+
+	// Build expected values from data table (single column)
+	expectedValues := make([]string, 0, len(table.Rows)-1)
+	for i := 1; i < len(table.Rows); i++ {
+		if len(table.Rows[i].Cells) > 0 {
+			expectedValues = append(expectedValues, table.Rows[i].Cells[0].Value)
+		}
+	}
+
+	fmt.Printf("EXPECTED: string containing one of %v\n", expectedValues)
+	fmt.Printf("ACTUAL:   %s\n", actualStr)
+
+	// Check if the actual string contains any of the expected values
+	for _, expected := range expectedValues {
+		if strings.Contains(actualStr, expected) {
+			fmt.Printf("✓ String contains '%s'\n", expected)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("expected %s to contain one of %v, but got '%s'", field, expectedValues, actualStr)
+}
+
 // parseNumber converts a value to float64 for numeric comparisons
 func parseNumber(val interface{}) (float64, error) {
 	switch v := val.(type) {
@@ -1459,6 +1535,7 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^"([^"]*)" is an error$`, pw.fieldIsError)
 	s.Step(`^"([^"]*)" is not an error$`, pw.fieldIsNotError)
 	s.Step(`^"([^"]*)" contains "([^"]*)"$`, pw.fieldContains)
+	s.Step(`^"([^"]*)" is a string containing one of$`, pw.fieldIsStringContainingOneOf)
 
 	// Numeric comparisons
 	s.Step(`^"([^"]*)" should be greater than "([^"]*)"$`, pw.fieldShouldBeGreaterThan)
@@ -1494,4 +1571,18 @@ func (pw *PropsWorld) RegisterSteps(s *godog.ScenarioContext) {
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameter "([^"]*)"$`, pw.iWaitForObjectWithMethodWithParameter)
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameters "([^"]*)" and "([^"]*)"$`, pw.iWaitForObjectWithMethodWithTwoParameters)
 	s.Step(`^I wait for "([^"]*)" with "([^"]*)" with parameters "([^"]*)", "([^"]*)" and "([^"]*)"$`, pw.iWaitForObjectWithMethodWithThreeParameters)
+
+	// Stub/no-op patterns for controls that don't require policy checks
+	s.Step(`^no-op required$`, pw.noOpRequired)
+}
+
+// noOpRequired is a stub step for controls that don't need automated verification
+func (pw *PropsWorld) noOpRequired() error {
+	// This step intentionally does nothing - it marks scenarios where
+	// the control either:
+	// - Requires behavioral testing not implementable as a policy check
+	// - Is enforced at the identity provider level
+	// - Is inherently satisfied by another control
+	// - Requires runtime verification
+	return nil
 }

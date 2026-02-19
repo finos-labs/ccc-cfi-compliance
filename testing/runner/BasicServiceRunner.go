@@ -62,6 +62,7 @@ func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, par
 	sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
 		suite.Props = make(map[string]interface{})
 		suite.AsyncManager = generic.NewAsyncTaskManager()
+		suite.ClearAttachments() // Clear attachments from previous scenario
 		suite.setupServiceParams(params)
 		suite.setupServiceParams(params.CloudParams)
 		return ctx, nil
@@ -181,6 +182,13 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 			continue
 		}
 
+		// Combine user-provided tags with service's tag filter using AND
+		// This allows narrowing down tests (e.g., "--tags '@CCC.Core.CN01 @Policy'")
+		if len(r.Config.Tags) > 0 {
+			resource.TagFilter = append(resource.TagFilter, r.Config.Tags...)
+		}
+		// Otherwise, use the TagFilter already set by GetOrProvisionTestableResources()
+
 		log.Printf("\n🔬 Running tests for resource %d/%d:", i+1, len(resources))
 		if resourceJSON, err := json.MarshalIndent(resource, "   ", "  "); err == nil {
 			log.Printf("   Resource: %s", string(resourceJSON))
@@ -209,8 +217,12 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 
 // runResourceTest runs tests for a single resource
 func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environment.TestParams, featuresPaths []string, catalogTypes []string) string {
-	// Create a safe filename from the resource name
-	filename := fmt.Sprintf("resource-%s", sanitizeFilename(params.ResourceName))
+	// Create a safe filename from ReportFile or fall back to ResourceName
+	baseName := params.ReportFile
+	if baseName == "" {
+		baseName = params.ResourceName
+	}
+	filename := sanitizeFilename(baseName)
 	reportPath := filepath.Join(r.Config.OutputDir, filename)
 
 	// Create output directory if it doesn't exist
@@ -231,26 +243,20 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	formatterFactory := reporters.NewFormatterFactory(params, suite.CloudWorld)
 
 	// Generate unique format names
-	htmlFormat := fmt.Sprintf("html-resource-%s", sanitizeFilename(params.ResourceName))
-	ocsfFormat := fmt.Sprintf("ocsf-resource-%s", sanitizeFilename(params.ResourceName))
+	htmlFormat := fmt.Sprintf("html-%s", filename)
+	ocsfFormat := fmt.Sprintf("ocsf-%s", filename)
 
 	godog.Format(htmlFormat, "HTML report", formatterFactory.GetHTMLFormatterFunc())
 	godog.Format(ocsfFormat, "OCSF report", formatterFactory.GetOCSFFormatterFunc())
 
-	// Build tag filter - use provided tag or auto-generate from catalog types
-	var tagFilter string
-	if r.Config.Tag != "" {
-		tagFilter = r.Config.Tag
-		log.Printf("   Tag Filter (manual): %s", tagFilter)
-	} else {
-		tagFilter = buildTagFilter(params.CatalogTypes)
-		log.Printf("   Tag Filter (auto): %s", tagFilter)
-	}
+	// Log the tag filter (already set in runTests)
+	tagFilterExpr := strings.Join(params.TagFilter, " && ")
+	log.Printf("   Tag Filter: %s", tagFilterExpr)
 
 	opts := godog.Options{
 		Format:      fmt.Sprintf("%s:%s,%s:%s", htmlFormat, htmlReportPath, ocsfFormat, ocsfReportPath),
 		Paths:       featuresPaths,
-		Tags:        tagFilter,
+		Tags:        tagFilterExpr,
 		Concurrency: 1,
 		Strict:      true,
 		NoColors:    false,
@@ -271,11 +277,6 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 		return "skipped"
 	}
 	return "failed"
-}
-
-// buildTagFilter builds tag expression for filtering tests
-func buildTagFilter(catalogTypes []string) string {
-	return strings.Join(catalogTypes, ",")
 }
 
 // printSummary prints test execution summary

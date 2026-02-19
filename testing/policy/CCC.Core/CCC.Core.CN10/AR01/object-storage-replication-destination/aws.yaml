@@ -1,0 +1,47 @@
+name: S3 Replication Destination Region Validation
+service_type: object-storage
+requirement_text: >
+  When data is replicated, the service MUST ensure that replication only occurs 
+  to destinations that are explicitly included within the defined trust perimeter.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that S3 replication destinations are within approved
+  regions/accounts. Strengths:
+  - Validates destination bucket and account
+  - Can verify region from destination bucket ARN (if region is included)
+  - Supports validation against an approved destination list
+  Limitations:
+  - S3 bucket ARNs don't always include region (must query destination bucket)
+  - Cross-account replication requires additional trust validation
+  - Does not validate destination bucket security posture
+  - Multiple replication rules may have different destinations
+
+query: |
+  aws s3api get-bucket-replication \
+    --bucket ${BUCKET_NAME}
+
+rules:
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Destination.Bucket"
+    expected_values: []
+    validation_rule: "^arn:aws:s3:::[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    description: >
+      Validates the destination bucket ARN. The bucket name should be checked
+      against an approved list of replication destinations within the trust
+      perimeter.
+
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Destination.Account"
+    expected_values: []
+    validation_rule: "^[0-9]{12}$"
+    description: >
+      Validates the destination AWS account ID for cross-account replication.
+      The account should be verified against a list of trusted accounts
+      within the organization's trust perimeter.
+
+  - jsonpath: "$.ReplicationConfiguration.Rules[*].Destination.ReplicationTime.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^(Enabled|Disabled)$"
+    description: >
+      Checks if S3 Replication Time Control (RTC) is enabled, which provides
+      predictable replication timing and metrics.

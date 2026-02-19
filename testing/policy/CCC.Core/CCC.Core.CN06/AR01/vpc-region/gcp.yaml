@@ -1,0 +1,36 @@
+name: GCP VPC Network Region Compliance
+service_type: vpc
+requirement_text: >
+  When the service is running, its region and availability zone MUST be included 
+  in a list of explicitly trusted or approved locations within the trust perimeter.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that GCP VPC subnets are deployed in approved regions.
+  GCP VPCs are global but subnets are regional. Strengths:
+  - Directly queries subnet regions
+  - Easy to validate against an approved region list
+  Limitations:
+  - Approved regions must be defined externally
+  - VPC peering may extend trust boundaries
+  - Global VPC means subnets can be in any region
+
+query: |
+  gcloud compute networks subnets list \
+    --network=${ResourceName} \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$[*].region"
+    expected_values:
+      - "us-east1"
+      - "us-west1"
+      - "us-central1"
+      - "europe-west1"
+    validation_rule: "^https://www.googleapis.com/compute/v1/projects/.+/regions/(us-east1|us-west1|us-central1|europe-west1)$"
+    todo: Replace with parameterised list of approved regions
+    description: >
+      Validates that all subnets in the VPC are in approved regions.
+      The expected_values list should be customized to match your organization's
+      approved regions.

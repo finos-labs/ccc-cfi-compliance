@@ -1,0 +1,42 @@
+name: S3 Bucket Server-Side Encryption Check
+service_type: object-storage
+requirement_text: >
+  When data is stored, it MUST be encrypted using the latest industry-standard 
+  encryption methods.
+
+validity_score: 9
+validity_commentary: >
+  This query provides strong validation of S3 bucket encryption configuration.
+  S3 default encryption ensures all objects are encrypted at rest. Strengths:
+  - Directly queries the bucket's encryption configuration
+  - Validates both encryption algorithm and KMS key usage
+  - AWS enforces encryption for all new objects when default encryption is enabled
+  Limitations:
+  - Does not verify encryption of objects uploaded before default encryption was enabled
+  - SSE-C (customer-provided keys) objects are not covered by this check
+  - Does not validate KMS key policy or rotation settings
+
+query: |
+  aws s3api get-bucket-encryption \
+    --bucket ${BUCKET_NAME}
+
+rules:
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm"
+    expected_values:
+      - "aws:kms"
+      - "aws:kms:dsse"
+      - "AES256"
+    validation_rule: "^(aws:kms|aws:kms:dsse|AES256)$"
+    description: >
+      Verifies that server-side encryption is enabled with an approved algorithm.
+      'aws:kms' uses AWS KMS keys, 'aws:kms:dsse' uses dual-layer encryption,
+      'AES256' uses S3-managed keys (SSE-S3). All are industry-standard AES-256.
+
+  - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[0].BucketKeyEnabled"
+    expected_values:
+      - true
+      - false
+    validation_rule: "^(true|false)$"
+    description: >
+      Checks S3 Bucket Keys setting. Enabled reduces KMS request costs when using 
+      SSE-KMS. Either value is acceptable for compliance.

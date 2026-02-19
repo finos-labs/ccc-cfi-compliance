@@ -1,0 +1,39 @@
+name: GCP Cloud Storage Replication Status Visibility
+service_type: object-storage
+requirement_text: >
+  When data is replicated into a second location, the service MUST be able to
+  accurately represent the replication locations, replication status, and data
+  synchronization status.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that GCP Cloud Storage bucket replication information
+  is visible. GCP provides location and replication type information.
+  Strengths:
+  - Location type indicates replication configuration
+  - Multi-region/dual-region locations are automatically replicated
+  - Turbo replication provides faster sync for dual-region
+  Limitations:
+  - GCP does not expose real-time replication lag metrics
+  - Object-level replication status is not available
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.locationType"
+    expected_values:
+      - "multi-region"
+      - "dual-region"
+    validation_rule: "^(multi-region|dual-region|region)$"
+    description: >
+      Validates that the location type is visible, indicating the
+      replication configuration.
+
+  - jsonpath: "$.location"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Confirms the bucket location is visible, providing information
+      about where data is replicated.

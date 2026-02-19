@@ -11,7 +11,8 @@ concurrency:
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - '**'
 
 jobs:
   prepare-matrix:
@@ -76,6 +77,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Load compliance testing environment
+        run: |
+          echo "📋 Loading compliance testing environment..."
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          echo "✅ Environment variables loaded"
+
       - name: Configure AWS Credentials (OIDC)
         if: matrix.target.provider == 'aws'
         uses: aws-actions/configure-aws-credentials@v4
@@ -108,21 +115,13 @@ jobs:
         with:
           go-version: "1.21"
 
-      - name: Install Steampipe
+      - name: Install testssl.sh
         run: |
-          echo "📦 Installing Steampipe..."
-          sudo /bin/sh -c "$(curl -fsSL https://steampipe.io/install/steampipe.sh)"
-          steampipe --version
-
-          echo "📦 Installing Steampipe plugins..."
-          steampipe plugin install aws
-          steampipe plugin install azure
-          steampipe plugin install gcp
-
-          echo "🚀 Starting Steampipe service..."
-          steampipe service start
-
-          echo "✅ Steampipe installed and configured successfully"
+          echo "📦 Installing testssl.sh..."
+          git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl
+          sudo ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
+          testssl.sh --version || true
+          echo "✅ testssl.sh installed"
 
       - name: Cache Python Poetry virtualenv
         uses: actions/cache@v4
@@ -307,13 +306,13 @@ jobs:
             ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
             ./run-compliance-tests.sh --provider azure --output "output" \
-              --region "eastus" \
+              --region "$TF_VAR_location" \
               --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              --azure-resource-group "cfi_test" \
-              --azure-storage-account "$AZURE_STORAGE_ACCOUNT"
+              --azure-resource-group "$TF_VAR_resource_group_name" \
+              --azure-storage-account "$TF_VAR_storage_account_name"
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
             ./run-compliance-tests.sh --provider gcp --output "output" \
-              --region "us-central1" \
+              --region "$TF_VAR_gcp_region" \
               --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
           fi
 
@@ -352,13 +351,15 @@ jobs:
             echo "⚠️  No Prowler delta-modified OCSF file found for $TARGET_ID"
           fi
 
-          # Copy combined OCSF results from compliance tests
-          cd "$GITHUB_WORKSPACE/testing"
-          if [ -f "output/combined.ocsf.json" ]; then
-            cp "output/combined.ocsf.json" "../${{ env.OUTPUT_DIR }}/${TARGET_ID}-combined.ocsf.json"
-            echo "✅ Successfully captured combined OCSF output for $TARGET_ID"
+          # Copy all compliance test results (HTML reports and OCSF JSON)
+          cd "$GITHUB_WORKSPACE/testing/output"
+          if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
+            for f in *.ocsf.json *.html; do
+              [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
+            done
+            echo "✅ Successfully captured compliance test output for $TARGET_ID"
           else
-            echo "⚠️  No combined OCSF file found for $TARGET_ID"
+            echo "⚠️  No compliance test output files found for $TARGET_ID"
           fi
 
       - name: Refresh AWS Credentials (OIDC)

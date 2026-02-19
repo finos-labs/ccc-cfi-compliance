@@ -1,0 +1,38 @@
+name: KMS Key Rotation Validation (90 days)
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST rotate active keys within 
+  90 days of issuance.
+
+validity_score: 3
+validity_commentary: >
+  AWS KMS automatic rotation is fixed at 365 days and cannot be configured
+  for 90-day rotation. To achieve 90-day rotation, manual processes are required:
+  - Create new KMS key every 90 days
+  - Update S3 bucket encryption configuration to use new key
+  - Maintain key aliases to simplify rotation
+  - Track rotation dates externally (AWS Config, Lambda, etc.)
+  This query can only verify automatic rotation is enabled, which does NOT
+  satisfy a 90-day requirement. Consider implementing custom rotation automation.
+
+query: |
+  aws kms describe-key \
+    --key-id ${KMS_KEY_ID}
+
+rules:
+  - jsonpath: "$.KeyMetadata.CreationDate"
+    expected_values: []
+    validation_rule: "^[0-9]{4}-[0-9]{2}-[0-9]{2}.*$"
+    description: >
+      Returns the key creation date. For 90-day rotation compliance, this date
+      must be within the last 90 days. Validation requires comparing against
+      current date, which is not possible with static regex. External tooling
+      is required to calculate and validate the rotation period.
+
+  - jsonpath: "$.KeyMetadata.KeyState"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Confirms the key is enabled. For rotation, old keys should be disabled
+      or scheduled for deletion after the rotation grace period.

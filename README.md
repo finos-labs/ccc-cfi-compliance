@@ -21,37 +21,23 @@ This repository contains Terraform modules and configuration examples for creati
 
 ### 1. Configuration Examples
 
-Browse the `/config` directory for ready-to-use configuration examples:
-
-#### AWS Configurations
-
-- **[aws-s3-bucket.json](config/aws-s3-bucket.json)** - Basic S3 bucket configuration
-- **[secure-aws-bucket.json](config/secure-aws-bucket.json)** - Enhanced security S3 configuration
-- **[aws-bedrock.json](config/aws-bedrock.json)** - AWS Bedrock AI service configuration
-- **[aws-rds.json](config/aws-rds.json)** - RDS database configuration
-- **[aws-vpc.json](config/aws-vpc.json)** - VPC networking configuration
-
-#### Azure Configurations
-
-- **[azure-storage-account.json](config/azure-storage-account.json)** - Azure Storage Account (in expensive/)
-- **[secure-azure-storage.json](config/secure-azure-storage.json)** - Secure Azure Storage configuration
-- **[azure-postgresql-flexibleserver.json](config/azure-postgresql-flexibleserver.json)** - PostgreSQL configuration
-- **[azure-virtualnetwork.json](config/azure-virtualnetwork.json)** - Virtual Network configuration
-- **[azure-cognitiveservices-account.json](config/broken/azure-cognitiveservices-account.json)** - Cognitive Services (needs fixing)
-
-#### Google Cloud Configurations
-
-- **[gcp-cloud-storage.json](config/gcp-cloud-storage.json)** - Cloud Storage bucket configuration
-- **[secure-gcp-storage.json](config/secure-gcp-storage.json)** - Enhanced security GCP Storage
-- **[gcp-network.json](config/gcp-network.json)** - VPC network configuration
-- **[gcp-sql-database.json](config/gcp-sql-database.json)** - Cloud SQL configuration
-- **[gcp-vertex-ai.json](config/gcp-vertex-ai.json)** - Vertex AI configuration
+Browse the `/config` directory for ready-to-use configuration example for aws, azure or gcp.
 
 ### 2. CCC Controls Implementation
 
 For the complete list of controls and their implementation details, see the [CCC Standard](https://ccc.finos.org).
 
 You can review the results of testing the above configurations on the [CCC Website](ccc.finos.org/cfi)
+
+### 3. Compliance Testing
+
+The testing system:
+
+- **Discovers resources** automatically using cloud provider APIs
+- **Runs Gherkin tests** filtered by catalog type (CCC.ObjStor, CCC.Core, etc.)
+- **Generates reports** in HTML and OCSF JSON formats
+
+See the [Testing README](testing/README.md) for full documentation on architecture, adding new services, and writing tests.
 
 ## How To Contribute
 
@@ -65,13 +51,14 @@ You can review the results of testing the above configurations on the [CCC Websi
 
 This project is part of the broader CCC initiative. Join the **Compliant Financial Infrastructure** working group:
 
-- **When**: 10AM UK on 2nd Thursday / 5PM UK on 4th Thursday each month
+- **When**: 10AM UK Thursday / 5PM UK on 4th Thursday each month
+- **See**: calendar.finos.org
 - **Chair**: @eddie-knight
 - **Mailing List**: [cfi+subscribe@lists.finos.org](mailto:cfi+subscribe@lists.finos.org)
 
 Find meetings on the [FINOS Community Calendar](https://finos.org/calendar) and browse [Past Meeting Minutes](https://github.com/finos/common-cloud-controls/labels/meeting).
 
-### 3. DCO Required
+### 3. DCO Required.
 
 #### Using DCO to sign your commits
 

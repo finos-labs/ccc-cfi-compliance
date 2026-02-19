@@ -1,0 +1,45 @@
+name: GCP Cloud Storage Replication Destination Validation
+service_type: object-storage
+requirement_text: >
+  When data is replicated, the service MUST ensure that replication only occurs 
+  to destinations that are explicitly included within the defined trust perimeter.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that GCP Cloud Storage bucket locations are within
+  approved regions. For multi-region/dual-region buckets, GCP automatically
+  determines replication destinations. Strengths:
+  - Location type and location are directly queryable
+  - Multi-region locations have known member regions
+  - Can validate against approved location list
+  Limitations:
+  - GCP does not allow custom replication destination selection
+  - Dual-region specific regions may need validation
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.location"
+    expected_values:
+      - "US"
+      - "US-EAST1"
+      - "US-WEST1"
+      - "EU"
+      - "EUROPE-WEST1"
+    validation_rule: "^(US|US-EAST1|US-WEST1|EU|EUROPE-WEST1|NAM4|EUR4)$"
+    todo: Replace with parameterised list of approved locations
+    description: >
+      Validates that the bucket location (and thus replication destination)
+      is within the approved list of locations in the trust perimeter.
+
+  - jsonpath: "$.locationType"
+    expected_values:
+      - "multi-region"
+      - "dual-region"
+      - "region"
+    validation_rule: "^(multi-region|dual-region|region)$"
+    description: >
+      Validates the location type. Multi-region and dual-region buckets
+      replicate to known GCP regions within that area.

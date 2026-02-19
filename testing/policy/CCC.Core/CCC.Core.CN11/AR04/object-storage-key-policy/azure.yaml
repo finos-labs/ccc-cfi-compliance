@@ -1,0 +1,32 @@
+name: Azure Key Vault Access Policy Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are accessed, the service MUST verify that access to 
+  encryption keys is restricted to authorized personnel and services, following 
+  the principle of least privilege.
+
+validity_score: 6
+validity_commentary: >
+  This query retrieves Azure Key Vault access configuration for validation.
+  Azure Key Vault supports both access policies and RBAC for authorization.
+  Limitations:
+  - Access policy/RBAC review requires context about authorized principals
+  - Cannot automatically determine if permissions are excessive
+  - Managed identities add complexity to authorization analysis
+  - Consider using Azure Policy for comprehensive access governance
+
+query: |
+  az keyvault show \
+    --name $(az storage account show --name ${AzureStorageAccount} --resource-group ${AzureResourceGroup} --query "encryption.keyVaultProperties.keyVaultUri" -o tsv | sed 's|https://||;s|.vault.azure.net/||') \
+    --query "{enableRbacAuthorization: properties.enableRbacAuthorization, accessPolicies: properties.accessPolicies}" \
+    --output json
+
+rules:
+  - jsonpath: "$.enableRbacAuthorization"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that RBAC authorization is enabled for Key Vault. RBAC provides
+      more granular and auditable access control than access policies.
+      When RBAC is enabled, access policies are not used.

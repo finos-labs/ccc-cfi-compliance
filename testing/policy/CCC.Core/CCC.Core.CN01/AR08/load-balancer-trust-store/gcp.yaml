@@ -1,0 +1,28 @@
+name: GCP Trust Config Validation
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 7
+validity_commentary: >
+  This query validates the trust config used for mTLS client validation.
+  It ensures CA certificates are configured for client authentication.
+  Limitations:
+  - Does not validate the specific CA certificate contents
+  - Cannot verify certificate chain validity
+  - Should be used in conjunction with the server-tls-policy check
+
+query: |
+  gcloud certificate-manager trust-configs describe ${ResourceName} \
+    --location=global \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.trustStores[*].trustAnchors"
+    expected_values: []
+    validation_rule: "^\\[.+\\]$"
+    description: >
+      Verifies that at least one trust anchor (CA certificate) is configured
+      in the trust store.

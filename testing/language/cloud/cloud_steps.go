@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,11 +12,14 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
+	"gopkg.in/yaml.v3"
 )
 
 // Connection represents a network connection with state and I/O
@@ -95,7 +99,7 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// Register generic steps first
 	cw.PropsWorld.RegisterSteps(ctx)
 
-	// Cloud-specific steps matching Cucumber-Cloud-Language.md
+	// Cloud-specific steps matching README.md
 
 	// OpenSSL connections
 	ctx.Step(`^an openssl s_client request to "([^"]*)" on "([^"]*)" protocol "([^"]*)"$`, cw.opensslClientRequestWithProtocol)
@@ -117,6 +121,9 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 
 	// Cloud API steps
 	ctx.Step(`^a cloud api for "([^"]*)" in "([^"]*)"$`, cw.aCloudAPIForProviderIn)
+
+	// Policy assessment steps
+	ctx.Step(`^I attempt policy check "([^"]*)" for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)" and provider "([^"]*)"$`, cw.attemptPolicyCheck)
 }
 
 // opensslClientRequest creates an OpenSSL s_client connection with optional TLS version
@@ -209,28 +216,107 @@ func (cw *CloudWorld) opensslClientRequestWithTLSAndProtocol(tlsVersion, port, h
 
 // clientConnectsWithProtocol establishes a plain client connection to a host with a specific protocol
 func (cw *CloudWorld) clientConnectsWithProtocol(hostName, protocol, port string) error {
-	return cw.opensslClientRequest("", port, hostName, "")
+	hostResolved := fmt.Sprintf("%v", cw.HandleResolve(hostName))
+	portResolved := fmt.Sprintf("%v", cw.HandleResolve(port))
+
+	// Use netcat for raw TCP connections (protocol-agnostic)
+	cmd := exec.Command("nc", hostResolved, portResolved)
+
+	// Create buffer for output
+	outputBuffer := &bytes.Buffer{}
+
+	// Get stdout pipe
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to get stdout pipe: %v", err)
+		return nil
+	}
+
+	// Connect command's stdin to our input buffer
+	stdinPipe, err := cmd.StdinPipe()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to get stdin pipe: %v", err)
+		return nil
+	}
+
+	fmt.Printf("DEBUG: Executing: nc %s %s\n", hostResolved, portResolved)
+
+	// Start the command
+	err = cmd.Start()
+	if err != nil {
+		cw.Props["result"] = fmt.Errorf("failed to start nc: %v", err)
+		return nil
+	}
+
+	// Create Connection object
+	conn := &Connection{
+		State:      "open",
+		Input:      stdinPipe,
+		Output:     "",
+		cmd:        cmd,
+		outputBuf:  outputBuffer,
+		stopReader: make(chan struct{}),
+	}
+
+	// Start goroutine to read stdout
+	conn.startOutputReader(stdout)
+
+	// Monitor the command and set state to closed when it exits
+	go func() {
+		cmd.Wait()
+		conn.stateMu.Lock()
+		conn.State = "closed"
+		conn.stateMu.Unlock()
+		fmt.Printf("DEBUG: nc exited, connection state set to closed\n")
+	}()
+
+	// Store in result
+	cw.Props["result"] = conn
+	fmt.Printf("DEBUG: Created nc connection with State=open, stored in result\n")
+
+	return nil
 }
 
 // transmitToConnection sends data to a connection's input field
-func (cw *CloudWorld) transmitToConnection(data, connectionInputPath string) error {
-	dataResolved := cw.HandleResolve(data)
-
-	if dataResolved == nil {
-		return fmt.Errorf("data %s not found", data)
+func (cw *CloudWorld) transmitToConnection(data, connectionName string) error {
+	// Resolve the connection object
+	connInterface := cw.HandleResolve(connectionName)
+	if connInterface == nil {
+		return fmt.Errorf("connection %s not found", connectionName)
 	}
 
-	// The connectionInputPath should be something like "{connection.input}"
-	// We need to extract the connection variable and set its Input field
-	// The generic HandleResolve will handle the field access
-	// For now, we'll use a simplified approach and directly set the input
+	conn, ok := connInterface.(*Connection)
+	if !ok {
+		return fmt.Errorf("%s is not a valid Connection object", connectionName)
+	}
 
-	// Extract connection name from path like "{connection.input}"
-	// This is handled by the generic PropsWorld field resolution
-	inputStr := fmt.Sprintf("%v", dataResolved)
+	if conn.Input == nil {
+		return fmt.Errorf("connection has no writable input")
+	}
 
-	// Store the transmission - in real implementation this would send over socket
-	cw.Props["result"] = fmt.Sprintf("Transmitted: %v", inputStr)
+	// Resolve any variables in the data string (e.g., {hostName})
+	dataStr := fmt.Sprintf("%v", cw.HandleResolve(data))
+	// Handle escape sequences for HTTP requests
+	dataStr = strings.ReplaceAll(dataStr, "\\r", "\r")
+	dataStr = strings.ReplaceAll(dataStr, "\\n", "\n")
+
+	fmt.Printf("DEBUG: Transmitting %d bytes to connection: %q\n", len(dataStr), dataStr)
+
+	// Write to the connection's input
+	_, err := conn.Input.Write([]byte(dataStr))
+	if err != nil {
+		return fmt.Errorf("failed to write to connection: %v", err)
+	}
+
+	// Give time for response to arrive
+	time.Sleep(500 * time.Millisecond)
+
+	// Update Output from the buffer
+	conn.mu.Lock()
+	conn.Output = conn.outputBuf.String()
+	conn.mu.Unlock()
+
+	fmt.Printf("DEBUG: Output now contains %d bytes\n", len(conn.Output))
 	return nil
 }
 
@@ -290,12 +376,20 @@ func (cw *CloudWorld) runTestSSL(reportName, testType, hostName, port string, us
 	tempFile += ".json"
 
 	// Build testssl.sh command
-	// Get the directory where this Go file is located
-	_, filename, _, _ := runtime.Caller(0)
-	cloudDir := filepath.Dir(filename)
-	testsslPath := filepath.Join(cloudDir, "testssl.sh")
+	// Try system-installed testssl.sh first, fall back to local copy
+	testsslPath := "testssl.sh" // Use PATH lookup
+	if _, err := exec.LookPath("testssl.sh"); err != nil {
+		// Fall back to local copy
+		_, filename, _, _ := runtime.Caller(0)
+		cloudDir := filepath.Dir(filename)
+		testsslPath = filepath.Join(cloudDir, "testssl.sh")
+	}
 
-	args := []string{testsslPath, "--" + fmt.Sprintf("%v", testTypeResolved)}
+	args := []string{
+		testsslPath,
+		"--" + fmt.Sprintf("%v", testTypeResolved),
+		"--ip", "one", // Only test first IP to avoid scanning all IPs (e.g., S3 has 8)
+	}
 
 	if useSTARTTLS {
 		// Determine STARTTLS protocol from port
@@ -311,12 +405,21 @@ func (cw *CloudWorld) runTestSSL(reportName, testType, hostName, port string, us
 	// Remove the temporary JSON file if it exists from a previous run
 	os.Remove(tempFile)
 
-	cmd := exec.Command("bash", args...)
+	// Use Go context timeout (120 seconds) - vulnerable/server-defaults scans take longer
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", args...)
+	// Set process group so we can kill all children
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Debug: Print the command being executed
 	fmt.Printf("DEBUG: Executing: bash %v\n", strings.Join(args, " "))
 
 	_, err := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("testssl.sh timed out")
+	}
 	if err != nil {
 		// testssl.sh might return non-zero exit code even on success
 		// Continue to try reading the JSON file
@@ -388,4 +491,115 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 	cw.Props[apiName] = f
 
 	return nil
+}
+
+// attemptPolicyCheck runs a specific policy check by name
+// Example: I attempt policy check "s3-object-lock" for control "CCC.Core.CN14" assessment requirement "AR01" for service "object-storage" on resource "{ResourceName}" and provider "aws"
+// Returns:
+//   - Pass if service type doesn't match (policy not applicable)
+//   - Fail if policy file is missing
+//   - Pass/Fail based on policy evaluation otherwise
+func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, resourceName, provider string) error {
+	// Resolve any variable references
+	checkNameResolved := fmt.Sprintf("%v", cw.HandleResolve(checkName))
+	controlResolved := fmt.Sprintf("%v", cw.HandleResolve(control))
+	arResolved := fmt.Sprintf("%v", cw.HandleResolve(ar))
+	serviceTypeResolved := fmt.Sprintf("%v", cw.HandleResolve(serviceType))
+	resourceNameResolved := fmt.Sprintf("%v", cw.HandleResolve(resourceName))
+	providerResolved := fmt.Sprintf("%v", cw.HandleResolve(provider))
+
+	// Get CloudParams from Props
+	cloudParams, ok := cw.Props["CloudParams"].(environment.CloudParams)
+	if !ok {
+		return fmt.Errorf("CloudParams not found in Props")
+	}
+
+	// Build TestParams from resolved data
+	testParams := environment.TestParams{
+		ResourceName: resourceNameResolved,
+		ServiceType:  serviceTypeResolved,
+		CloudParams:  cloudParams,
+	}
+
+	// Get UID if available
+	if uid := cw.HandleResolve("{UID}"); uid != nil && uid != "{UID}" {
+		testParams.UID = fmt.Sprintf("%v", uid)
+	}
+
+	// Build the policy file path directly
+	// Directory structure: policy/{CatalogType}/{Control}/{AR}/{check-name}/{provider}.yaml
+	// Example: policy/CCC.Core/CCC.Core.CN14/AR01/s3-object-lock/aws.yaml
+
+	// Extract catalog type from control (e.g., "CCC.Core" from "CCC.Core.CN14")
+	catalogType := extractCatalogType(controlResolved)
+
+	// Get the directory where this Go file is located, then navigate to policy dir
+	_, filename, _, _ := runtime.Caller(0)
+	cloudDir := filepath.Dir(filename)
+	testingDir := filepath.Dir(filepath.Dir(cloudDir)) // Go up from language/cloud to testing
+	policyBaseDir := filepath.Join(testingDir, "policy")
+
+	// Build the exact policy file path
+	policyPath := filepath.Join(policyBaseDir, catalogType, controlResolved, arResolved, checkNameResolved, providerResolved+".yaml")
+
+	// Check if the policy file exists
+	if _, err := os.Stat(policyPath); os.IsNotExist(err) {
+		cw.Props["result"] = false
+		return fmt.Errorf("policy check file not found: %s", policyPath)
+	}
+
+	// Load the policy to check service_type
+	data, err := os.ReadFile(policyPath)
+	if err != nil {
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to read policy file %s: %w", policyPath, err)
+	}
+
+	// Parse the YAML to get the service_type
+	var policyDef struct {
+		ServiceType string `yaml:"service_type"`
+	}
+	if err := yaml.Unmarshal(data, &policyDef); err != nil {
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
+	}
+
+	// If service type doesn't match, return pass (policy not applicable to this service)
+	if policyDef.ServiceType != serviceTypeResolved {
+		cw.Props["result"] = true
+		fmt.Printf("Policy %s skipped: service type %s doesn't match resource service type %s\n",
+			checkNameResolved, policyDef.ServiceType, serviceTypeResolved)
+		return nil
+	}
+
+	// Create policy checker and run the policy
+	checker := NewPolicyChecker(policyBaseDir)
+	result, err := checker.RunPolicy(testParams, policyPath)
+	if err != nil {
+		cw.Props["result"] = false
+		return fmt.Errorf("failed to run policy %s: %w", policyPath, err)
+	}
+
+	// Attach policy result as JSON
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	cw.Attach(fmt.Sprintf("policy-result-%s.json", checkNameResolved), "application/json", resultJSON)
+
+	cw.Props["result"] = result.Passed
+
+	// If policy failed, return an error with details
+	if !result.Passed {
+		return fmt.Errorf("policy check failed: %s: %s", result.Name, result.QueryError)
+	}
+
+	return nil
+}
+
+// extractCatalogType extracts the catalog type from a control ID
+// e.g., "CCC.Core.CN14" -> "CCC.Core", "CCC.ObjStor.CN01" -> "CCC.ObjStor"
+func extractCatalogType(control string) string {
+	parts := strings.Split(control, ".")
+	if len(parts) >= 2 {
+		return parts[0] + "." + parts[1]
+	}
+	return control
 }

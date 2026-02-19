@@ -1,0 +1,53 @@
+name: Azure Storage Replication Destination Region Validation
+service_type: object-storage
+requirement_text: >
+  When data is replicated, the service MUST ensure that replication only occurs 
+  to destinations that are explicitly included within the defined trust perimeter.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Azure Storage replication destinations are within
+  approved Azure paired regions. Strengths:
+  - Azure paired regions are pre-defined and documented
+  - Secondary region is automatically set based on primary
+  - Can validate against approved region pairs
+  Limitations:
+  - Azure does not allow custom secondary region selection for GRS
+  - Object replication policies for custom destinations need separate checks
+  - Cross-subscription replication requires additional trust validation
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{primaryLocation: primaryLocation, secondaryLocation: secondaryLocation, sku: sku.name}" \
+    --output json
+
+rules:
+  - jsonpath: "$.secondaryLocation"
+    expected_values:
+      - "westus"
+      - "westus2"
+      - "eastus"
+      - "eastus2"
+      - "northeurope"
+      - "westeurope"
+    validation_rule: "^(westus|westus2|eastus|eastus2|northeurope|westeurope)$"
+    todo: Replace with parameterised list of approved paired regions
+    description: >
+      Validates that the secondary replication location is within the approved
+      list of Azure regions in the trust perimeter. Azure paired regions are
+      automatically determined but should be verified against policy.
+
+  - jsonpath: "$.primaryLocation"
+    expected_values:
+      - "eastus"
+      - "eastus2"
+      - "westus"
+      - "westus2"
+      - "westeurope"
+      - "northeurope"
+    validation_rule: "^(eastus|eastus2|westus|westus2|westeurope|northeurope)$"
+    description: >
+      Validates the primary location is in an approved region. The secondary
+      location is determined by Azure based on region pairing.

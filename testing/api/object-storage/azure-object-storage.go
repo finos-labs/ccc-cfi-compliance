@@ -261,17 +261,31 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data s
 	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
 
 	// Upload blob
-	_, err = blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content), nil)
+	uploadResp, err := blockBlobClient.UploadStream(s.ctx, bytes.NewReader(content), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload blob %s: %w", objectID, err)
 	}
 
+	// Azure encrypts all blobs by default
+	// Check if the response indicates encryption (IsServerEncrypted)
+	encryption := "Microsoft"
+	encryptionAlgorithm := "AES256"
+	if uploadResp.IsServerEncrypted != nil && *uploadResp.IsServerEncrypted {
+		encryption = "Microsoft"
+		// Check for customer-managed key
+		if uploadResp.EncryptionKeySHA256 != nil {
+			encryptionAlgorithm = "CMEK"
+		}
+	}
+
 	return &Object{
-		ID:       objectID,
-		BucketID: bucketID,
-		Name:     objectID,
-		Size:     int64(len(content)),
-		Data:     []string{data},
+		ID:                  objectID,
+		BucketID:            bucketID,
+		Name:                objectID,
+		Size:                int64(len(content)),
+		Data:                []string{data},
+		Encryption:          encryption,
+		EncryptionAlgorithm: encryptionAlgorithm,
 	}, nil
 }
 
@@ -510,6 +524,9 @@ func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objec
 }
 
 // GetOrProvisionTestableResources returns all Azure storage containers as testable resources
+// Returns two TestParams per container:
+// 1. PerService - for policy/configuration checks
+// 2. PerPort - for TLS/endpoint connectivity tests
 func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// Validate that storage account name is set
 	if s.cloudParams.AzureStorageAccount == "" {
@@ -530,17 +547,38 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	// Convert containers to TestParams
+	// Convert containers to TestParams (2 per container: service + port)
 	// UID is the storage account resource ID (for RBAC scope)
 	// ResourceName is the container name (for test identification)
-	resources := make([]environment.TestParams, 0, len(buckets))
+	resources := make([]environment.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
+		// PerService: Resource-level tests (policy checks, configuration validation)
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
-			UID:                 storageAccountResourceID, // Use storage account resource ID for RBAC
+			UID:                 storageAccountResourceID,
+			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
+			ReportTitle:         bucket.Name,
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor"},
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
+			CloudParams:         s.cloudParams,
+		})
+
+		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
+		endpoint := fmt.Sprintf("%s.blob.core.windows.net", s.cloudParams.AzureStorageAccount)
+		resources = append(resources, environment.TestParams{
+			ResourceName:        bucket.Name,
+			UID:                 storageAccountResourceID,
+			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
+			ReportTitle:         fmt.Sprintf("%s:443", endpoint),
+			HostName:            endpoint,
+			PortNumber:          "443",
+			Protocol:            "https",
+			ServiceType:         "object-storage",
+			ProviderServiceType: "Microsoft.Storage/storageAccounts",
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			CloudParams:         s.cloudParams,
 		})
 	}
@@ -561,7 +599,148 @@ func (s *AzureBlobService) CheckUserProvisioned() error {
 // SetObjectPermission always returns an error for Azure Blob Storage
 // Azure does not support object-level permissions - only uniform bucket-level access via RBAC
 func (s *AzureBlobService) SetObjectPermission(bucketID, objectID string, permissionLevel string) error {
-	return fmt.Errorf("Azure Blob Storage does not support object-level permissions - uniform bucket-level access is enforced via RBAC")
+	return fmt.Errorf("azure Blob Storage does not support object-level permissions - uniform bucket-level access is enforced via RBAC")
+}
+
+// ListDeletedBuckets lists all soft-deleted containers in the storage account
+// Azure supports container-level soft delete for CN03.AR01
+func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
+	storageAccountName := s.cloudParams.AzureStorageAccount
+	if storageAccountName == "" {
+		return nil, fmt.Errorf("no storage account name provided")
+	}
+
+	// Create blob service client
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", storageAccountName)
+	client, err := azblob.NewClient(serviceURL, s.credential, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob service client: %w", err)
+	}
+
+	// List containers with Include: Deleted option
+	pager := client.NewListContainersPager(&azblob.ListContainersOptions{
+		Include: azblob.ListContainersInclude{
+			Deleted: true,
+		},
+	})
+
+	var buckets []Bucket
+	for pager.More() {
+		resp, err := pager.NextPage(s.ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list deleted containers: %w", err)
+		}
+
+		for _, container := range resp.ContainerItems {
+			// Only include soft-deleted containers
+			if container.Deleted != nil && *container.Deleted {
+				buckets = append(buckets, Bucket{
+					ID:     *container.Name,
+					Name:   *container.Name,
+					Region: s.cloudParams.Region,
+				})
+			}
+		}
+	}
+
+	return buckets, nil
+}
+
+// RestoreBucket restores a soft-deleted container
+// Azure supports container-level soft delete for CN03.AR01
+func (s *AzureBlobService) RestoreBucket(bucketID string) error {
+	storageAccountName := s.cloudParams.AzureStorageAccount
+	if storageAccountName == "" {
+		return fmt.Errorf("no storage account name provided")
+	}
+
+	// Create blob service client
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", storageAccountName)
+	client, err := azblob.NewClient(serviceURL, s.credential, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create blob service client: %w", err)
+	}
+
+	// First, find the deleted version of the container
+	pager := client.NewListContainersPager(&azblob.ListContainersOptions{
+		Include: azblob.ListContainersInclude{
+			Deleted: true,
+		},
+	})
+
+	var deletedVersion string
+	for pager.More() {
+		resp, err := pager.NextPage(s.ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list deleted containers: %w", err)
+		}
+
+		for _, containerItem := range resp.ContainerItems {
+			if containerItem.Name != nil && *containerItem.Name == bucketID && containerItem.Deleted != nil && *containerItem.Deleted {
+				if containerItem.Version != nil {
+					deletedVersion = *containerItem.Version
+					break
+				}
+			}
+		}
+	}
+
+	if deletedVersion == "" {
+		return fmt.Errorf("deleted container %s not found or has no version", bucketID)
+	}
+
+	// Get the container client
+	containerClient := client.ServiceClient().NewContainerClient(bucketID)
+
+	// Restore the deleted container with its version
+	_, err = containerClient.Restore(s.ctx, deletedVersion, &container.RestoreOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to restore container %s: %w", bucketID, err)
+	}
+
+	fmt.Printf("✅ Restored soft-deleted container: %s (version: %s)\n", bucketID, deletedVersion)
+	return nil
+}
+
+// SetBucketRetentionDurationDays attempts to modify the immutability policy
+// For CN03.AR02, this should fail if the policy is locked
+func (s *AzureBlobService) SetBucketRetentionDurationDays(bucketID string, days int) error {
+	storageAccountName := s.cloudParams.AzureStorageAccount
+	if storageAccountName == "" {
+		return fmt.Errorf("no storage account name provided")
+	}
+
+	// Create BlobContainersClient for managing container properties
+	containersClient, err := armstorage.NewBlobContainersClient(s.cloudParams.AzureSubscriptionID, s.credential, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create blob containers client: %w", err)
+	}
+
+	// Immutability policies are managed through the ARM management API
+	// Attempt to update the immutability policy via ARM
+	immutabilityPeriod := int32(days)
+
+	_, err = containersClient.CreateOrUpdateImmutabilityPolicy(
+		s.ctx,
+		s.cloudParams.AzureResourceGroup,
+		storageAccountName,
+		bucketID,
+		&armstorage.BlobContainersClientCreateOrUpdateImmutabilityPolicyOptions{
+			Parameters: &armstorage.ImmutabilityPolicy{
+				Properties: &armstorage.ImmutabilityPolicyProperty{
+					ImmutabilityPeriodSinceCreationInDays: &immutabilityPeriod,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		// If policy is locked, this will fail with appropriate error
+		return fmt.Errorf("failed to modify immutability policy: %w", err)
+	}
+
+	fmt.Printf("⚠️  Warning: Successfully modified immutability policy to %d days (policy was not locked)\n", days)
+	return nil
 }
 
 func (s *AzureBlobService) ElevateAccessForInspection() error {

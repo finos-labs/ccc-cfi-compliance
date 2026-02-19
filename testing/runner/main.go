@@ -16,10 +16,11 @@ import (
 
 var (
 	provider       = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
+	service        = flag.String("service", "", "Service type to test (object-storage, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services.")
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
-	tag            = flag.String("tag", "", "Tag filter to override automatic catalog type filtering (e.g., 'CCC.ObjStor.CN04')")
+	tags           = flag.String("tags", "", "Space-separated tag filters ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')")
 
 	// Cloud configuration flags
 	region              = flag.String("region", "", "Cloud region")
@@ -75,16 +76,35 @@ func main() {
 	log.Printf("✅ Output directory ready")
 	log.Println()
 
+	// Determine which services to run
+	serviceTypes := environment.ServiceTypes
+	if *service != "" {
+		// Validate the service type
+		validService := false
+		for _, st := range environment.ServiceTypes {
+			if st == *service {
+				validService = true
+				break
+			}
+		}
+		if !validService {
+			log.Fatalf("Error: invalid service '%s'. Valid services are: %s", *service, strings.Join(environment.ServiceTypes, ", "))
+		}
+		serviceTypes = []string{*service}
+		log.Printf("   Service: %s", *service)
+		log.Println()
+	}
+
 	// Assemble list of service runners - one for each service type
 	var runners []ServiceRunner
-	for _, serviceName := range environment.ServiceTypes {
+	for _, serviceName := range serviceTypes {
 		runners = append(runners, NewBasicServiceRunner(RunConfig{
 			ServiceName:    serviceName,
 			CloudParams:    cloudParams,
 			OutputDir:      *outputDir,
 			Timeout:        *timeout,
 			ResourceFilter: *resourceFilter,
-			Tag:            *tag,
+			Tags:           parseTags(*tags),
 		}))
 	}
 
@@ -213,6 +233,27 @@ func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup,
 	}
 
 	return params
+}
+
+// parseTags parses a space-separated tags string into a slice of tags
+// Ensures each tag has @ prefix if it's a simple tag name
+func parseTags(tagsStr string) []string {
+	if tagsStr == "" {
+		return nil
+	}
+
+	parts := strings.Fields(tagsStr)
+	tags := make([]string, 0, len(parts))
+
+	for _, tag := range parts {
+		// Ensure tag has @ prefix if it's a simple tag name (not negated with ~)
+		if !strings.HasPrefix(tag, "@") && !strings.HasPrefix(tag, "~") {
+			tag = "@" + tag
+		}
+		tags = append(tags, tag)
+	}
+
+	return tags
 }
 
 // validateCloudParams validates that required parameters are set for the provider

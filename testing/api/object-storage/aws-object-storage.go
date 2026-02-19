@@ -172,15 +172,21 @@ func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 
 // CreateObject creates a new object in a bucket
 func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
-	// Create a regional client
+	// Get the bucket's actual region
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket region: %w", err)
+	}
+
+	// Create a regional client for the bucket's region
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = bucketRegion
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Convert string to []byte
 	content := []byte(data)
 
-	_, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
+	putResult, err := regionalClient.PutObject(s.ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 		Body:   bytes.NewReader(content),
@@ -189,12 +195,21 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		return nil, fmt.Errorf("failed to create object %s in bucket %s: %w", objectID, bucketID, err)
 	}
 
+	// Extract encryption information from response
+	encryption := string(putResult.ServerSideEncryption)
+	encryptionAlgorithm := encryption
+	if putResult.SSEKMSKeyId != nil {
+		encryptionAlgorithm = "aws:kms"
+	}
+
 	return &Object{
-		ID:       objectID,
-		BucketID: bucketID,
-		Name:     objectID,
-		Size:     int64(len(content)),
-		Data:     []string{data},
+		ID:                  objectID,
+		BucketID:            bucketID,
+		Name:                objectID,
+		Size:                int64(len(content)),
+		Data:                []string{data},
+		Encryption:          encryption,
+		EncryptionAlgorithm: encryptionAlgorithm,
 	}, nil
 }
 
@@ -231,12 +246,18 @@ func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, er
 
 // DeleteObject deletes an object from a bucket
 func (s *AWSS3Service) DeleteObject(bucketID string, objectID string) error {
-	// Create a regional client
+	// Get the bucket's actual region
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return fmt.Errorf("failed to get bucket region: %w", err)
+	}
+
+	// Create a regional client for the bucket's region
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = bucketRegion
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
-	_, err := regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
+	_, err = regionalClient.DeleteObject(s.ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucketID),
 		Key:    aws.String(objectID),
 	})
@@ -356,6 +377,9 @@ func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID 
 }
 
 // GetOrProvisionTestableResources returns all S3 buckets as testable resources
+// Returns two TestParams per bucket:
+// 1. PerService - for policy/configuration checks
+// 2. PerPort - for TLS/endpoint connectivity tests
 func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
 	// List all buckets and ensure at least one exists
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
@@ -363,15 +387,36 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
-	// Convert buckets to TestParams
-	resources := make([]environment.TestParams, 0, len(buckets))
+	// Convert buckets to TestParams (2 per bucket: service + port)
+	resources := make([]environment.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
+		// PerService: Resource-level tests (policy checks, configuration validation)
 		resources = append(resources, environment.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
+			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
+			ReportTitle:         bucket.Name,
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor"},
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
+			CloudParams:         s.cloudParams,
+		})
+
+		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
+		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.cloudParams.Region)
+		resources = append(resources, environment.TestParams{
+			ResourceName:        bucket.Name,
+			UID:                 bucket.ID,
+			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
+			ReportTitle:         fmt.Sprintf("%s:443", endpoint),
+			HostName:            endpoint,
+			PortNumber:          "443",
+			Protocol:            "https",
+			ProviderServiceType: "s3",
+			ServiceType:         "object-storage",
+			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			CloudParams:         s.cloudParams,
 		})
 	}
@@ -429,6 +474,24 @@ func (s *AWSS3Service) SetObjectPermission(bucketID, objectID string, permission
 
 	// ACL was set successfully (only happens if uniform access is NOT enforced)
 	return nil
+}
+
+// ListDeletedBuckets returns an error - AWS S3 does not support bucket-level soft delete
+// S3 bucket deletion is immediate and permanent (CN03.AR01 not supported)
+func (s *AWSS3Service) ListDeletedBuckets() ([]Bucket, error) {
+	return nil, fmt.Errorf("AWS S3 does not support bucket-level soft delete - bucket deletion is immediate and permanent")
+}
+
+// RestoreBucket returns an error - AWS S3 does not support bucket-level soft delete
+// S3 bucket deletion is immediate and permanent (CN03.AR01 not supported)
+func (s *AWSS3Service) RestoreBucket(bucketID string) error {
+	return fmt.Errorf("AWS S3 does not support bucket restoration - bucket deletion is immediate and permanent")
+}
+
+// SetBucketRetentionDurationDays returns an error - AWS S3 does not support bucket-level retention policies
+// S3 has Object Lock for object-level retention, but not bucket-level (CN03.AR02 not supported at bucket level)
+func (s *AWSS3Service) SetBucketRetentionDurationDays(bucketID string, days int) error {
+	return fmt.Errorf("AWS S3 does not support bucket-level retention policies - use Object Lock for object-level retention instead")
 }
 
 // ResetAccess is a no-op for AWS S3 (access is managed via IAM)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/cucumber/godog/formatters"
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/attachments"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // HTMLFormatter is a godog formatter that generates HTML reports
@@ -34,10 +34,11 @@ type HTMLFormatter struct {
 	bodyBuffer         bytes.Buffer
 	scenarioOpened     bool
 	featureOpened      bool
-	stepKeywords       map[string]string    // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
-	backgroundSteps    map[string]bool      // Maps step AST node IDs to whether they're from Background
-	attachmentProvider attachments.Provider // Provider for accessing attachments from PropsWorld
-	params             *TestParams          // Optional test parameters
+	stepKeywords       map[string]string              // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
+	backgroundSteps    map[string]bool                // Maps step AST node IDs to whether they're from Background
+	attachmentProvider environment.AttachmentProvider // Provider for accessing attachments from PropsWorld
+	params             *TestParams                    // Optional test parameters
+	allTags            map[string]bool                // Tracks all unique tags seen
 }
 
 // Feature captures feature information
@@ -46,6 +47,14 @@ func (f *HTMLFormatter) Feature(gd *messages.GherkinDocument, uri string, c []by
 	if f.featureOpened {
 		// Close scenario if open
 		if f.scenarioOpened {
+			// Render any attachments collected during the scenario
+			if f.attachmentProvider != nil {
+				attachments := f.attachmentProvider.GetAttachments()
+				if len(attachments) > 0 {
+					f.bodyBuffer.WriteString(formatAttachments(attachments))
+					f.attachmentProvider.ClearAttachments()
+				}
+			}
 			fmt.Fprintf(&f.bodyBuffer, `</div>`)
 			f.scenarioOpened = false
 		}
@@ -90,8 +99,26 @@ func (f *HTMLFormatter) Pickle(pickle *messages.Pickle) {
 		fmt.Fprintf(&f.bodyBuffer, `</div>`)
 	}
 
+	// Extract tags from pickle
+	var tagNames []string
+	for _, tag := range pickle.Tags {
+		tagNames = append(tagNames, tag.Name)
+		// Track unique tags for filter dropdown
+		if f.allTags == nil {
+			f.allTags = make(map[string]bool)
+		}
+		f.allTags[tag.Name] = true
+	}
+
+	// Build data-tags attribute for filtering
+	tagsAttr := strings.Join(tagNames, " ")
+	tagsHTML := ""
+	if len(tagNames) > 0 {
+		tagsHTML = fmt.Sprintf(`<span class="tags">%s</span>`, strings.Join(tagNames, " "))
+	}
+
 	f.stats.totalScenarios++
-	fmt.Fprintf(&f.bodyBuffer, `<div class="scenario"><strong>Scenario:</strong> %s`, pickle.Name)
+	fmt.Fprintf(&f.bodyBuffer, `<div class="scenario" data-tags="%s"><strong>Scenario:</strong> %s %s`, tagsAttr, pickle.Name, tagsHTML)
 	f.scenarioOpened = true
 }
 
@@ -119,6 +146,8 @@ func (f *HTMLFormatter) Summary() {
 			attachments := f.attachmentProvider.GetAttachments()
 			if len(attachments) > 0 {
 				f.bodyBuffer.WriteString(formatAttachments(attachments))
+				// Clear attachments after rendering
+				f.attachmentProvider.ClearAttachments()
 			}
 		}
 		fmt.Fprintf(&f.bodyBuffer, `</div>`)
@@ -265,7 +294,7 @@ func formatStepArgument(arg *messages.PickleStepArgument) string {
 }
 
 // formatAttachments renders attachments as HTML
-func formatAttachments(attachments []attachments.Attachment) string {
+func formatAttachments(attachments []environment.Attachment) string {
 	if len(attachments) == 0 {
 		return ""
 	}
@@ -315,41 +344,41 @@ func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v 
 		return
 	}
 
-		t := v.Type()
-		for i := 0; i < v.NumField(); i++ {
-			field := t.Field(i)
-			value := v.Field(i)
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
 
 		// Skip the specified field if provided
 		if skipFieldName != "" && field.Name == skipFieldName {
 			continue
 		}
 
-			// Format the value based on its type
-			var valueStr string
-			switch value.Kind() {
-			case reflect.Slice:
+		// Format the value based on its type
+		var valueStr string
+		switch value.Kind() {
+		case reflect.Slice:
 			// Handle slice types (like Labels, CatalogTypes)
-				if value.Len() > 0 {
-					items := make([]string, value.Len())
-					for j := 0; j < value.Len(); j++ {
-						items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
-					}
-					valueStr = strings.Join(items, ", ")
-				} else {
-					valueStr = ""
+			if value.Len() > 0 {
+				items := make([]string, value.Len())
+				for j := 0; j < value.Len(); j++ {
+					items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
 				}
+				valueStr = strings.Join(items, ", ")
+			} else {
+				valueStr = ""
+			}
 		case reflect.Struct:
 			// Skip nested structs (like CloudParams) - they should be handled separately
 			continue
-			default:
-				valueStr = fmt.Sprintf("%v", value.Interface())
-			}
+		default:
+			valueStr = fmt.Sprintf("%v", value.Interface())
+		}
 
-			// Only add non-empty values
-			if valueStr != "" {
-				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
-			}
+		// Only add non-empty values
+		if valueStr != "" {
+			tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
+		}
 	}
 }
 
@@ -383,6 +412,13 @@ func (f *HTMLFormatter) generateHTML() string {
 		}
 	}
 
+	// Generate tag filter options
+	var tagOptions strings.Builder
+	tagOptions.WriteString(`<option value="">All Tags</option>`)
+	for tag := range f.allTags {
+		tagOptions.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`, tag, tag))
+	}
+
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -400,6 +436,7 @@ func (f *HTMLFormatter) generateHTML() string {
         .feature { margin: 20px 0; border: 1px solid #ddd; border-radius: 5px; }
         .feature-header { background: #2196F3; color: white; padding: 10px; cursor: pointer; }
         .scenario { margin: 10px; padding: 10px; background:rgba(249, 249, 249, 0.41); border-left: 4px solid #2196F3; }
+        .scenario.hidden, .feature.hidden { display: none; }
         .step { padding: 5px 10px; margin: 5px 0; font-family: monospace; }
         .passed { background: #c8e6c9; border-left: 4px solid #e7f7e8; }
         .failed { background: #ffcdd2; border-left: 4px solid #f44336; }
@@ -407,6 +444,12 @@ func (f *HTMLFormatter) generateHTML() string {
         .undefined { background: #e0e0e0; border-left: 4px solid #9E9E9E; }
         .error-message { color: #f44336; font-family: monospace; margin: 10px 0; padding: 10px; background: #ffebee; }
         .timestamp { color: #666; font-size: 0.9em; }
+        .tags { margin-left: 10px; font-size: 0.85em; color: #666; }
+        .tags::before { content: "🏷️ "; }
+        .filter-bar { background: #fff3e0; padding: 15px; margin: 20px 0; border-radius: 5px; display: flex; align-items: center; gap: 10px; }
+        .filter-bar label { font-weight: bold; }
+        .filter-bar select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; min-width: 200px; }
+        .filter-count { margin-left: auto; color: #666; }
     </style>
 </head>
 <body>
@@ -421,8 +464,56 @@ func (f *HTMLFormatter) generateHTML() string {
             <p>Scenarios: %d (✅ %d | ❌ %d)</p>
             <p>Steps: %d (✅ %d | ❌ %d | ⏭️ %d | ❓ %d)</p>
         </div>
+        <div class="filter-bar">
+            <label for="tag-filter">Filter by Tag:</label>
+            <select id="tag-filter" onchange="filterByTag(this.value)">
+                %s
+            </select>
+            <span class="filter-count" id="filter-count"></span>
+        </div>
         %s
     </div>
+    <script>
+        function filterByTag(tag) {
+            const scenarios = document.querySelectorAll('.scenario');
+            const features = document.querySelectorAll('.feature');
+            let visible = 0;
+            let total = scenarios.length;
+            
+            // First, filter scenarios
+            scenarios.forEach(scenario => {
+                if (!tag) {
+                    scenario.classList.remove('hidden');
+                    visible++;
+                } else {
+                    const tags = scenario.getAttribute('data-tags') || '';
+                    if (tags.includes(tag)) {
+                        scenario.classList.remove('hidden');
+                        visible++;
+                    } else {
+                        scenario.classList.add('hidden');
+                    }
+                }
+            });
+            
+            // Then, hide features with no visible scenarios
+            features.forEach(feature => {
+                const visibleScenarios = feature.querySelectorAll('.scenario:not(.hidden)');
+                if (visibleScenarios.length === 0) {
+                    feature.classList.add('hidden');
+                } else {
+                    feature.classList.remove('hidden');
+                }
+            });
+            
+            const countEl = document.getElementById('filter-count');
+            if (tag) {
+                countEl.textContent = 'Showing ' + visible + ' of ' + total + ' scenarios';
+            } else {
+                countEl.textContent = '';
+            }
+        }
+    </script>
 </body>
 </html>`,
 		f.title,
@@ -439,6 +530,7 @@ func (f *HTMLFormatter) generateHTML() string {
 		f.stats.failedSteps,
 		f.stats.skippedSteps,
 		f.stats.undefinedSteps,
+		tagOptions.String(),
 		f.bodyBuffer.String(),
 	)
 }
@@ -449,13 +541,14 @@ func NewHTMLFormatterWithParams(suite string, out io.Writer, params TestParams) 
 }
 
 // NewHTMLFormatterWithAttachments creates a new HTML formatter with test parameters and attachment provider
-func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider attachments.Provider) formatters.Formatter {
+func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider environment.AttachmentProvider) formatters.Formatter {
 	f := &HTMLFormatter{
 		out:                out,
 		title:              suite,
 		stepKeywords:       make(map[string]string),
 		params:             &params,
 		attachmentProvider: attachmentProvider,
+		allTags:            make(map[string]bool),
 	}
 	f.stats.startTime = time.Now()
 	return f

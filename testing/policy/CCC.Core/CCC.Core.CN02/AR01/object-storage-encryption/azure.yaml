@@ -1,0 +1,44 @@
+name: Azure Storage Account Encryption Check
+service_type: object-storage
+requirement_text: >
+  When data is stored, it MUST be encrypted using the latest industry-standard 
+  encryption methods.
+
+validity_score: 9
+validity_commentary: >
+  This query validates Azure Storage Account encryption configuration.
+  Azure Storage automatically encrypts all data at rest with 256-bit AES encryption.
+  Strengths:
+  - Directly queries the storage account's encryption configuration
+  - Validates encryption key source (Microsoft-managed or customer-managed)
+  - Azure enforces encryption for all data, cannot be disabled
+  Limitations:
+  - Does not validate Key Vault key configuration details
+  - Does not verify customer-managed key rotation policies
+  - Infrastructure encryption (double encryption) is checked separately
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{keySource: encryption.keySource, requireInfrastructureEncryption: encryption.requireInfrastructureEncryption, services: encryption.services}" \
+    --output json
+
+rules:
+  - jsonpath: "$.keySource"
+    expected_values:
+      - "Microsoft.Storage"
+      - "Microsoft.Keyvault"
+    validation_rule: "^(Microsoft\\.Storage|Microsoft\\.Keyvault)$"
+    description: >
+      Verifies that encryption is configured with an approved key source.
+      'Microsoft.Storage' uses Microsoft-managed keys, 'Microsoft.Keyvault'
+      uses customer-managed keys stored in Azure Key Vault.
+
+  - jsonpath: "$.services.blob.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that blob service encryption is enabled. This should always
+      be true as Azure Storage encryption cannot be disabled.

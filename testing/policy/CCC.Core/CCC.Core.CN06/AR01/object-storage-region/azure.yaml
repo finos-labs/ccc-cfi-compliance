@@ -1,0 +1,41 @@
+name: Azure Storage Account Region Compliance
+service_type: object-storage
+requirement_text: >
+  When the service is running, its region and availability zone MUST be included 
+  in a list of explicitly trusted or approved locations within the trust perimeter.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that Azure Storage Accounts are deployed in approved regions.
+  Storage accounts are regional resources, making region validation straightforward.
+  Strengths:
+  - Directly queries storage account location
+  - Storage account region cannot be changed after creation
+  - Easy to validate against an approved region list
+  Limitations:
+  - Approved regions must be defined externally (not in this query)
+  - Does not validate geo-redundant storage secondary regions
+  - Blob replication destinations are checked separately (CN10)
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{location: location}" \
+    --output json
+
+rules:
+  - jsonpath: "$.location"
+    expected_values:
+      - "eastus"
+      - "eastus2"
+      - "westus"
+      - "westus2"
+      - "westeurope"
+      - "northeurope"
+    validation_rule: "^(eastus|eastus2|westus|westus2|westeurope|northeurope)$"
+    todo: Replace with parameterised list of approved regions
+    description: >
+      Validates that the storage account is located in an approved region.
+      The expected_values list should be customized to match your organization's
+      approved Azure regions.

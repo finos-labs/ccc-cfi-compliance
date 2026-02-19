@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN01.AR01
+@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN01.AR01
 Feature: CCC.ObjStor.CN01.AR01
   As a security administrator
   I want to prevent any requests to read protected buckets using untrusted KMS keys
@@ -11,6 +11,7 @@ Feature: CCC.ObjStor.CN01.AR01
     And I call "{api}" with "GetServiceAPI" with parameter "iam"
     And I refer to "{result}" as "iamService"
 
+  @Destructive
   Scenario: Service prevents reading bucket with no access
     Given I call "{iamService}" with "ProvisionUserWithAccess" with parameters "test-user-no-access", "{UID}" and "none"
     And I refer to "{result}" as "testUserNoAccess"
@@ -33,3 +34,7 @@ Feature: CCC.ObjStor.CN01.AR01
     When I call "{userStorage}" with "ListObjects" with parameter "{ResourceName}"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "read-list-objects-result.json"
+
+  @Policy
+  Scenario: Test policy
+    # no policy check required for this test

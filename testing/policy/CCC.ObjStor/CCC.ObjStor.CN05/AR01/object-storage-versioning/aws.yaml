@@ -1,0 +1,29 @@
+name: S3 Bucket Versioning Configuration
+service_type: object-storage
+requirement_text: >
+  When an object is uploaded to the object storage bucket, the object MUST be
+  stored with a unique identifier.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 bucket versioning is enabled. When versioning
+  is enabled, each object version gets a unique version ID. Strengths:
+  - Directly queries versioning configuration
+  - S3 automatically assigns unique version IDs
+  - Versioning cannot be removed once enabled (only suspended)
+  Limitations:
+  - Does not validate MFA Delete configuration
+  - Suspended versioning still has version IDs but stops creating new ones
+
+query: |
+  aws s3api get-bucket-versioning \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Verifies that versioning is enabled on the bucket. When enabled,
+      all objects receive unique version IDs automatically.

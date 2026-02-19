@@ -86,3 +86,6 @@ cucumber-report.html
 report.json
 coverage.out
 coverage.html
+test-output.log
+testing/output/
+ccc-compliance

@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN02.AR01
+@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN02.AR01
 Feature: CCC.ObjStor.CN02.AR01 - Uniform Bucket-Level Access (Consistent Allow)
   When a permission set is allowed for an object in a bucket,
   the service MUST allow the same permission set to access all objects in the same bucket.

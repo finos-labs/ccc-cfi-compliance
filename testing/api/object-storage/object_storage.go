@@ -13,11 +13,13 @@ type Bucket struct {
 
 // Object represents a stored object/blob
 type Object struct {
-	ID       string   // Unique identifier (key/path)
-	BucketID string   // Parent bucket identifier
-	Name     string   // Object name/key
-	Size     int64    // Size in bytes
-	Data     []string // Object content (for small objects)
+	ID                  string   // Unique identifier (key/path)
+	BucketID            string   // Parent bucket identifier
+	Name                string   // Object name/key
+	Size                int64    // Size in bytes
+	Data                []string // Object content (for small objects)
+	Encryption          string   // Encryption status (e.g., "SSE-S3", "SSE-KMS", "AES256")
+	EncryptionAlgorithm string   // Encryption algorithm (e.g., "AES256", "aws:kms")
 }
 
 // Service provides operations for object storage testing
@@ -31,6 +33,9 @@ type Service interface {
 	DeleteBucket(bucketID string) error
 	GetBucketRegion(bucketID string) (string, error)
 	GetBucketRetentionDurationDays(bucketID string) (int, error)
+	SetBucketRetentionDurationDays(bucketID string, days int) error
+	ListDeletedBuckets() ([]Bucket, error)
+	RestoreBucket(bucketID string) error
 
 	// Object operations
 	ListObjects(bucketID string) ([]Object, error)

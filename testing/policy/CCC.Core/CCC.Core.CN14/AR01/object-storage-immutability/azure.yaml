@@ -1,0 +1,35 @@
+name: Azure Immutable Blob Storage Configuration (30-day retention)
+service_type: object-storage
+requirement_text: >
+  When backups are created for disaster recovery purposes, the storage mechanism 
+  MUST NOT allow modification or deletion within 30 days of creation.
+
+validity_score: 8
+validity_commentary: >
+  Azure Immutable Blob Storage provides WORM (Write Once Read Many) protection,
+  preventing blob deletion or modification for a specified retention period.
+  Strengths:
+  - Immutability policies are enforced at the Azure Storage service level
+  - Supports both time-based retention and legal holds
+  - Locked policies cannot be deleted or shortened
+  - Can be applied at container or account level
+  Limitations:
+  - Container-level policies must be checked individually
+  - Version-level immutability requires separate configuration
+  - Account-level policies may not apply to existing containers
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{immutableStorageWithVersioning: immutableStorageWithVersioning, allowBlobPublicAccess: allowBlobPublicAccess}" \
+    --output json
+
+rules:
+  - jsonpath: "$.immutableStorageWithVersioning.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that account-level immutable storage with versioning is enabled.
+      This provides version-level WORM protection for all blobs in the account.

@@ -1,0 +1,44 @@
+name: VPC Region and Availability Zone Compliance
+service_type: vpc
+requirement_text: >
+  When the service is running, its region and availability zone MUST be included 
+  in a list of explicitly trusted or approved locations within the trust perimeter.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that VPCs and their subnets are deployed in approved
+  regions and availability zones. Strengths:
+  - Directly queries VPC and subnet locations
+  - Subnets include explicit AZ information
+  - Region is derived from the AZ identifier
+  Limitations:
+  - Approved regions/AZs must be defined externally
+  - Does not validate resources within the VPC (instances, etc.)
+  - VPC peering connections may extend trust boundaries
+
+query: |
+  aws ec2 describe-subnets \
+    --filters Name=vpc-id,Values=${VPC_ID}
+
+rules:
+  - jsonpath: "$.Subnets[*].AvailabilityZone"
+    expected_values:
+      - "us-east-1a"
+      - "us-east-1b"
+      - "us-east-1c"
+      - "us-west-2a"
+      - "us-west-2b"
+      - "us-west-2c"
+    validation_rule: "^(us-east-1|us-west-2)[a-z]$"
+    todo: Replace with parameterised list of approved regions and AZs
+    description: >
+      Validates that all subnets in the VPC are in approved availability zones.
+      The expected_values and validation_rule should be customized to match
+      your organization's approved regions and AZs.
+
+  - jsonpath: "$.Subnets[*].AvailabilityZoneId"
+    expected_values: []
+    validation_rule: "^(use1-az[1-6]|usw2-az[1-4])$"
+    description: >
+      Validates the AZ ID (consistent identifier across accounts) for subnets.
+      AZ IDs are more reliable than AZ names for cross-account validation.

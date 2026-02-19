@@ -1,0 +1,32 @@
+name: Azure Key Vault Key Rotation (90 days)
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST rotate active keys within 
+  90 days of issuance.
+
+validity_score: 7
+validity_commentary: >
+  Azure Key Vault supports configurable automatic key rotation, including 90-day
+  periods. This is an advantage over AWS KMS which only supports annual rotation.
+  Strengths:
+  - Azure allows rotation periods as short as needed
+  - Key Vault automatically rotates keys on schedule
+  - 90-day rotation can be configured directly
+  Limitations:
+  - Rotation policy must be explicitly configured for each key
+  - Legacy keys may not have rotation policies
+  - Does not verify actual last rotation date
+
+query: |
+  az keyvault key rotation-policy show \
+    --vault-name $(az storage account show --name ${AzureStorageAccount} --resource-group ${AzureResourceGroup} --query "encryption.keyVaultProperties.keyVaultUri" -o tsv | sed 's|https://||;s|.vault.azure.net/||') \
+    --name $(az storage account show --name ${AzureStorageAccount} --resource-group ${AzureResourceGroup} --query "encryption.keyVaultProperties.keyName" -o tsv) \
+    --output json
+
+rules:
+  - jsonpath: "$.lifetimeActions[?(@.action.type=='Rotate')].trigger.timeAfterCreate"
+    expected_values: []
+    validation_rule: "^P([1-8][0-9]|90)D$"
+    description: >
+      Verifies that key rotation is configured to occur within 90 days.
+      The regex matches ISO 8601 durations from P10D to P90D.

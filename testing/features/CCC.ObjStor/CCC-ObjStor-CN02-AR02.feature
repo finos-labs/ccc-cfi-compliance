@@ -1,4 +1,4 @@
-@CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN02.AR02
+@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN02.AR02
 Feature: CCC.ObjStor.CN02.AR02 - Uniform Bucket-Level Access (Consistent Deny)
   When a permission set is denied for an object in a bucket,
   the service MUST deny the same permission set to access all objects in the same bucket.

@@ -1,0 +1,30 @@
+name: KMS Key Policy Least Privilege Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are accessed, the service MUST verify that access to 
+  encryption keys is restricted to authorized personnel and services, following 
+  the principle of least privilege.
+
+validity_score: 6
+validity_commentary: >
+  This query retrieves the KMS key policy for validation. Policy analysis
+  requires additional processing to verify least privilege. Limitations:
+  - Policy is returned as a JSON string requiring parsing
+  - Least privilege assessment requires context about authorized principals
+  - Cannot automatically determine if permissions are excessive
+  - IAM policies also affect key access (not just key policy)
+  - Consider using AWS IAM Access Analyzer for comprehensive analysis
+
+query: |
+  aws kms get-key-policy \
+    --key-id ${KMS_KEY_ID} \
+    --policy-name default
+
+rules:
+  - jsonpath: "$.Policy"
+    expected_values: []
+    validation_rule: "^\\{.*\\}$"
+    description: >
+      Retrieves the key policy document. The policy should be parsed and
+      validated to ensure only authorized principals have access. Look for
+      overly permissive statements like Principal: "*" without conditions.

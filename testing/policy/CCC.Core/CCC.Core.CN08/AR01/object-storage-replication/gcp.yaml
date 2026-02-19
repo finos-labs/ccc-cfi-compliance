@@ -1,0 +1,39 @@
+name: GCP Cloud Storage Multi-Region/Dual-Region Configuration
+service_type: object-storage
+requirement_text: >
+  When data is created or modified, the data MUST have a complete and recoverable 
+  duplicate that is stored in a physically separate data center.
+
+validity_score: 8
+validity_commentary: >
+  This query validates GCP Cloud Storage replication through multi-region or
+  dual-region bucket configuration. GCP provides automatic geo-redundancy
+  for multi-region and dual-region buckets. Strengths:
+  - Replication is automatic and synchronous
+  - Multi-region provides geographic redundancy
+  - Turbo replication available for dual-region
+  Limitations:
+  - Regional buckets do not provide geo-redundancy
+  - Cross-bucket replication requires separate configuration
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.locationType"
+    expected_values:
+      - "multi-region"
+      - "dual-region"
+    validation_rule: "^(multi-region|dual-region)$"
+    description: >
+      Validates that the bucket uses a multi-region or dual-region location
+      type, which provides automatic geo-redundancy. Regional buckets do not
+      satisfy cross-region replication requirements.
+
+  - jsonpath: "$.location"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Confirms the bucket has a location configured. Multi-region locations
+      (US, EU, ASIA) span multiple data centers.

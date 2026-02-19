@@ -1,5 +1,5 @@
 variable "storage_account_name" {
-  description = "Azure storage account name (set via TF_VAR_storage_account_name or AZURE_STORAGE_ACCOUNT)"
+  description = "Azure storage account name"
   type        = string
   default     = "storagecfitesting2026"
 }
@@ -10,12 +10,30 @@ resource "azurerm_resource_group" "cfi_test" {
   location = "eastus"
 }
 
+variable "location" {
+  description = "Azure region"
+  type        = string
+  default     = "eastus"
+}
+
+variable "resource_group_name" {
+  description = "Azure resource group name"
+  type        = string
+  default     = "cfi_test"
+}
+
+# Create the resource group if it doesn't exist
+resource "azurerm_resource_group" "this" {
+  name     = var.resource_group_name
+  location = var.location
+}
+
 # Storage account for compliance testing
 module "storage_account" {
   source = "git::https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount.git?ref=main"
-  location = azurerm_resource_group.cfi_test.location
-  resource_group_name = azurerm_resource_group.cfi_test.name
-  name = var.storage_account_name
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  name                = var.storage_account_name
 
   account_tier             = "Standard"
   account_replication_type = "LRS"  # Locally redundant - cheapest option

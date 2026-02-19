@@ -1,0 +1,46 @@
+name: ALB Mutual TLS (mTLS) Configuration Check
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 8
+validity_commentary: >
+  This query provides strong validation of mTLS configuration at the ALB level.
+  The ALB mutual authentication feature directly enforces client certificate
+  requirements. Remaining gaps include:
+  - Does not validate the trust store contents (CA certificates)
+  - Cannot verify that all clients actually present valid certificates at runtime
+  - Backend connections (ALB to EC2) are not covered by this check
+  - API Gateway mTLS would require a separate query
+  - Certificate revocation list (CRL) validation is not checked
+  - Consider adding trust store validation as a companion query
+
+query: |
+  aws elbv2 describe-listener-attributes \
+    --listener-arn ${LISTENER_ARN}
+
+rules:
+  - jsonpath: "$.Attributes[?(@.Key == 'mutual_authentication.mode')].Value"
+    expected_values:
+      - "verify"
+    validation_rule: "^verify$"
+    description: >
+      Verifies that mutual authentication mode is set to 'verify', which requires
+      clients to present a valid certificate. Mode 'passthrough' or 'off' would
+      not enforce mTLS.
+
+  - jsonpath: "$.Attributes[?(@.Key == 'mutual_authentication.trust_store_arn')].Value"
+    expected_values: []
+    validation_rule: "^arn:aws:elasticloadbalancing:[a-z0-9-]+:[0-9]+:truststore/[a-zA-Z0-9-]+/[a-f0-9]+$"
+    description: >
+      Validates that a trust store ARN is configured. The trust store contains
+      the CA certificates used to validate client certificates.
+
+  - jsonpath: "$.Attributes[?(@.Key == 'mutual_authentication.ignore_client_certificate_expiry')].Value"
+    expected_values:
+      - "false"
+    validation_rule: "^false$"
+    description: >
+      Ensures that expired client certificates are rejected. Setting this to 'true'
+      would allow connections with expired certificates, weakening security.

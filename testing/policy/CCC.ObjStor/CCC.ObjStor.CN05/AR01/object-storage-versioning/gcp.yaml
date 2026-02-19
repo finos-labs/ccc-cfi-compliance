@@ -1,0 +1,30 @@
+name: GCP Cloud Storage Bucket Versioning Configuration
+service_type: object-storage
+requirement_text: >
+  When an object is uploaded to the object storage bucket, the object MUST be
+  stored with a unique identifier.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that GCP Cloud Storage bucket versioning is enabled.
+  When versioning is enabled, each object version gets a unique generation
+  number. Strengths:
+  - Directly queries versioning configuration
+  - GCS automatically assigns unique generation numbers
+  - Versioning can be suspended but history is preserved
+  Limitations:
+  - Does not validate lifecycle rules that may delete versions
+  - Suspended versioning stops creating new versions
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.versioning.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that versioning is enabled on the bucket. When enabled,
+      all objects receive unique generation numbers automatically.

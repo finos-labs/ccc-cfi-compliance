@@ -3,7 +3,7 @@
     "provider": "azure",
     "service": "storage",
     "name": "CCC Azure Storage Account Terraform Module",
-    "description": "This module creates a secure Azure Storage Account with encryption, networking, monitoring, and advanced security features.  Currently disabled due to high costs.",
+    "description": "This module creates a secure Azure Storage Account with encryption, networking, monitoring, and advanced security features. ",
     "path": "remote/azure/storageaccount",
     "git": "https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount"
 }

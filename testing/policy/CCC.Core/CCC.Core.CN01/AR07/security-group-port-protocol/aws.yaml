@@ -1,0 +1,80 @@
+name: Security Group IANA Port/Protocol Compliance
+service_type: security-group
+requirement_text: >
+  When a port is exposed, the service MUST ensure that the protocol and service 
+  officially assigned to that port number by the IANA Service Name and Transport 
+  Protocol Port Number Registry, and no other, is run on that port.
+
+validity_score: 6
+validity_commentary: >
+  This query validates that security group port/protocol combinations align with
+  IANA standards. Limitations include:
+  - Only validates declared security group rules, not actual running services
+  - Cannot detect if a non-standard service is running on a standard port
+  - Custom/high ports (>1024) don't have strict IANA assignments
+  - Some services legitimately use non-standard ports (e.g., HTTPS on 8443)
+  - Does not cover application-layer protocol validation
+  - A runtime port scan or service enumeration would provide better assurance
+  - Consider tagging security group rules with expected service names for validation
+
+query: |
+  aws ec2 describe-security-groups \
+    --group-ids ${SECURITY_GROUP_ID}
+
+rules:
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 22)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 22 (SSH) must use TCP protocol. SSH does not operate over UDP.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 80)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 80 (HTTP) must use TCP protocol for standard web traffic.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 443)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 443 (HTTPS) must use TCP protocol for secure web traffic.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 3306)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 3306 (MySQL) must use TCP protocol for database connections.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 5432)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 5432 (PostgreSQL) must use TCP protocol for database connections.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 3389)].IpProtocol"
+    expected_values:
+      - "tcp"
+    validation_rule: "^tcp$"
+    description: >
+      IANA Port 3389 (RDP) must use TCP protocol for Remote Desktop connections.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 53)].IpProtocol"
+    expected_values:
+      - "tcp"
+      - "udp"
+    validation_rule: "^(tcp|udp)$"
+    description: >
+      IANA Port 53 (DNS) may use either TCP or UDP. Both are valid per IANA.
+
+  - jsonpath: "$.SecurityGroups[*].IpPermissions[?(@.FromPort == 123)].IpProtocol"
+    expected_values:
+      - "udp"
+    validation_rule: "^udp$"
+    description: >
+      IANA Port 123 (NTP) must use UDP protocol for time synchronization.

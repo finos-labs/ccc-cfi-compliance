@@ -1,0 +1,44 @@
+name: Azure Application Gateway Trusted Client Certificates Validation
+service_type: load-balancer
+requirement_text: >
+  When a service transmits data using TLS, mutual TLS (mTLS) MUST be implemented 
+  to require both client and server certificate authentication for all connections.
+
+validity_score: 7
+validity_commentary: >
+  This companion query validates the trusted client certificate configuration.
+  It ensures CA certificates are configured for client authentication. Limitations:
+  - Does not validate the specific CA certificate contents
+  - Cannot verify certificate chain validity
+  - Revocation configuration is checked separately
+  - Should be used in conjunction with the SSL profile mTLS configuration check
+  - Consider adding certificate expiry monitoring for trust store CAs
+
+query: |
+  az network application-gateway show \
+    --name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{trustedClientCertificates: trustedClientCertificates, sslProfiles: sslProfiles[*].{name: name, trustedClientCertificates: trustedClientCertificates}}" \
+    --output json
+
+rules:
+  - jsonpath: "$.trustedClientCertificates"
+    expected_values: []
+    validation_rule: "^\\[.+\\]$"
+    description: >
+      Verifies that at least one trusted client certificate is configured.
+      An empty array indicates no CA certificates for client validation.
+
+  - jsonpath: "$.trustedClientCertificates[*].name"
+    expected_values: []
+    validation_rule: "^[a-zA-Z0-9-_]+$"
+    description: >
+      Validates that trusted client certificates have properly formatted names.
+      This is a basic sanity check for the certificate configuration.
+
+  - jsonpath: "$.sslProfiles[*].trustedClientCertificates"
+    expected_values: []
+    validation_rule: "^\\[.+\\]$"
+    description: >
+      Ensures SSL profiles reference trusted client certificates.
+      Profiles without certificate references cannot perform mTLS validation.

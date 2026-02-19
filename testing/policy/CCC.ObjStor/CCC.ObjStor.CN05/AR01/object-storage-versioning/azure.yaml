@@ -1,0 +1,32 @@
+name: Azure Blob Versioning Configuration
+service_type: object-storage
+requirement_text: >
+  When an object is uploaded to the object storage bucket, the object MUST be
+  stored with a unique identifier.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that Azure Blob versioning is enabled. When versioning
+  is enabled, each blob version gets a unique version ID. Strengths:
+  - Directly queries versioning configuration
+  - Azure automatically assigns unique version IDs
+  - Versioning integrates with soft delete for protection
+  Limitations:
+  - Does not validate soft delete configuration
+  - Versioning must be enabled at the storage account level
+
+query: |
+  az storage account blob-service-properties show \
+    --account-name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{isVersioningEnabled: isVersioningEnabled, containerDeleteRetentionPolicy: containerDeleteRetentionPolicy, deleteRetentionPolicy: deleteRetentionPolicy}" \
+    --output json
+
+rules:
+  - jsonpath: "$.isVersioningEnabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that blob versioning is enabled on the storage account.
+      When enabled, all blobs receive unique version IDs automatically.

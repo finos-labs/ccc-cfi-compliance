@@ -1,0 +1,40 @@
+name: Azure Storage Account Diagnostic Logging Configuration
+service_type: object-storage
+requirement_text: >
+  When the service is operational, its logs and any child resource logs MUST NOT 
+  be accessible from the resource they record access to.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Azure Storage blob diagnostic settings are configured.
+  Azure Storage logs can be sent to Log Analytics, Storage Account, or Event Hub.
+  Strengths:
+  - Validates that diagnostic logging is enabled
+  - Azure Monitor provides centralized logging separate from source
+  - Supports multiple logging destinations
+  Limitations:
+  - Does not validate the specific logging destination
+  - Does not verify Log Analytics workspace configuration
+  - Classic storage analytics logging is deprecated in favor of Azure Monitor
+  - Blob read/write/delete logs require specific category configuration
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "value[0]" \
+    --output json
+
+rules:
+  - jsonpath: "$.name"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Validates that at least one diagnostic setting exists for the blob service.
+      The presence of any diagnostic setting indicates logging is configured.
+
+  - jsonpath: "$.logs[?(@.enabled==true)].category"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Validates that at least one log category is enabled. Categories include
+      StorageRead, StorageWrite, and StorageDelete for blob operations.

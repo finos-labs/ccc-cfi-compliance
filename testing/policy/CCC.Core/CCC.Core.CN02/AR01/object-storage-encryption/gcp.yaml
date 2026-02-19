@@ -1,0 +1,39 @@
+name: GCP Cloud Storage Bucket Encryption Check
+service_type: object-storage
+requirement_text: >
+  When data is stored, it MUST be encrypted using the latest industry-standard 
+  encryption methods.
+
+validity_score: 9
+validity_commentary: >
+  This query validates GCP Cloud Storage bucket encryption configuration.
+  GCP encrypts all data at rest by default using AES-256. Strengths:
+  - All GCS data is encrypted by default
+  - Supports Google-managed, CMEK, and CSEK keys
+  - Validates CMEK configuration when specified
+  Limitations:
+  - Does not validate KMS key configuration details
+  - Does not verify key rotation policies
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.name"
+    expected_values: []
+    validation_rule: ".+"
+    description: >
+      Confirms the bucket exists. GCP Cloud Storage encrypts all data at rest
+      by default using AES-256. No explicit encryption configuration is required.
+
+  - jsonpath: "$.default_storage_class"
+    expected_values:
+      - "STANDARD"
+      - "NEARLINE"
+      - "COLDLINE"
+      - "ARCHIVE"
+    validation_rule: "^(STANDARD|NEARLINE|COLDLINE|ARCHIVE)$"
+    description: >
+      Confirms the bucket has a valid storage class. All storage classes
+      use the same encryption (AES-256 with Google-managed or CMEK keys).

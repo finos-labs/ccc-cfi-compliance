@@ -1,0 +1,28 @@
+name: GCP Cloud Storage Customer-Managed Encryption Key (CMEK) Enforcement
+service_type: object-storage
+requirement_text: >
+  When encrypting data, the service MUST verify that customer-managed encryption 
+  keys (CMEKs) are used.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that GCP Cloud Storage bucket encryption uses
+  customer-managed encryption keys (CMEK) from Cloud KMS. Strengths:
+  - Directly validates default KMS key configuration
+  - KMS key reference indicates CMEK usage
+  - Supports both regional and global keys
+  Limitations:
+  - Does not validate the referenced KMS key exists
+  - Does not verify key rotation policy
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.encryption.defaultKmsKeyName"
+    expected_values: []
+    validation_rule: "^projects/.+/locations/.+/keyRings/.+/cryptoKeys/.+$"
+    description: >
+      Verifies that a Cloud KMS key is configured as the default encryption
+      key. The presence of a KMS key path confirms CMEK is in use.

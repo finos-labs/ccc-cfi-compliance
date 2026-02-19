@@ -1,0 +1,46 @@
+name: GCP Cloud KMS Key Algorithm Validation
+service_type: object-storage
+requirement_text: >
+  When encryption keys are used, the service MUST verify that all encryption 
+  keys use the latest industry-standard cryptographic algorithms.
+
+validity_score: 7
+validity_commentary: >
+  This query validates the GCP Cloud KMS key used for Cloud Storage encryption.
+  GCP KMS supports various key algorithms. Strengths:
+  - Validates key algorithm meets minimum requirements
+  - GCP KMS keys are FIPS 140-2 Level 3 validated (for HSM keys)
+  - Supports both software and HSM-protected keys
+  Limitations:
+  - Requires key name to be known
+  - Does not validate IAM permissions
+
+query: |
+  gcloud kms keys describe ${GCPKMSKey} \
+    --keyring=${GCPKMSKeyRing} \
+    --location=${GCPKMSLocation} \
+    --project=${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.purpose"
+    expected_values:
+      - "ENCRYPT_DECRYPT"
+    validation_rule: "^ENCRYPT_DECRYPT$"
+    description: >
+      Validates that the key is configured for encryption/decryption,
+      which is required for Cloud Storage encryption.
+
+  - jsonpath: "$.versionTemplate.algorithm"
+    expected_values:
+      - "GOOGLE_SYMMETRIC_ENCRYPTION"
+    validation_rule: "^GOOGLE_SYMMETRIC_ENCRYPTION$"
+    description: >
+      Verifies the key uses Google's symmetric encryption algorithm (AES-256-GCM).
+
+  - jsonpath: "$.primary.state"
+    expected_values:
+      - "ENABLED"
+    validation_rule: "^ENABLED$"
+    description: >
+      Confirms the primary key version is enabled and can be used.
