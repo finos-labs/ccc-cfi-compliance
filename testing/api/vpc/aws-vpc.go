@@ -432,12 +432,12 @@ func (s *AWSVPCService) EvaluatePeerAgainstAllowList(peerVpcID string) (map[stri
 		}
 	}
 
-	reason := "CN03 allow-list is not defined via environment variables or trial matrix file"
+	reason := "CN03 allow-list is not defined via environment variables or trial matrix file; classification is non-enforcing until IAM/SCP guardrail is configured"
 	if len(allowedIDs) > 0 {
 		if allowed {
-			reason = "candidate VPC ID exists in CN03 allow-list"
+			reason = "requester VPC exists in CN03 allow-list; expected enforcement outcome is allow"
 		} else {
-			reason = "candidate VPC ID does not exist in CN03 allow-list"
+			reason = "requester VPC does not exist in CN03 allow-list; expected enforcement outcome is deny"
 		}
 	}
 
@@ -948,8 +948,8 @@ func (s *AWSVPCService) attemptVpcPeeringDryRunWithOwner(requesterVpcID, peerVpc
 	if err == nil {
 		evidence["DryRunAllowed"] = true
 		evidence["ExitCode"] = 0
-		evidence["Reason"] = "dry-run call returned success"
-		return evidence, nil
+		evidence["Reason"] = "dry-run call returned success; request would be allowed"
+		return s.enrichCN03EnforcementEvidence(requesterVpcIDStr, evidence), nil
 	}
 
 	errText := strings.TrimSpace(err.Error())
@@ -966,7 +966,7 @@ func (s *AWSVPCService) attemptVpcPeeringDryRunWithOwner(requesterVpcID, peerVpc
 			evidence["ExitCode"] = 0
 			evidence["Reason"] = "DryRunOperation indicates request would be allowed"
 		}
-		return evidence, nil
+		return s.enrichCN03EnforcementEvidence(requesterVpcIDStr, evidence), nil
 	}
 
 	if strings.Contains(strings.ToLower(errText), "dryrunoperation") {
@@ -976,7 +976,59 @@ func (s *AWSVPCService) attemptVpcPeeringDryRunWithOwner(requesterVpcID, peerVpc
 		evidence["Reason"] = "dry-run response indicates request would be allowed"
 	}
 
-	return evidence, nil
+	return s.enrichCN03EnforcementEvidence(requesterVpcIDStr, evidence), nil
+}
+
+func (s *AWSVPCService) enrichCN03EnforcementEvidence(requesterVpcID string, evidence map[string]interface{}) map[string]interface{} {
+	allowedIDs, source, err := s.resolveCN03AllowedRequesterVpcIDs()
+	if err != nil {
+		evidence["AllowListDefined"] = false
+		evidence["AllowListSource"] = ""
+		evidence["RequesterInAllowList"] = false
+		evidence["GuardrailExpectation"] = ""
+		evidence["GuardrailMismatch"] = false
+		evidence["Reason"] = fmt.Sprintf("%v; CN03 allow-list resolution failed: %v", evidence["Reason"], err)
+		return evidence
+	}
+
+	allowListDefined := len(allowedIDs) > 0
+	requesterInAllowList := false
+	for _, allowedID := range allowedIDs {
+		if allowedID == requesterVpcID {
+			requesterInAllowList = true
+			break
+		}
+	}
+
+	evidence["AllowListDefined"] = allowListDefined
+	evidence["AllowListSource"] = source
+	evidence["RequesterInAllowList"] = requesterInAllowList
+
+	if !allowListDefined {
+		evidence["GuardrailExpectation"] = ""
+		evidence["GuardrailMismatch"] = false
+		evidence["Reason"] = fmt.Sprintf("%v; CN03 allow-list is not defined, so enforcement expectation cannot be computed", evidence["Reason"])
+		return evidence
+	}
+
+	expectedAllowed := requesterInAllowList
+	guardrailExpectation := "deny"
+	if expectedAllowed {
+		guardrailExpectation = "allow"
+	}
+
+	actualAllowed := boolFromEvidence(evidence["DryRunAllowed"])
+	guardrailMismatch := actualAllowed != expectedAllowed
+
+	evidence["GuardrailExpectation"] = guardrailExpectation
+	evidence["GuardrailMismatch"] = guardrailMismatch
+	if guardrailMismatch {
+		evidence["Reason"] = fmt.Sprintf("%v; CN03 guardrail mismatch: allow-list expects %s for requester %s", evidence["Reason"], guardrailExpectation, requesterVpcID)
+	} else {
+		evidence["Reason"] = fmt.Sprintf("%v; CN03 guardrail aligned: allow-list expects %s for requester %s", evidence["Reason"], guardrailExpectation, requesterVpcID)
+	}
+
+	return evidence
 }
 
 func (s *AWSVPCService) resolveCN03AllowedRequesterVpcIDs() ([]string, string, error) {
