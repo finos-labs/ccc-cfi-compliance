@@ -1,8 +1,6 @@
 package objstorage
 
 import (
-	"time"
-
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 )
 
@@ -22,15 +20,6 @@ type Object struct {
 	Data                []string // Object content (for small objects)
 	Encryption          string   // Encryption status (e.g., "SSE-S3", "SSE-KMS", "AES256")
 	EncryptionAlgorithm string   // Encryption algorithm (e.g., "AES256", "aws:kms")
-}
-
-// LogEntry represents a log entry from cloud logging services (CloudTrail, Cloud Audit Logs, Azure Monitor)
-type LogEntry struct {
-	Identity  string    `json:"identity"`  // Who performed the action
-	Action    string    `json:"action"`    // What action was performed
-	Resource  string    `json:"resource"`  // What resource was affected
-	Timestamp time.Time `json:"timestamp"` // When the action occurred
-	Result    string    `json:"result"`    // Result/status of the action
 }
 
 // Service provides operations for object storage testing
@@ -60,9 +49,4 @@ type Service interface {
 	// AWS: Should fail if uniform bucket-level access is enforced (ACLs disabled)
 	// Azure: Always fails (doesn't support object-level permissions)
 	SetObjectPermission(bucketID string, objectID string, permissionLevel string) error
-
-	// Logging operations (for CN04 - Log All Access and Changes)
-	QueryAdminLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error)
-	QueryDataWriteLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error)
-	QueryDataReadLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error)
 }

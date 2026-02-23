@@ -483,54 +483,38 @@ func (s *GCPStorageService) UpdateBucketPolicy(bucketID string, policyTag string
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bucket attributes: %w", err)
 	}
-	
+
 	return &Bucket{
 		ID:   bucketID,
 		Name: bucketID,
 	}, nil
 }
 
-// QueryAdminLogs queries Cloud Audit Logs for admin activity events on the bucket
-func (s *GCPStorageService) QueryAdminLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Cloud Logging API
-	// Admin Activity logs are enabled by default in GCP
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-default",
-			Action:    "QueryAdminLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "Admin Activity audit logs are enabled by default in GCP",
-		},
-	}, nil
+// UpdateResourcePolicy updates the bucket's labels to trigger logging without functional changes.
+// It sets a timestamped label to ensure the bucket is "changed" for Cloud Audit Logs' perspective.
+func (s *GCPStorageService) UpdateResourcePolicy() error {
+	// Get the first bucket to update
+	buckets, err := s.ListBuckets()
+	if err != nil {
+		return fmt.Errorf("failed to list buckets: %w", err)
+	}
+	if len(buckets) == 0 {
+		return fmt.Errorf("no buckets found to update policy")
+	}
+
+	bucketID := buckets[0].ID
+	bucket := s.client.Bucket(bucketID)
+
+	// Update bucket labels with a timestamp to ensure a "change" for logging purposes
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	bucketAttrsToUpdate := storage.BucketAttrsToUpdate{}
+	bucketAttrsToUpdate.SetLabel("ccc_compliance_test", timestamp)
+
+	_, err = bucket.Update(s.ctx, bucketAttrsToUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to update bucket labels: %w", err)
+	}
+
+	return nil
 }
 
-// QueryDataWriteLogs queries Cloud Audit Logs for data write events on the bucket
-func (s *GCPStorageService) QueryDataWriteLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Cloud Logging API
-	// DATA_WRITE logs must be explicitly enabled
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-not-configured",
-			Action:    "QueryDataWriteLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "DATA_WRITE audit logs must be explicitly enabled in IAM policy",
-		},
-	}, nil
-}
-
-// QueryDataReadLogs queries Cloud Audit Logs for data read events on the bucket
-func (s *GCPStorageService) QueryDataReadLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Cloud Logging API
-	// DATA_READ logs must be explicitly enabled
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-not-configured",
-			Action:    "QueryDataReadLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "DATA_READ audit logs must be explicitly enabled in IAM policy",
-		},
-	}, nil
-}

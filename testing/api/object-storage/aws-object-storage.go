@@ -3,6 +3,7 @@ package objstorage
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -514,79 +515,70 @@ func (s *AWSS3Service) ResetAccess() error {
 	return nil
 }
 
-// UpdateBucketPolicy updates the bucket policy (used for admin action logging tests)
-func (s *AWSS3Service) UpdateBucketPolicy(bucketID string, policyTag string) (*Bucket, error) {
-	policy := fmt.Sprintf(`{
-		"Version": "2012-10-17",
-		"Statement": [{
-			"Sid": "TestPolicy-%s",
-			"Effect": "Deny",
-			"Principal": "*",
-			"Action": "s3:*",
-			"Resource": "arn:aws:s3:::%s/*",
-			"Condition": {
-				"StringEquals": {
-					"aws:PrincipalAccount": "000000000000"
-				}
-			}
-		}]
-	}`, policyTag, bucketID)
-
-	_, err := s.client.PutBucketPolicy(s.ctx, &s3.PutBucketPolicyInput{
-		Bucket: aws.String(bucketID),
-		Policy: aws.String(policy),
-	})
+// UpdateResourcePolicy updates the bucket policy to trigger logging without functional changes.
+// It fetches the existing policy and modifies the SID field with a timestamp to ensure the
+// policy is "changed" from CloudTrail's perspective while keeping the actual permissions intact.
+func (s *AWSS3Service) UpdateResourcePolicy() error {
+	// Get the first bucket to update
+	buckets, err := s.ListBuckets()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update bucket policy: %w", err)
+		return fmt.Errorf("failed to list buckets: %w", err)
+	}
+	if len(buckets) == 0 {
+		return fmt.Errorf("no buckets found to update policy")
 	}
 
-	return &Bucket{
-		ID:   bucketID,
-		Name: bucketID,
-	}, nil
-}
+	bucketID := buckets[0].ID
 
-// QueryAdminLogs queries CloudTrail for admin/management events on the bucket
-func (s *AWSS3Service) QueryAdminLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use CloudTrail LookupEvents API
-	// For now, return a placeholder indicating the feature requires CloudTrail setup
-	return []LogEntry{
-		{
-			Identity:  "cloudtrail-not-configured",
-			Action:    "QueryAdminLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "CloudTrail management events logging must be configured separately",
-		},
-	}, nil
-}
+	// Get the existing bucket policy
+	getPolicyOutput, err := s.client.GetBucketPolicy(s.ctx, &s3.GetBucketPolicyInput{
+		Bucket: aws.String(bucketID),
+	})
+	if err != nil {
+		// If there's no policy, we can't do a no-op update
+		return fmt.Errorf("failed to get bucket policy (bucket may not have a policy): %w", err)
+	}
 
-// QueryDataWriteLogs queries CloudTrail for data write events on the bucket
-func (s *AWSS3Service) QueryDataWriteLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use CloudTrail LookupEvents API
-	// with EventCategory=Data and ReadOnly=false
-	return []LogEntry{
-		{
-			Identity:  "cloudtrail-not-configured",
-			Action:    "QueryDataWriteLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "CloudTrail data events (write) logging must be configured separately",
-		},
-	}, nil
-}
+	// Parse the existing policy
+	var policy map[string]interface{}
+	if err := json.Unmarshal([]byte(*getPolicyOutput.Policy), &policy); err != nil {
+		return fmt.Errorf("failed to parse bucket policy: %w", err)
+	}
 
-// QueryDataReadLogs queries CloudTrail for data read events on the bucket
-func (s *AWSS3Service) QueryDataReadLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use CloudTrail LookupEvents API
-	// with EventCategory=Data and ReadOnly=true
-	return []LogEntry{
-		{
-			Identity:  "cloudtrail-not-configured",
-			Action:    "QueryDataReadLogs",
-			Resource:  bucketID,
-			Timestamp: time.Now(),
-			Result:    "CloudTrail data events (read) logging must be configured separately",
-		},
-	}, nil
+	// Update the SID in each statement with a timestamp suffix
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	if statements, ok := policy["Statement"].([]interface{}); ok {
+		for _, stmt := range statements {
+			if statement, ok := stmt.(map[string]interface{}); ok {
+				// Modify the SID - append or update timestamp
+				if sid, exists := statement["Sid"]; exists {
+					sidStr := fmt.Sprintf("%v", sid)
+					// Remove any existing timestamp suffix and add new one
+					if idx := strings.LastIndex(sidStr, "-ccc-"); idx != -1 {
+						sidStr = sidStr[:idx]
+					}
+					statement["Sid"] = sidStr + "-ccc-" + timestamp
+				} else {
+					statement["Sid"] = "CCCComplianceTest-" + timestamp
+				}
+			}
+		}
+	}
+
+	// Marshal the modified policy back to JSON
+	modifiedPolicy, err := json.Marshal(policy)
+	if err != nil {
+		return fmt.Errorf("failed to marshal modified policy: %w", err)
+	}
+
+	// Put the modified policy back
+	_, err = s.client.PutBucketPolicy(s.ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(bucketID),
+		Policy: aws.String(string(modifiedPolicy)),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update bucket policy: %w", err)
+	}
+
+	return nil
 }

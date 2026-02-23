@@ -494,3 +494,8 @@ func (s *AWSIAMService) ResetAccess() error {
 	// No-op: IAM services don't have network-level access controls to reset
 	return nil
 }
+
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *AWSIAMService) UpdateResourcePolicy() error {
+	return nil
+}

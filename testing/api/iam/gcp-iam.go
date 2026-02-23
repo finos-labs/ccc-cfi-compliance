@@ -472,3 +472,8 @@ func (s *GCPIAMService) ResetAccess() error {
 	// No-op: IAM services don't have network-level access controls to reset
 	return nil
 }
+
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *GCPIAMService) UpdateResourcePolicy() error {
+	return nil
+}

@@ -488,6 +488,11 @@ func (s *AzureIAMService) ResetAccess() error {
 	return nil
 }
 
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *AzureIAMService) UpdateResourcePolicy() error {
+	return nil
+}
+
 // Microsoft Graph API helper methods
 
 func (s *AzureIAMService) callGraphAPI(method, endpoint string, body interface{}) (map[string]interface{}, error) {

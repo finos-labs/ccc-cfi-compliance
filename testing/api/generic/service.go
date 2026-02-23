@@ -26,4 +26,11 @@ type Service interface {
 	// ResetAccess restores the original access permissions that were in place
 	// before ElevateAccessForInspection was called
 	ResetAccess() error
+
+	// UpdateResourcePolicy updates the resource's policy in a way that triggers logging
+	// without changing the policy's functional behavior.
+	// AWS: Modifies the SID field
+	// Azure: Changes the description
+	// GCP: Changes the description
+	UpdateResourcePolicy() error
 }

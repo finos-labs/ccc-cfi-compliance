@@ -7,6 +7,7 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/logging"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
@@ -72,6 +73,13 @@ func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 
 	case "object-storage":
 		return objstorage.NewGCPStorageService(f.ctx, f.cloudParams)
+
+	case "logging":
+		service, err := logging.NewGCPLoggingService(f.ctx, &f.cloudParams, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCP logging service: %w", err)
+		}
+		return service, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for GCP: %s", serviceID)

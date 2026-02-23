@@ -753,13 +753,9 @@ func (s *AzureBlobService) ResetAccess() error {
 }
 
 // UpdateBucketPolicy updates container access policy (used for admin action logging tests)
-func (s *AzureBlobService) UpdateBucketPolicy(containerID string, policyTag string) (*Bucket, error) {
-	// Parse container ID to get storage account and container name
-	parts := strings.SplitN(containerID, "/", 2)
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid containerID format, expected 'storageAccount/containerName'")
-	}
-	storageAccountName, containerName := parts[0], parts[1]
+// containerName is just the container name; storage account is taken from cloudParams
+func (s *AzureBlobService) UpdateBucketPolicy(containerName string, policyTag string) (*Bucket, error) {
+	storageAccountName := s.cloudParams.AzureStorageAccount
 
 	blobClient, err := s.getBlobServiceClient(storageAccountName)
 	if err != nil {
@@ -767,7 +763,7 @@ func (s *AzureBlobService) UpdateBucketPolicy(containerID string, policyTag stri
 	}
 
 	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
-	
+
 	// Set metadata as a simple admin action that will be logged
 	_, err = containerClient.SetMetadata(s.ctx, &container.SetMetadataOptions{
 		Metadata: map[string]*string{
@@ -777,54 +773,46 @@ func (s *AzureBlobService) UpdateBucketPolicy(containerID string, policyTag stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to update container metadata: %w", err)
 	}
-	
+
 	return &Bucket{
-		ID:   containerID,
+		ID:   fmt.Sprintf("%s/%s", storageAccountName, containerName),
 		Name: containerName,
 	}, nil
 }
 
-// QueryAdminLogs queries Azure Activity Log for admin events on the storage account
-func (s *AzureBlobService) QueryAdminLogs(containerID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Azure Monitor Activity Log API
-	// Activity Log is enabled by default in Azure
-	return []LogEntry{
-		{
-			Identity:  "azure-activity-log-default",
-			Action:    "QueryAdminLogs",
-			Resource:  containerID,
-			Timestamp: time.Now(),
-			Result:    "Activity Log is enabled by default in Azure",
+// UpdateResourcePolicy updates the container metadata to trigger logging without functional changes.
+// It sets a timestamped metadata value to ensure the resource is "changed" for Azure Monitor's perspective.
+func (s *AzureBlobService) UpdateResourcePolicy() error {
+	// Get the first container to update
+	buckets, err := s.ListBuckets()
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	if len(buckets) == 0 {
+		return fmt.Errorf("no containers found to update policy")
+	}
+
+	containerName := buckets[0].Name
+	storageAccountName := s.cloudParams.AzureStorageAccount
+
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+
+	// Set metadata with a timestamp to ensure a "change" for logging purposes
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	_, err = containerClient.SetMetadata(s.ctx, &container.SetMetadataOptions{
+		Metadata: map[string]*string{
+			"ccc_compliance_test": &timestamp,
 		},
-	}, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update container metadata: %w", err)
+	}
+
+	return nil
 }
 
-// QueryDataWriteLogs queries Azure Storage diagnostic logs for write events
-func (s *AzureBlobService) QueryDataWriteLogs(containerID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Azure Monitor Diagnostic Settings
-	// StorageWrite category must be explicitly enabled
-	return []LogEntry{
-		{
-			Identity:  "azure-diagnostics-not-configured",
-			Action:    "QueryDataWriteLogs",
-			Resource:  containerID,
-			Timestamp: time.Now(),
-			Result:    "StorageWrite diagnostic logging must be explicitly enabled",
-		},
-	}, nil
-}
-
-// QueryDataReadLogs queries Azure Storage diagnostic logs for read events
-func (s *AzureBlobService) QueryDataReadLogs(containerID string, lookbackMinutes int) ([]LogEntry, error) {
-	// Note: In a real implementation, this would use Azure Monitor Diagnostic Settings
-	// StorageRead category must be explicitly enabled
-	return []LogEntry{
-		{
-			Identity:  "azure-diagnostics-not-configured",
-			Action:    "QueryDataReadLogs",
-			Resource:  containerID,
-			Timestamp: time.Now(),
-			Result:    "StorageRead diagnostic logging must be explicitly enabled",
-		},
-	}, nil
-}

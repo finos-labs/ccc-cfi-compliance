@@ -6,6 +6,7 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/logging"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
@@ -55,6 +56,13 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
 		}
 
+		return service, nil
+
+	case "logging":
+		service, err := logging.NewAWSLoggingService(f.ctx, &f.cloudParams, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS logging service: %w", err)
+		}
 		return service, nil
 
 	default:

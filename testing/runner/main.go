@@ -16,7 +16,7 @@ import (
 
 var (
 	provider       = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
-	service        = flag.String("service", "", "Service type to test (object-storage, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services.")
+	service        = flag.String("service", "", "Service type to test (object-storage, logging, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services.")
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
