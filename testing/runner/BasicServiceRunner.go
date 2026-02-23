@@ -65,6 +65,7 @@ func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, par
 		suite.ClearAttachments() // Clear attachments from previous scenario
 		suite.setupServiceParams(params)
 		suite.setupServiceParams(params.CloudParams)
+		suite.setupServiceParams(params.Props)
 		return ctx, nil
 	})
 
