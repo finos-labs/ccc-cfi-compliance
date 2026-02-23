@@ -7,7 +7,7 @@ Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Unauthorized data modification requests are blocked
     # This control requires behavioral testing - attempting unauthorized modifications
     # IAM policies and bucket policies enforce this at runtime

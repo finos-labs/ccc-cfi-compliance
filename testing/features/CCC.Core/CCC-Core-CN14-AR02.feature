@@ -7,7 +7,7 @@ Feature: CCC.Core.CN14.AR02 - Backup Recency
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Most recent backup is within required timeframe
     # Backup recency verification requires checking backup timestamps
     # This is typically enforced by backup policies and monitoring

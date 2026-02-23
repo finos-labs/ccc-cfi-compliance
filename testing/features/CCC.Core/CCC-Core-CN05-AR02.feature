@@ -7,7 +7,7 @@ Feature: CCC.Core.CN05.AR02 - Block Unauthorized Administrative Access
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Unauthorized administrative access is blocked
     # This control requires behavioral testing - attempting unauthorized admin access
     # IAM policies enforce this at runtime

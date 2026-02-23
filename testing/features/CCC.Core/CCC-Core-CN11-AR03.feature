@@ -7,7 +7,7 @@ Feature: CCC.Core.CN11.AR03 - Customer-Managed Encryption Keys
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage CMEK compliance
     When I attempt policy check "object-storage-cmek" for control "CCC.Core.CN11" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

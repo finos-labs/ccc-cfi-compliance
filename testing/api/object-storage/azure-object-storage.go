@@ -561,7 +561,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
+			TagFilter:           []string{"@object-storage", "@PerService"},
 			CloudParams:         s.cloudParams,
 		})
 
@@ -578,7 +578,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
+			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			CloudParams:         s.cloudParams,
 		})
 	}

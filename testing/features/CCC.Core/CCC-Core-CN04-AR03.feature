@@ -7,7 +7,7 @@ Feature: CCC.Core.CN04.AR03 - Log Data Read Attempts
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Data read attempts are logged
     # This control requires verifying that logging captures data read events
     # Covered by CN09.AR01 access logging configuration with read events enabled

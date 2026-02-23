@@ -7,7 +7,7 @@ Feature: CCC.Core.CN13.AR02 - Certificate Rotation within 180 Days
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Certificates are rotated within 180 days
     # Certificate age verification requires checking certificate NotBefore date
     # This is typically enforced by certificate management policies

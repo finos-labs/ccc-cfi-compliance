@@ -7,7 +7,7 @@ Feature: CCC.Core.CN07.AR01 - Publish Enumeration Activity Events
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Enumeration activities publish events to monitored channels
     # This control requires runtime monitoring configuration verification
     # CloudWatch/Azure Monitor/Cloud Monitoring alerts enforce this

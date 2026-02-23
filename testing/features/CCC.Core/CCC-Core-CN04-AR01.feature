@@ -7,7 +7,7 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Administrative access attempts are logged
     # This control requires verifying that logging is enabled and captures admin events
     # Covered by CN09.AR01 access logging configuration

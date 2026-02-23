@@ -7,7 +7,7 @@ Feature: CCC.Core.CN06.AR02 - Child Resource Location Compliance
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Child resources are in approved regions
     # Child resources inherit region from parent in most cloud services
     # Covered by CN06.AR01 parent resource region check

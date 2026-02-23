@@ -7,7 +7,7 @@ Feature: CCC.Core.CN06.AR01 - Resource Location Compliance
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage region compliance
     When I attempt policy check "object-storage-region" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

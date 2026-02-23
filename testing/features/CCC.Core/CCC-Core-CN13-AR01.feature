@@ -7,7 +7,7 @@ Feature: CCC.Core.CN13.AR01 - Valid Unexpired Certificates
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Behavioral @CCC.ObjStor
+  @Behavioral @object-storage
   Scenario: Certificates are valid and unexpired
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
     Then "{report}" is an array of objects with at least the following contents

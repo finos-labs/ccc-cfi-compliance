@@ -7,7 +7,7 @@ Feature: CCC.Core.CN05.AR03 - Block Cross-Tenant Access
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Cross-tenant access is blocked without explicit allowlist
     # This control requires behavioral testing - attempting cross-tenant access
     # Cloud provider isolation and IAM policies enforce this at runtime

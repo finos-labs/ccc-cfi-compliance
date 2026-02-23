@@ -7,7 +7,7 @@ Feature: CCC.Core.CN11.AR02 - Encryption Key Rotation (180 days)
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage key rotation compliance (180 days)
     When I attempt policy check "object-storage-key-rotation" for control "CCC.Core.CN11" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

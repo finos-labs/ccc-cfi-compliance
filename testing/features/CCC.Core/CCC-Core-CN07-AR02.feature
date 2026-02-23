@@ -7,7 +7,7 @@ Feature: CCC.Core.CN07.AR02 - Log Enumeration Activities
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Enumeration activities are logged
     # This control requires runtime logging verification
     # Covered by CN09.AR01 access logging configuration

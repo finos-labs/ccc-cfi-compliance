@@ -7,7 +7,7 @@ Feature: CCC.Core.CN03.AR03 - MFA for UI Viewing
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: UI viewing requires multi-factor authentication
     # This control is enforced at the identity provider level (Azure AD, AWS IAM, etc.)
     # Cannot be verified with a resource-level policy check

@@ -7,7 +7,7 @@ Feature: CCC.Core.CN05.AR06 - Block All Unauthorized Requests
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: All unauthorized requests are blocked
     # This control requires behavioral testing - comprehensive access testing
     # IAM policies enforce this at runtime

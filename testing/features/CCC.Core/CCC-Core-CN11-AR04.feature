@@ -7,7 +7,7 @@ Feature: CCC.Core.CN11.AR04 - Encryption Key Access Control
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage key policy compliance
     When I attempt policy check "object-storage-key-policy" for control "CCC.Core.CN11" assessment requirement "AR04" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

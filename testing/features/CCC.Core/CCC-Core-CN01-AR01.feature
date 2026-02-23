@@ -1,4 +1,4 @@
-@CCC.Core @tlp-green @tlp-amber @tlp-red @CCC.Core.CN01 @tls
+@CCC.Core @object-storage @vpc @tlp-green @tlp-amber @tlp-red @CCC.Core.CN01 @tls
 Feature: CCC.Core.CN01.AR01
   As a security administrator
   I want to ensure all non-SSH network traffic uses TLS 1.3 or higher
@@ -70,7 +70,7 @@ Feature: CCC.Core.CN01.AR01
       | cert_expirationStatus | OK       |
       | cert_chain_of_trust   | OK       |
 
-  @Policy @PerService @CCC.ObjStor
+  @Policy @PerService @object-storage
   Scenario: Storage account enforces minimum TLS version
     When I attempt policy check "object-storage-tls-policy" for control "CCC.Core.CN01" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

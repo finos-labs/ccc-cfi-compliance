@@ -7,7 +7,7 @@ Feature: CCC.Core.CN14.AR01 - Data Immutability for Disaster Recovery
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage immutability compliance
     When I attempt policy check "object-storage-immutability" for control "CCC.Core.CN14" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

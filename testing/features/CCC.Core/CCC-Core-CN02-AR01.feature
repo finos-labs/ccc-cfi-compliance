@@ -7,12 +7,12 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage encryption compliance
     When I attempt policy check "object-storage-encryption" for control "CCC.Core.CN02" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Behavioural @CCC.ObjStor
+  @Behavioural @object-storage
   Scenario: Verify objects are encrypted at rest
     Given I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"

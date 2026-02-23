@@ -7,7 +7,7 @@ Feature: CCC.Core.CN10.AR01 - Replication Destination Trust
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage replication destination compliance
     When I attempt policy check "object-storage-replication-destination" for control "CCC.Core.CN10" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
