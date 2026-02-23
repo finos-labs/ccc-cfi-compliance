@@ -10,7 +10,7 @@ Feature: CCC.Core.CN13.AR01 - Valid Unexpired Certificates
   @Behavioral @CCC.ObjStor
   Scenario: Certificates are valid and unexpired
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id                    | finding |
       | cert_expirationStatus | ok      |
       | cert_chain_of_trust   | passed. |

@@ -11,7 +11,7 @@ Feature: CCC.Core.CN01.AR08
     ensuring that only authenticated clients can establish connections.
 
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id         | finding  |
       | clientAuth | required |
 

@@ -43,7 +43,7 @@ Feature: CCC.Core.CN01.AR03
     all exposed ports use TLS/SSL or other encryption.
 
     Given "report" contains details of SSL Support type "protocols" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id     | severity |
       | TLS1_2 | OK       |
       | TLS1_3 | OK       |

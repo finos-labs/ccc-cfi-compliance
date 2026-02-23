@@ -40,21 +40,21 @@ Feature: CCC.Core.CN01.AR01
   @Behavioural @PerPort
   Scenario: Verify SSL/TLS protocol support
     Given "report" contains details of SSL Support type "protocols" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects which doesn't contain any of
+    Then "{report}" is an array of objects which doesn't contain any of
       | id     | finding |
       | SSLv2  | offered |
       | SSLv3  | offered |
       | TLS1   | offered |
       | TLS1_1 | offered |
       | TLS1_2 | offered |
-    And "{report}" is a slice of objects with at least the following contents
+    And "{report}" is an array of objects with at least the following contents
       | id     | finding            |
       | TLS1_3 | offered with final |
 
   @Behavioural @PerPort
   Scenario: Verify no known SSL/TLS vulnerabilities
     Given "report" contains details of SSL Support type "vulnerable" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id            | severity |
       | heartbleed    | OK       |
       | CCS           | OK       |
@@ -65,7 +65,7 @@ Feature: CCC.Core.CN01.AR01
   @Behavioural @PerPort
   Scenario: Verify TLS 1.3 only certificate validity
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id                    | severity |
       | cert_expirationStatus | OK       |
       | cert_chain_of_trust   | OK       |

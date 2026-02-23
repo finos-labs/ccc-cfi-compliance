@@ -15,8 +15,8 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
+	generic "github.com/robmoffat/standard-cucumber-steps/go"
 )
 
 // TestSuite for running cloud tests

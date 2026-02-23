@@ -18,7 +18,7 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
+	generic "github.com/robmoffat/standard-cucumber-steps/go"
 	"gopkg.in/yaml.v3"
 )
 
@@ -84,20 +84,88 @@ func (c *Connection) startOutputReader(reader io.Reader) {
 // CloudWorld extends PropsWorld with cloud-specific functionality
 type CloudWorld struct {
 	*generic.PropsWorld
-	mu sync.RWMutex
+	Attachments []environment.Attachment // CFI-specific: Store attachments for the current scenario
+	mu          sync.RWMutex
 }
 
 // NewCloudWorld creates a new CloudWorld instance
 func NewCloudWorld() *CloudWorld {
 	return &CloudWorld{
-		PropsWorld: generic.NewPropsWorld(),
+		PropsWorld:  generic.NewPropsWorld(),
+		Attachments: make([]environment.Attachment, 0),
 	}
+}
+
+// Attach adds an attachment to the current scenario (CFI-specific)
+func (cw *CloudWorld) Attach(name, mediaType string, data []byte) {
+	cw.mu.Lock()
+	defer cw.mu.Unlock()
+	cw.Attachments = append(cw.Attachments, environment.Attachment{
+		Name:      name,
+		MediaType: mediaType,
+		Data:      data,
+	})
+	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
+}
+
+// GetAttachments returns a copy of the current attachments (implements environment.AttachmentProvider)
+func (cw *CloudWorld) GetAttachments() []environment.Attachment {
+	cw.mu.RLock()
+	defer cw.mu.RUnlock()
+
+	// Return a copy to avoid race conditions
+	attachmentsCopy := make([]environment.Attachment, len(cw.Attachments))
+	copy(attachmentsCopy, cw.Attachments)
+	return attachmentsCopy
+}
+
+// ClearAttachments clears all attachments (implements environment.AttachmentProvider)
+func (cw *CloudWorld) ClearAttachments() {
+	cw.mu.Lock()
+	defer cw.mu.Unlock()
+	cw.Attachments = make([]environment.Attachment, 0)
+}
+
+// iAttachToTestOutput attaches content to the test output (CFI-specific step)
+func (cw *CloudWorld) iAttachToTestOutput(content, name string) error {
+	resolved := cw.HandleResolve(content)
+
+	// Determine the media type and convert to bytes
+	var data []byte
+	var mediaType string
+
+	switch v := resolved.(type) {
+	case error:
+		// Handle errors specifically - convert to text
+		data = []byte(v.Error())
+		mediaType = "text/plain"
+	case string:
+		data = []byte(v)
+		mediaType = "text/plain"
+	case []byte:
+		data = v
+		mediaType = "application/octet-stream"
+	default:
+		// Try to convert to JSON for complex objects
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to marshal attachment: %w", err)
+		}
+		data = jsonData
+		mediaType = "application/json"
+	}
+
+	cw.Attach(name, mediaType, data)
+	return nil
 }
 
 // RegisterSteps registers all cloud-specific step definitions
 func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// Register generic steps first
 	cw.PropsWorld.RegisterSteps(ctx)
+
+	// CFI-specific attachment step
+	ctx.Step(`^I attach "([^"]*)" to the test output as "([^"]*)"$`, cw.iAttachToTestOutput)
 
 	// Cloud-specific steps matching README.md
 

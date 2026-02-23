@@ -24,7 +24,7 @@ Feature: CCC.Core.CN01.AR02
     clients to use modern, secure encryption algorithms like AES-256-GCM or ChaCha20-Poly1305.
 
     Given "report" contains details of SSL Support type "each-cipher" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects which doesn't contain any of
+    Then "{report}" is an array of objects which doesn't contain any of
       | id           | finding |
       |     3DES-CBC | offered |
       | RC4          | offered |
@@ -38,7 +38,7 @@ Feature: CCC.Core.CN01.AR02
     man-in-the-middle attacks.
 
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
-    Then "{report}" is a slice of objects with at least the following contents
+    Then "{report}" is an array of objects with at least the following contents
       | id                    | finding |
       | cert_expirationStatus | ok      |
       | cert_chain_of_trust   | passed. |

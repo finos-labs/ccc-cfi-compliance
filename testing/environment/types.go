@@ -27,7 +27,8 @@ type CloudParams struct {
 	GCPProjectID        string // GCP Project ID
 }
 
-// ServiceTypes contains all known service types
+// ServiceTypes contains all known service types.  NB:  These are also used as tags on tests relevant
+// to that service.
 var ServiceTypes = []string{
 	"object-storage",
 	"block-storage",

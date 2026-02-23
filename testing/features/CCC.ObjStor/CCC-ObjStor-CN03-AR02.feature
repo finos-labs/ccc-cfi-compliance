@@ -7,18 +7,18 @@ Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
 
   Background:
     Given a cloud api for "{Provider}" in "api"
-    And I call "{api}" with "GetServiceAPI" with parameter "object-storage"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 
   Scenario: Service prevents modification of locked retention policy
-    When I call "{storage}" with "GetBucketRetentionDurationDays" with parameter "{ResourceName}"
+    When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error
     And I refer to "{result}" as "originalRetention"
     And I attach "{result}" to the test output as "original-retention-days.txt"
     And "{result}" should be greater than "0"
-    When I call "{storage}" with "SetBucketRetentionDurationDays" with parameters "{ResourceName}" and "1"
+    When I call "{storage}" with "SetBucketRetentionDurationDays" using arguments "{ResourceName}" and "1"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "set-retention-error.txt"
-    When I call "{storage}" with "GetBucketRetentionDurationDays" with parameter "{ResourceName}"
+    When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error
     And "{result}" should equal "{originalRetention}"
