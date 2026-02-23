@@ -21,10 +21,12 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
     When I call "{theService}" with "UpdateResourcePolicy"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "Policy Update Result"
-    When I call "{loggingService}" with "QueryAdminLogs" using arguments "{ResourceName}" and "{60}"
+    # Wait for log ingestion (Azure Activity Log can take up to 15 minutes)
+    And we wait for a period of "10000" ms
+    When I call "{loggingService}" with "QueryAdminLogs" using arguments "{ResourceName}" and "{20}"
     Then "{result}" is not an error
     And I refer to "{result}" as "adminLogs"
     And I attach "{adminLogs}" to the test output as "Admin Activity Logs"
     Then "{adminLogs}" is an array of objects with at least the following contents
-      | Identity  | Action            |
-      | .+        | .*Policy.*        |
+      | result    | resource    |
+      | Succeeded | {UID} |

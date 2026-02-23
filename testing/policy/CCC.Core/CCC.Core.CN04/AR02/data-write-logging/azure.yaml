@@ -20,14 +20,14 @@ validity_commentary: >
 query: |
   az monitor diagnostic-settings list \
     --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
-    --query "value[0]" \
     --output json
 
 rules:
-  - jsonpath: "$.logs[?(@.category=='StorageWrite')].enabled"
+  - jsonpath: "$.value[*].logs[?(@.category=='StorageWrite')].enabled"
     expected_values: ["true"]
     validation_rule: ""
     description: >
       Validates that StorageWrite logging is enabled for the blob service.
       StorageWrite captures blob creation, deletion, update, and copy
-      operations with full caller identity and timestamp.
+      operations with full caller identity and timestamp. If no diagnostic
+      settings exist, this check will fail.

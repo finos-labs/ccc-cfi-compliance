@@ -2,21 +2,22 @@ package logging
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/monitor/azquery"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 )
 
 // AzureLoggingService implements Service for Azure Monitor/Log Analytics
 type AzureLoggingService struct {
-	logsClient  *azquery.LogsClient
-	credential  azcore.TokenCredential
-	ctx         context.Context
-	cloudParams *environment.CloudParams
-	testParams  *environment.TestParams
+	activityLogsClient *armmonitor.ActivityLogsClient
+	credential         azcore.TokenCredential
+	ctx                context.Context
+	cloudParams        *environment.CloudParams
+	testParams         *environment.TestParams
 }
 
 // NewAzureLoggingService creates a new Azure logging service using default credential chain
@@ -26,17 +27,17 @@ func NewAzureLoggingService(ctx context.Context, cloudParams *environment.CloudP
 		return nil, err
 	}
 
-	logsClient, err := azquery.NewLogsClient(cred, nil)
+	activityLogsClient, err := armmonitor.NewActivityLogsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AzureLoggingService{
-		logsClient:  logsClient,
-		credential:  cred,
-		ctx:         ctx,
-		cloudParams: cloudParams,
-		testParams:  testParams,
+		activityLogsClient: activityLogsClient,
+		credential:         cred,
+		ctx:                ctx,
+		cloudParams:        cloudParams,
+		testParams:         testParams,
 	}, nil
 }
 
@@ -90,39 +91,100 @@ func (s *AzureLoggingService) UpdateResourcePolicy() error {
 
 // QueryAdminLogs queries Azure Activity Log for admin events
 func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return []LogEntry{
-		{
-			Identity:  "azure-activity-log-default",
-			Action:    "QueryAdminLogs",
-			Resource:  resourceID,
-			Timestamp: time.Now(),
-			Result:    "Activity Log is enabled by default in Azure",
-		},
-	}, nil
+	startTime := time.Now().Add(-time.Duration(lookbackMinutes) * time.Minute)
+	endTime := time.Now()
+
+	// Build the filter for Activity Log query
+	// Filter by time range and resource group (storage account operations are logged at resource group level)
+	filter := fmt.Sprintf("eventTimestamp ge '%s' and eventTimestamp le '%s' and resourceGroupName eq '%s'",
+		startTime.UTC().Format(time.RFC3339),
+		endTime.UTC().Format(time.RFC3339),
+		s.cloudParams.AzureResourceGroup)
+
+	pager := s.activityLogsClient.NewListPager(filter, nil)
+
+	var entries []LogEntry
+	for pager.More() {
+		page, err := pager.NextPage(s.ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get activity log page: %w", err)
+		}
+
+		for _, event := range page.Value {
+			entry := LogEntry{
+				Timestamp: azureGetTime(event.EventTimestamp),
+				Resource:  azureGetString(event.ResourceID),
+			}
+			if event.OperationName != nil {
+				entry.Action = azureGetString(event.OperationName.LocalizedValue)
+			}
+			if event.Status != nil {
+				entry.Result = azureGetString(event.Status.LocalizedValue)
+			}
+			if event.Caller != nil {
+				entry.Identity = *event.Caller
+			}
+			entries = append(entries, entry)
+		}
+	}
+
+	if len(entries) == 0 {
+		return []LogEntry{
+			{
+				Identity:  "azure-activity-log",
+				Action:    "QueryAdminLogs",
+				Resource:  resourceID,
+				Timestamp: time.Now(),
+				Result:    fmt.Sprintf("No admin events found in last %d minutes", lookbackMinutes),
+			},
+		}, nil
+	}
+
+	return entries, nil
 }
 
 // QueryDataWriteLogs queries Azure Storage diagnostic logs for write events
+// Note: Data-level logs require Azure Diagnostic Settings to be configured
 func (s *AzureLoggingService) QueryDataWriteLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
+	// Data-level logging in Azure requires Diagnostic Settings which send logs to
+	// Log Analytics, Storage Account, or Event Hub. This is a configuration check.
 	return []LogEntry{
 		{
-			Identity:  "azure-diagnostics-not-configured",
+			Identity:  "azure-diagnostics",
 			Action:    "QueryDataWriteLogs",
 			Resource:  resourceID,
 			Timestamp: time.Now(),
-			Result:    "StorageWrite diagnostic logging must be explicitly enabled",
+			Result:    "Data write logging requires Diagnostic Settings - check via policy",
 		},
 	}, nil
 }
 
 // QueryDataReadLogs queries Azure Storage diagnostic logs for read events
+// Note: Data-level logs require Azure Diagnostic Settings to be configured
 func (s *AzureLoggingService) QueryDataReadLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
+	// Data-level logging in Azure requires Diagnostic Settings which send logs to
+	// Log Analytics, Storage Account, or Event Hub. This is a configuration check.
 	return []LogEntry{
 		{
-			Identity:  "azure-diagnostics-not-configured",
+			Identity:  "azure-diagnostics",
 			Action:    "QueryDataReadLogs",
 			Resource:  resourceID,
 			Timestamp: time.Now(),
-			Result:    "StorageRead diagnostic logging must be explicitly enabled",
+			Result:    "Data read logging requires Diagnostic Settings - check via policy",
 		},
 	}, nil
+}
+
+func azureGetString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func azureGetTime(t *time.Time) time.Time {
+	if t == nil {
+		return time.Now()
+	}
+	return *t
 }

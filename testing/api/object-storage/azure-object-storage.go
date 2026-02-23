@@ -780,37 +780,36 @@ func (s *AzureBlobService) UpdateBucketPolicy(containerName string, policyTag st
 	}, nil
 }
 
-// UpdateResourcePolicy updates the container metadata to trigger logging without functional changes.
-// It sets a timestamped metadata value to ensure the resource is "changed" for Azure Monitor's perspective.
+// UpdateResourcePolicy updates the storage account tags to trigger Activity Log entries.
+// Azure Activity Log only captures control plane (ARM) operations, so we update tags
+// rather than container metadata (which is a data plane operation).
 func (s *AzureBlobService) UpdateResourcePolicy() error {
-	// Get the first container to update
-	buckets, err := s.ListBuckets()
-	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
-	}
-	if len(buckets) == 0 {
-		return fmt.Errorf("no containers found to update policy")
-	}
-
-	containerName := buckets[0].Name
 	storageAccountName := s.cloudParams.AzureStorageAccount
 
-	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	// Get current storage account to preserve existing tags
+	account, err := s.storageClient.GetProperties(s.ctx, s.cloudParams.AzureResourceGroup, storageAccountName, nil)
 	if err != nil {
-		return fmt.Errorf("failed to get blob service client: %w", err)
+		return fmt.Errorf("failed to get storage account properties: %w", err)
 	}
 
-	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+	// Copy existing tags or create new map
+	tags := make(map[string]*string)
+	if account.Tags != nil {
+		for k, v := range account.Tags {
+			tags[k] = v
+		}
+	}
 
-	// Set metadata with a timestamp to ensure a "change" for logging purposes
+	// Add/update our compliance test tag with timestamp
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
-	_, err = containerClient.SetMetadata(s.ctx, &container.SetMetadataOptions{
-		Metadata: map[string]*string{
-			"ccc_compliance_test": &timestamp,
-		},
-	})
+	tags["ccc_compliance_test"] = &timestamp
+
+	// Update storage account with new tags (control plane operation - will appear in Activity Log)
+	_, err = s.storageClient.Update(s.ctx, s.cloudParams.AzureResourceGroup, storageAccountName, armstorage.AccountUpdateParameters{
+		Tags: tags,
+	}, nil)
 	if err != nil {
-		return fmt.Errorf("failed to update container metadata: %w", err)
+		return fmt.Errorf("failed to update storage account tags: %w", err)
 	}
 
 	return nil
