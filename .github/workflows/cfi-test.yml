@@ -1,0 +1,242 @@
+name: CFI Test
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: cfi-test
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Generate matrix from config files
+        id: set-matrix
+        run: |
+          TARGETS_DIR=config
+          matrix='{"target": []}'
+
+          for target_file in $TARGETS_DIR/*.json; do
+            if [[ "$target_file" == *".json" ]]; then
+              id=$(jq -r '.id' "$target_file")
+              name=$(jq -r '.name' "$target_file")
+              path=$(jq -r '.path' "$target_file")
+              provider=$(jq -r '.provider' "$target_file")
+              service=$(jq -r '.service' "$target_file")
+              
+              target_json=$(jq -c '.' "$target_file")
+              matrix=$(echo "$matrix" | jq --argjson target "$target_json" '.target += [$target]')
+            fi
+          done
+
+          echo "matrix={\"target\": $(echo "$matrix" | jq -c '.target')}" >> $GITHUB_OUTPUT
+          echo "Generated matrix with $(echo "$matrix" | jq '.target | length') targets"
+
+  test:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3
+      matrix:
+        target: ${{ fromJson(needs.prepare-matrix.outputs.matrix).target }}
+      fail-fast: false
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      OUTPUT_DIR: results
+      PROWLER_BRANCH: master
+      TARGET_ID: ${{ matrix.target.id }}
+      TARGET_NAME: ${{ matrix.target.name }}
+      TARGET_PATH: ${{ matrix.target.path }}
+      TARGET_PROVIDER: ${{ matrix.target.provider }}
+      TARGET_SERVICE: ${{ matrix.target.service }}
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_target_id: ${{ matrix.target.id }}
+      TF_VAR_github_run_id: ${{ github.run_id }}
+      TF_VAR_github_run_number: ${{ github.run_number }}
+      TF_VAR_github_actor: ${{ github.actor }}
+      TF_VAR_github_repository: ${{ github.repository }}
+      TF_VAR_github_workflow: ${{ github.workflow }}
+      TF_VAR_github_sha: ${{ github.sha }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Load compliance testing environment
+        run: |
+          echo "📋 Loading compliance testing environment..."
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          echo "✅ Environment variables loaded"
+
+      - name: Configure AWS Credentials (OIDC)
+        if: matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure Azure Credentials (OIDC)
+        if: matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Install testssl.sh
+        run: |
+          echo "📦 Installing testssl.sh..."
+          git clone --depth 1 https://github.com/drwetter/testssl.sh.git /opt/testssl
+          sudo ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
+          testssl.sh --version || true
+          echo "✅ testssl.sh installed"
+
+      - name: Cache Python Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.virtualenvs
+            prowler/.venv
+          key: prowler-${{ hashFiles('prowler/poetry.lock') }}
+          restore-keys: prowler-
+
+      - name: Install Prowler and Python deps
+        run: |
+          git clone -b ${{ env.PROWLER_BRANCH }} --single-branch https://github.com/prowler-cloud/prowler
+          cd prowler
+          pipx install poetry
+          poetry install
+
+      - name: Run Prowler Scan
+        id: prowler-scan
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "🔍 Running Prowler scan for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler"
+          mkdir -p output
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            poetry run python prowler-cli.py aws --output-filename scan
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            poetry run python prowler-cli.py azure --az-cli-auth --output-filename scan
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            poetry run python prowler-cli.py gcp --project-id ${{ secrets.GCP_PROJECT_ID }} --output-filename scan
+          fi
+
+          echo "✅ Prowler scan completed for $TARGET_ID"
+
+      - name: Modify Prowler metadata
+        id: modify-prowler-metadata
+        if: always()
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "✏️  Modifying Prowler metadata for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/prowler/output"
+
+          # Find the scan file
+          SCAN_FILE=$(ls -t scan*.ocsf.json 2>/dev/null | head -n 1)
+
+          # Modify scan file
+          if [ -n "$SCAN_FILE" ] && [ -f "$SCAN_FILE" ]; then
+            echo "📝 Modifying scan metadata..."
+            jq 'map(.metadata.product.name = "Prowler")' "$SCAN_FILE" > scan-modified.ocsf.json
+            echo "✅ Created scan-modified.ocsf.json"
+          fi
+
+          echo "✅ Prowler metadata modifications completed"
+
+      - name: Run Compliance Tests
+        id: compliance-tests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+
+          echo "🧪 Running compliance tests for $TARGET_ID..."
+          cd "$GITHUB_WORKSPACE/testing"
+
+          chmod +x run-compliance-tests.sh
+
+          # Build command with provider-specific parameters
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            ./run-compliance-tests.sh --provider azure --output "output" \
+              --region "$TF_VAR_location" \
+              --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              --azure-resource-group "$TF_VAR_resource_group_name" \
+              --azure-storage-account "$TF_VAR_storage_account_name"
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            ./run-compliance-tests.sh --provider gcp --output "output" \
+              --region "$TF_VAR_gcp_region" \
+              --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
+          fi
+
+          echo "✅ Compliance tests completed for $TARGET_ID"
+
+      - name: Copy OCSF Results
+        if: always()
+        run: |
+          # Create output directory
+          mkdir -p ${{ env.OUTPUT_DIR }}
+
+          # Copy Prowler OCSF results
+          cd "$GITHUB_WORKSPACE/prowler/output"
+
+          if [ -f "scan-modified.ocsf.json" ]; then
+            cp "scan-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-prowler.ocsf.json"
+            echo "✅ Successfully captured Prowler output for $TARGET_ID"
+          else
+            echo "⚠️  No Prowler OCSF file found for $TARGET_ID"
+          fi
+
+          # Copy all compliance test results (HTML reports and OCSF JSON)
+          cd "$GITHUB_WORKSPACE/testing/output"
+          if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
+            for f in *.ocsf.json *.html; do
+              [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
+            done
+            echo "✅ Successfully captured compliance test output for $TARGET_ID"
+          else
+            echo "⚠️  No compliance test output files found for $TARGET_ID"
+          fi
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfi-results-${{ matrix.target.id }}
+          path: |
+            ${{ env.OUTPUT_DIR }}
+            config/${{ matrix.target.id }}.json

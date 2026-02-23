@@ -1,11 +1,11 @@
-name: CFI Nuke
+name: CFI Nuke and Rebuild
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: cfi-build
+  group: cfi-infra
   cancel-in-progress: false
 
 on:
@@ -15,10 +15,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ===========================================================================
+  # PHASE 1: Nuke all cloud resources
+  # ===========================================================================
   nuke-resources:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 3 # Run all platforms concurrently
+      max-parallel: 3
       matrix:
         platform:
           - name: gcp
@@ -117,13 +120,7 @@ jobs:
               ${{ env.DRY_RUN_FLAG }} \
               --no-prompt || true
           elif [ "${{ matrix.platform.name }}" = "azure" ]; then
-            # Debug: Show subscription ID being used (first 8 chars only for security)
-            SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            echo "🔍 Debug: Subscription ID starts with: ${SUBSCRIPTION_ID:0:8}..."
-            echo "🔍 Debug: Expected in config: c1cedd8e-bf91-4d7d-a4cc-45700402a2a1"
-            
             # Get OIDC token from GitHub Actions and write to file
-            echo "🔍 Debug: Fetching OIDC token..."
             FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
             
@@ -131,7 +128,7 @@ jobs:
               echo "❌ Error: Failed to retrieve OIDC token"
               exit 1
             fi
-            echo "✅ OIDC token retrieved (length: ${#FEDERATED_TOKEN})"
+            echo "✅ OIDC token retrieved"
             echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
             
             ${{ matrix.platform.binary_name }} run \
@@ -143,7 +140,6 @@ jobs:
               ${{ env.DRY_RUN_FLAG }} \
               --force || true
             
-            # Clean up token file
             rm -f /tmp/azure-federated-token.txt
           else
             ${{ matrix.platform.binary_name }} run \
@@ -170,4 +166,141 @@ jobs:
         with:
           name: nuke-results-${{ matrix.platform.name }}
           path: nuke-output/
+          retention-days: 30
+
+  # ===========================================================================
+  # PHASE 2: Prepare matrix for terraform rebuild
+  # ===========================================================================
+  prepare-matrix:
+    needs: nuke-resources
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Generate matrix from config files
+        id: set-matrix
+        run: |
+          TARGETS_DIR=config
+          matrix='{"target": []}'
+
+          for target_file in $TARGETS_DIR/*.json; do
+            if [[ "$target_file" == *".json" ]]; then
+              target_json=$(jq -c '.' "$target_file")
+              matrix=$(echo "$matrix" | jq --argjson target "$target_json" '.target += [$target]')
+            fi
+          done
+
+          echo "matrix={\"target\": $(echo "$matrix" | jq -c '.target')}" >> $GITHUB_OUTPUT
+          echo "Generated matrix with $(echo "$matrix" | jq '.target | length') targets"
+
+  # ===========================================================================
+  # PHASE 3: Rebuild infrastructure with Terraform
+  # ===========================================================================
+  rebuild-infrastructure:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 3
+      matrix:
+        target: ${{ fromJson(needs.prepare-matrix.outputs.matrix).target }}
+      fail-fast: false
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      TARGET_ID: ${{ matrix.target.id }}
+      TARGET_NAME: ${{ matrix.target.name }}
+      TARGET_PATH: ${{ matrix.target.path }}
+      TARGET_PROVIDER: ${{ matrix.target.provider }}
+      TARGET_SERVICE: ${{ matrix.target.service }}
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_target_id: ${{ matrix.target.id }}
+      TF_VAR_github_run_id: ${{ github.run_id }}
+      TF_VAR_github_run_number: ${{ github.run_number }}
+      TF_VAR_github_actor: ${{ github.actor }}
+      TF_VAR_github_repository: ${{ github.repository }}
+      TF_VAR_github_workflow: ${{ github.workflow }}
+      TF_VAR_github_sha: ${{ github.sha }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Load compliance testing environment
+        run: |
+          echo "📋 Loading compliance testing environment..."
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          echo "✅ Environment variables loaded"
+
+      - name: Configure AWS Credentials (OIDC)
+        if: matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure Azure Credentials (OIDC)
+        if: matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Apply
+        id: terraform-apply
+        run: |
+          set -euo pipefail
+
+          echo "🚀 Deploying module: $TARGET_NAME (id: $TARGET_ID)"
+          echo "📁 Path: $TARGET_PATH"
+          echo "☁️  Provider: $TARGET_PROVIDER"
+          echo "🔧 Service: $TARGET_SERVICE"
+
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            terraform init
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            terraform init -upgrade
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            export TF_VAR_gcp_project_id="${{ secrets.GCP_PROJECT_ID }}"
+            terraform init
+            terraform apply -auto-approve -input=false
+          fi
+
+          echo "✅ Terraform apply completed successfully for $TARGET_ID"
+
+      - name: Save rebuild output
+        if: always()
+        run: |
+          mkdir -p rebuild-output
+          echo "Rebuild completed at $(date)" > rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
+          echo "Target: ${{ matrix.target.id }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
+          echo "Provider: ${{ matrix.target.provider }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
+          echo "Terraform outcome: ${{ steps.terraform-apply.outcome }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
+
+      - name: Upload rebuild results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuild-results-${{ matrix.target.id }}
+          path: rebuild-output/
           retention-days: 30
