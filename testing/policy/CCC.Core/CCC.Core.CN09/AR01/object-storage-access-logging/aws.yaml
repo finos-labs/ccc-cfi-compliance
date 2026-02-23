@@ -20,12 +20,12 @@ validity_commentary: >
 
 query: |
   aws s3api get-bucket-logging \
-    --bucket ${BUCKET_NAME}
+    --bucket ${ResourceName}
 
 rules:
   - jsonpath: "$.LoggingEnabled.TargetBucket"
     expected_values: []
-    validation_rule: "^(?!${BUCKET_NAME}$)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+    validation_rule: "^(?!${ResourceName}$)[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
     description: >
       Validates that access logging is enabled and the target bucket is different
       from the source bucket. Logs stored in the same bucket would violate the

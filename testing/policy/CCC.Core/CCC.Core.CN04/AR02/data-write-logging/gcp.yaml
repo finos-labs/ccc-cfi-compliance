@@ -1,0 +1,31 @@
+name: Cloud Audit Logs Data Write Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all data modification attempts 
+  (identity, timestamp, action, result).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Data Write audit logs are enabled.
+  Data Write logs capture resource creation, deletion, and modification.
+  Strengths:
+  - Captures object-level write operations
+  - Logs include principal, timestamp, method, and status
+  - Stored in Cloud Logging separate from the bucket
+  Limitations:
+  - Data Write logs must be explicitly enabled (not default)
+  - High-volume buckets may incur significant logging costs
+  - Requires IAM configuration at project or organization level
+
+query: |
+  gcloud projects get-iam-policy ${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.auditConfigs[*].auditLogConfigs[?(@.logType=='DATA_WRITE')]"
+    expected_values: []
+    validation_rule: ".*DATA_WRITE.*"
+    description: >
+      Validates that Data Write audit logging is enabled.
+      DATA_WRITE logs capture resource creation, deletion, update, and copy
+      operations with full identity and timestamp.

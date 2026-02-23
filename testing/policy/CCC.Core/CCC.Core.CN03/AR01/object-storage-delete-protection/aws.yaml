@@ -16,7 +16,7 @@ validity_commentary: >
 
 query: |
   aws s3api get-bucket-versioning \
-    --bucket ${BUCKET_NAME}
+    --bucket ${ResourceName}
 
 rules:
   - jsonpath: "$.Status"

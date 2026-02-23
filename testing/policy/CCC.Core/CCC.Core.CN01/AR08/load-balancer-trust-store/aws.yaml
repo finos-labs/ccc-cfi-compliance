@@ -16,7 +16,7 @@ validity_commentary: >
 
 query: |
   aws elbv2 describe-trust-stores \
-    --trust-store-arns ${TRUST_STORE_ARN}
+    --trust-store-arns ${UID}
 
 rules:
   - jsonpath: "$.TrustStores[*].Status"

@@ -18,7 +18,7 @@ validity_commentary: >
 
 query: |
   aws elbv2 describe-listener-attributes \
-    --listener-arn ${LISTENER_ARN}
+    --listener-arn ${UID}
 
 rules:
   - jsonpath: "$.Attributes[?(@.Key == 'mutual_authentication.mode')].Value"

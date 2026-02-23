@@ -7,8 +7,23 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
   Background:
     Given a cloud api for "{Provider}" in "api"
 
-  @Policy @object-storage
-  Scenario: Administrative access attempts are logged
-    # This control requires verifying that logging is enabled and captures admin events
-    # Covered by CN09.AR01 access logging configuration
-    Then no-op required
+  @Policy @object-storage @vpc
+  Scenario: Admin logging compliance
+    When I attempt policy check "admin-logging" for control "CCC.Core.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
+  @Behavioural @object-storage
+  Scenario: Verify admin actions are logged with identity and timestamp
+    Given I call "{api}" with "GetServiceAPI" using argument "object-storage"
+    And I refer to "{result}" as "storage"
+    When I call "{storage}" with "UpdateBucketPolicy" using arguments "{ResourceName}" and "test-policy-update"
+    Then "{result}" is not an error
+    And I refer to "{result}" as "policyUpdateResult"
+    And I attach "{policyUpdateResult}" to the test output as "Policy Update Result"
+    When I call "{storage}" with "QueryAdminLogs" using arguments "{ResourceName}" and "60"
+    Then "{result}" is not an error
+    And I refer to "{result}" as "adminLogs"
+    And I attach "{adminLogs}" to the test output as "Admin Activity Logs"
+    And "{adminLogs}" is an array of objects with at least the following contents
+      | Identity  | Action            |
+      | .+        | .*Policy.*        |

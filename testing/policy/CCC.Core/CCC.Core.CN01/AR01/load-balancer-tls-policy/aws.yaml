@@ -16,7 +16,7 @@ validity_commentary: >
 
 query: |
   aws elbv2 describe-listeners \
-    --load-balancer-arn ${LOAD_BALANCER_ARN}
+    --load-balancer-arn ${UID}
 
 rules:
   - jsonpath: "$.Listeners[?(@.Protocol == 'HTTPS')].SslPolicy"

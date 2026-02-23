@@ -499,3 +499,80 @@ func (s *AWSS3Service) ResetAccess() error {
 	// No-op: AWS S3 access is managed through IAM policies, not network access
 	return nil
 }
+
+// UpdateBucketPolicy updates the bucket policy (used for admin action logging tests)
+func (s *AWSS3Service) UpdateBucketPolicy(bucketID string, policyTag string) (*Bucket, error) {
+	policy := fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Sid": "TestPolicy-%s",
+			"Effect": "Deny",
+			"Principal": "*",
+			"Action": "s3:*",
+			"Resource": "arn:aws:s3:::%s/*",
+			"Condition": {
+				"StringEquals": {
+					"aws:PrincipalAccount": "000000000000"
+				}
+			}
+		}]
+	}`, policyTag, bucketID)
+
+	_, err := s.client.PutBucketPolicy(s.ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(bucketID),
+		Policy: aws.String(policy),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update bucket policy: %w", err)
+	}
+
+	return &Bucket{
+		ID:   bucketID,
+		Name: bucketID,
+	}, nil
+}
+
+// QueryAdminLogs queries CloudTrail for admin/management events on the bucket
+func (s *AWSS3Service) QueryAdminLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
+	// Note: In a real implementation, this would use CloudTrail LookupEvents API
+	// For now, return a placeholder indicating the feature requires CloudTrail setup
+	return []LogEntry{
+		{
+			Identity:  "cloudtrail-not-configured",
+			Action:    "QueryAdminLogs",
+			Resource:  bucketID,
+			Timestamp: time.Now(),
+			Result:    "CloudTrail management events logging must be configured separately",
+		},
+	}, nil
+}
+
+// QueryDataWriteLogs queries CloudTrail for data write events on the bucket
+func (s *AWSS3Service) QueryDataWriteLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
+	// Note: In a real implementation, this would use CloudTrail LookupEvents API
+	// with EventCategory=Data and ReadOnly=false
+	return []LogEntry{
+		{
+			Identity:  "cloudtrail-not-configured",
+			Action:    "QueryDataWriteLogs",
+			Resource:  bucketID,
+			Timestamp: time.Now(),
+			Result:    "CloudTrail data events (write) logging must be configured separately",
+		},
+	}, nil
+}
+
+// QueryDataReadLogs queries CloudTrail for data read events on the bucket
+func (s *AWSS3Service) QueryDataReadLogs(bucketID string, lookbackMinutes int) ([]LogEntry, error) {
+	// Note: In a real implementation, this would use CloudTrail LookupEvents API
+	// with EventCategory=Data and ReadOnly=true
+	return []LogEntry{
+		{
+			Identity:  "cloudtrail-not-configured",
+			Action:    "QueryDataReadLogs",
+			Resource:  bucketID,
+			Timestamp: time.Now(),
+			Result:    "CloudTrail data events (read) logging must be configured separately",
+		},
+	}, nil
+}

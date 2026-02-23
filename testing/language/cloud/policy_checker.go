@@ -41,33 +41,43 @@ func (c *PolicyChecker) LoadPolicy(policyPath string) (*environment.PolicyDefini
 	return &policy, nil
 }
 
-// SubstituteParams replaces parameter placeholders in a query string
-func (c *PolicyChecker) SubstituteParams(query string, params environment.TestParams) string {
-	result := query
+// SubstituteParams replaces parameter placeholders in a query string using values from Props
+// Returns an error if any placeholder references an unknown parameter
+func (c *PolicyChecker) SubstituteParams(query string, props map[string]interface{}) (string, error) {
+	// Find all ${...} placeholders in the query
+	placeholderRegex := regexp.MustCompile(`\$\{([^}]+)\}`)
+	matches := placeholderRegex.FindAllStringSubmatch(query, -1)
 
-	// Map TestParams fields
-	result = strings.ReplaceAll(result, "${ResourceName}", params.ResourceName)
-	result = strings.ReplaceAll(result, "${UID}", params.UID)
-	result = strings.ReplaceAll(result, "${ServiceType}", params.ServiceType)
+	// Check that all placeholders have corresponding values
+	var missingParams []string
+	for _, match := range matches {
+		paramName := match[1]
+		if _, exists := props[paramName]; !exists {
+			missingParams = append(missingParams, paramName)
+		}
+	}
 
-	// Map CloudParams fields
-	result = strings.ReplaceAll(result, "${Provider}", params.CloudParams.Provider)
-	result = strings.ReplaceAll(result, "${Region}", params.CloudParams.Region)
-	result = strings.ReplaceAll(result, "${AzureResourceGroup}", params.CloudParams.AzureResourceGroup)
-	result = strings.ReplaceAll(result, "${AzureSubscriptionID}", params.CloudParams.AzureSubscriptionID)
-	result = strings.ReplaceAll(result, "${AzureStorageAccount}", params.CloudParams.AzureStorageAccount)
-	result = strings.ReplaceAll(result, "${GCPProjectID}", params.CloudParams.GCPProjectID)
+	if len(missingParams) > 0 {
+		return "", fmt.Errorf("unknown parameter(s) in policy query: %v (available: %v)",
+			missingParams, getMapKeys(props))
+	}
 
-	// Legacy parameter mappings (for backwards compatibility)
-	result = strings.ReplaceAll(result, "${BUCKET_NAME}", params.ResourceName)
-	result = strings.ReplaceAll(result, "${VPC_ID}", params.UID)
-	result = strings.ReplaceAll(result, "${SECURITY_GROUP_ID}", params.UID)
-	result = strings.ReplaceAll(result, "${LOAD_BALANCER_ARN}", params.UID)
-	result = strings.ReplaceAll(result, "${LISTENER_ARN}", params.UID)
-	result = strings.ReplaceAll(result, "${TRUST_STORE_ARN}", params.UID)
-	result = strings.ReplaceAll(result, "${KMS_KEY_ID}", params.UID)
+	// Replace all placeholders with their values
+	result := placeholderRegex.ReplaceAllStringFunc(query, func(placeholder string) string {
+		paramName := placeholder[2 : len(placeholder)-1] // strip ${ and }
+		return fmt.Sprintf("%v", props[paramName])
+	})
 
-	return result
+	return result, nil
+}
+
+// getMapKeys returns the keys of a map as a slice
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // ExecuteQuery runs a shell query and returns the output
@@ -145,8 +155,8 @@ func (c *PolicyChecker) EvaluateRule(rule environment.Rule, queryOutput string) 
 	return result
 }
 
-// RunPolicy executes a complete policy check
-func (c *PolicyChecker) RunPolicy(params environment.TestParams, policyPath string) (*environment.PolicyResult, error) {
+// RunPolicy executes a complete policy check using values from Props
+func (c *PolicyChecker) RunPolicy(props map[string]interface{}, policyPath string) (*environment.PolicyResult, error) {
 	// Load the policy
 	policyDef, err := c.LoadPolicy(policyPath)
 	if err != nil {
@@ -165,7 +175,13 @@ func (c *PolicyChecker) RunPolicy(params environment.TestParams, policyPath stri
 	}
 
 	// Substitute parameters in the query
-	result.QueryExecuted = c.SubstituteParams(policyDef.Query, params)
+	queryExecuted, err := c.SubstituteParams(policyDef.Query, props)
+	if err != nil {
+		result.QueryError = err.Error()
+		result.Passed = false
+		return result, nil
+	}
+	result.QueryExecuted = queryExecuted
 
 	// Execute the query
 	output, err := c.ExecuteQuery(result.QueryExecuted)

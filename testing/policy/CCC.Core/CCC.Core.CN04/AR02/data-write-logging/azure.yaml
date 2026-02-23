@@ -1,0 +1,33 @@
+name: Azure Diagnostic Logging Write Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all data modification attempts 
+  (identity, timestamp, action, result).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Azure diagnostic settings are configured
+  to log write operations.
+  Strengths:
+  - StorageWrite captures blob upload, delete, and copy operations
+  - Logs include caller identity, timestamp, operation, and status
+  - Separate from the storage account being logged
+  Limitations:
+  - Diagnostic settings must be explicitly configured (not default)
+  - Requires destination (Log Analytics, Storage, or Event Hub)
+  - High-volume accounts may generate significant log data
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "value[0]" \
+    --output json
+
+rules:
+  - jsonpath: "$.logs[?(@.category=='StorageWrite')].enabled"
+    expected_values: ["true"]
+    validation_rule: ""
+    description: >
+      Validates that StorageWrite logging is enabled for the blob service.
+      StorageWrite captures blob creation, deletion, update, and copy
+      operations with full caller identity and timestamp.

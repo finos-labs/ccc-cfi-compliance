@@ -25,6 +25,7 @@ type CloudParams struct {
 	AzureSubscriptionID string // Azure subscription ID
 	AzureStorageAccount string // Azure storage account name
 	GCPProjectID        string // GCP Project ID
+	AWSCloudTrailName   string // AWS CloudTrail trail name
 }
 
 // ServiceTypes contains all known service types.  NB:  These are also used as tags on tests relevant
@@ -94,23 +95,3 @@ type Rule struct {
 	Description    string `yaml:"description"`
 	Todo           string `yaml:"todo,omitempty"`
 }
-
-// Parameter names that can be used in policy queries
-// These map to fields in TestParams and CloudParams
-const (
-	// From TestParams
-	ParamResourceName = "${ResourceName}" // Human-readable resource name
-	ParamUID          = "${UID}"          // ARN, resource ID, etc.
-	ParamServiceType  = "${ServiceType}"  // Service type (e.g., "object-storage")
-
-	// From CloudParams
-	ParamProvider            = "${Provider}"            // Cloud provider
-	ParamRegion              = "${Region}"              // Cloud region
-	ParamAzureResourceGroup  = "${AzureResourceGroup}"  // Azure resource group
-	ParamAzureSubscriptionID = "${AzureSubscriptionID}" // Azure subscription ID
-	ParamAzureStorageAccount = "${AzureStorageAccount}" // Azure storage account
-	ParamGCPProjectID        = "${GCPProjectID}"        // GCP project ID
-
-	// Legacy parameter names (for backwards compatibility during migration)
-	ParamBucketName = "${BUCKET_NAME}" // Maps to ResourceName for object-storage
-)

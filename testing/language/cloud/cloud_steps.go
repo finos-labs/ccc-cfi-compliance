@@ -572,27 +572,7 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 	checkNameResolved := fmt.Sprintf("%v", cw.HandleResolve(checkName))
 	controlResolved := fmt.Sprintf("%v", cw.HandleResolve(control))
 	arResolved := fmt.Sprintf("%v", cw.HandleResolve(ar))
-	serviceTypeResolved := fmt.Sprintf("%v", cw.HandleResolve(serviceType))
-	resourceNameResolved := fmt.Sprintf("%v", cw.HandleResolve(resourceName))
 	providerResolved := fmt.Sprintf("%v", cw.HandleResolve(provider))
-
-	// Get CloudParams from Props
-	cloudParams, ok := cw.Props["CloudParams"].(environment.CloudParams)
-	if !ok {
-		return fmt.Errorf("CloudParams not found in Props")
-	}
-
-	// Build TestParams from resolved data
-	testParams := environment.TestParams{
-		ResourceName: resourceNameResolved,
-		ServiceType:  serviceTypeResolved,
-		CloudParams:  cloudParams,
-	}
-
-	// Get UID if available
-	if uid := cw.HandleResolve("{UID}"); uid != nil && uid != "{UID}" {
-		testParams.UID = fmt.Sprintf("%v", uid)
-	}
 
 	// Build the policy file path directly
 	// Directory structure: policy/{CatalogType}/{Control}/{AR}/{check-name}/{provider}.yaml
@@ -632,17 +612,9 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 		return fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
 	}
 
-	// If service type doesn't match, return pass (policy not applicable to this service)
-	if policyDef.ServiceType != serviceTypeResolved {
-		cw.Props["result"] = true
-		fmt.Printf("Policy %s skipped: service type %s doesn't match resource service type %s\n",
-			checkNameResolved, policyDef.ServiceType, serviceTypeResolved)
-		return nil
-	}
-
-	// Create policy checker and run the policy
+	// Create policy checker and run the policy using Props for parameter substitution
 	checker := NewPolicyChecker(policyBaseDir)
-	result, err := checker.RunPolicy(testParams, policyPath)
+	result, err := checker.RunPolicy(cw.Props, policyPath)
 	if err != nil {
 		cw.Props["result"] = false
 		return fmt.Errorf("failed to run policy %s: %w", policyPath, err)

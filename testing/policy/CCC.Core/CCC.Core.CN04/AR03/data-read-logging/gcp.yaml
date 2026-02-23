@@ -1,0 +1,31 @@
+name: Cloud Audit Logs Data Read Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all data read attempts 
+  (identity, timestamp, action, result).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Data Read audit logs are enabled.
+  Data Read logs capture resource download and metadata read operations.
+  Strengths:
+  - Captures object-level read operations
+  - Logs include principal, timestamp, method, and status
+  - Stored in Cloud Logging separate from the bucket
+  Limitations:
+  - Data Read logs must be explicitly enabled (not default)
+  - High-volume buckets may incur very significant logging costs
+  - Requires IAM configuration at project or organization level
+
+query: |
+  gcloud projects get-iam-policy ${GCPProjectID} \
+    --format=json
+
+rules:
+  - jsonpath: "$.auditConfigs[*].auditLogConfigs[?(@.logType=='DATA_READ')]"
+    expected_values: []
+    validation_rule: ".*DATA_READ.*"
+    description: >
+      Validates that Data Read audit logging is enabled.
+      DATA_READ logs capture resource download, metadata read, and list
+      operations with full identity and timestamp.
