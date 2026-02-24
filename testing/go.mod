@@ -23,7 +23,7 @@ require (
 	github.com/cucumber/godog v0.14.1
 	github.com/cucumber/messages/go/v21 v21.0.1
 	github.com/google/uuid v1.6.0
-	github.com/robmoffat/standard-cucumber-steps/go v1.0.3
+	github.com/robmoffat/standard-cucumber-steps/go v1.0.5
 	google.golang.org/api v0.267.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409
 	gopkg.in/yaml.v3 v3.0.1
@@ -101,5 +101,3 @@ require (
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace github.com/robmoffat/standard-cucumber-steps/go => /Users/rob/Documents/cucumber/standard-cucumber-steps/go
