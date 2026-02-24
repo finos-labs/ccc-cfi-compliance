@@ -1,7 +1,7 @@
 package generic
 
 import (
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // Service is the generic interface for cloud services
@@ -11,7 +11,7 @@ type Service interface {
 
 	// For a given service type, return all the resources that can be tested within it,
 	// as a set of TestParams. If no resources exist, create default ones.
-	GetOrProvisionTestableResources() ([]environment.TestParams, error)
+	GetOrProvisionTestableResources() ([]types.TestParams, error)
 
 	// CheckUserProvisioned validates that the service's identity is properly provisioned
 	// and usable. Returns nil if the user is ready, error otherwise.

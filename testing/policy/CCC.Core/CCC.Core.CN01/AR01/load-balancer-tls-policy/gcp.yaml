@@ -14,7 +14,7 @@ validity_commentary: >
 
 query: |
   gcloud compute ssl-policies describe ${ResourceName} \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --format=json
 
 rules:

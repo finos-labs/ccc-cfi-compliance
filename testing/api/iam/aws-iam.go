@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSIAMService implements IAMService for AWS
@@ -92,7 +92,7 @@ func (s *AWSIAMService) provisionUserInternal(userName string) (*Identity, error
 		fmt.Printf("👤 Creating user %s...\n", userName)
 		createUserOutput, err = s.client.CreateUser(s.ctx, &iam.CreateUserInput{
 			UserName: aws.String(userName),
-			Tags: []types.Tag{
+			Tags: []iamtypes.Tag{
 				{
 					Key:   aws.String("Purpose"),
 					Value: aws.String("CCC-Testing"),
@@ -473,8 +473,8 @@ func sanitizeForPolicyName(s string) string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *AWSIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-	return []environment.TestParams{}, nil
+func (s *AWSIAMService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
+	return []types.TestParams{}, nil
 }
 
 // CheckUserProvisioned is a no-op for IAM services (no service-specific validation needed)

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,13 +27,13 @@ func NewPolicyChecker(baseDir string) *PolicyChecker {
 }
 
 // LoadPolicy loads a policy definition from a YAML file
-func (c *PolicyChecker) LoadPolicy(policyPath string) (*environment.PolicyDefinition, error) {
+func (c *PolicyChecker) LoadPolicy(policyPath string) (*types.PolicyDefinition, error) {
 	data, err := os.ReadFile(policyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read policy file %s: %w", policyPath, err)
 	}
 
-	var policy environment.PolicyDefinition
+	var policy types.PolicyDefinition
 	if err := yaml.Unmarshal(data, &policy); err != nil {
 		return nil, fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
 	}
@@ -97,8 +97,8 @@ func (c *PolicyChecker) ExecuteQuery(query string) (string, error) {
 }
 
 // EvaluateRule checks if a single rule passes against the query output
-func (c *PolicyChecker) EvaluateRule(rule environment.Rule, queryOutput string) environment.RuleResult {
-	result := environment.RuleResult{
+func (c *PolicyChecker) EvaluateRule(rule types.Rule, queryOutput string) types.RuleResult {
+	result := types.RuleResult{
 		JSONPath:       rule.JSONPath,
 		ExpectedValues: make([]string, len(rule.ExpectedValues)),
 		ValidationRule: rule.ValidationRule,
@@ -156,14 +156,14 @@ func (c *PolicyChecker) EvaluateRule(rule environment.Rule, queryOutput string) 
 }
 
 // RunPolicy executes a complete policy check using values from Props
-func (c *PolicyChecker) RunPolicy(props map[string]interface{}, policyPath string) (*environment.PolicyResult, error) {
+func (c *PolicyChecker) RunPolicy(props map[string]interface{}, policyPath string) (*types.PolicyResult, error) {
 	// Load the policy
 	policyDef, err := c.LoadPolicy(policyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &environment.PolicyResult{
+	result := &types.PolicyResult{
 		PolicyPath:      policyPath,
 		Name:            policyDef.Name,
 		ServiceType:     policyDef.ServiceType,
@@ -193,7 +193,7 @@ func (c *PolicyChecker) RunPolicy(props map[string]interface{}, policyPath strin
 	}
 
 	// Evaluate each rule
-	result.RuleResults = make([]environment.RuleResult, len(policyDef.Rules))
+	result.RuleResults = make([]types.RuleResult, len(policyDef.Rules))
 	for i, rule := range policyDef.Rules {
 		ruleResult := c.EvaluateRule(rule, output)
 		result.RuleResults[i] = ruleResult

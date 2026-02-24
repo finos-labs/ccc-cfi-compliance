@@ -20,10 +20,11 @@ validity_commentary: >
 query: |
   az monitor diagnostic-settings list \
     --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "[].logs[?category=='StorageRead'] | [0][0]" \
     --output json
 
 rules:
-  - jsonpath: "$.value[*].logs[?(@.category=='StorageRead')].enabled"
+  - jsonpath: "$.enabled"
     expected_values: ["true"]
     validation_rule: ""
     description: >

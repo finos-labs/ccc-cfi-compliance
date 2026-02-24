@@ -8,55 +8,54 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/logging"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AzureFactory implements the Factory interface for Azure
 type AzureFactory struct {
-	ctx         context.Context
-	cloudParams environment.CloudParams
-	iamService  generic.Service
+	ctx        context.Context
+	instance   types.InstanceConfig
+	iamService generic.Service
 }
 
 // NewAzureFactory creates a new Azure factory
-func NewAzureFactory(cloudParams environment.CloudParams) *AzureFactory {
+func NewAzureFactory(instance types.InstanceConfig) *AzureFactory {
 	ctx := context.Background()
+	cloudParams := instance.CloudParams()
 
 	// Create IAM service once and cache it
 	iamService, err := iam.NewAzureIAMService(ctx, cloudParams)
 	if err != nil {
-		// Log error but don't fail - IAM service might not be needed
 		fmt.Printf("⚠️  Warning: Failed to create Azure IAM service: %v\n", err)
 	}
 
 	return &AzureFactory{
-		ctx:         ctx,
-		cloudParams: cloudParams,
-		iamService:  iamService,
+		ctx:        ctx,
+		instance:   instance,
+		iamService: iamService,
 	}
 }
 
 // GetServiceAPI returns a generic service API client for the given service type
 func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
+	cloudParams := f.instance.CloudParams()
+
 	switch serviceID {
 	case "iam":
 		return f.iamService, nil
 
 	case "object-storage":
-		service, err := objstorage.NewAzureBlobService(f.ctx, f.cloudParams)
+		service, err := objstorage.NewAzureBlobService(f.ctx, cloudParams, f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
 		}
-
-		// TODO: DO this generically.  Elevate access for testing
 		if err := service.ElevateAccessForInspection(); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
 		}
-
 		return service, nil
 
 	case "logging":
-		service, err := logging.NewAzureLoggingService(f.ctx, &f.cloudParams, nil)
+		service, err := logging.NewAzureLoggingService(f.ctx, &cloudParams, nil, f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure logging service: %w", err)
 		}
@@ -73,24 +72,22 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
 
+	cloudParams := f.instance.CloudParams()
+
 	switch serviceID {
 	case "iam":
 		return f.iamService, nil
 
 	case "object-storage":
-		service, err := objstorage.NewAzureBlobServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		service, err := objstorage.NewAzureBlobServiceWithCredentials(f.ctx, cloudParams, f.instance, identity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s' with identity: %w", serviceID, err)
 		}
-
-		// If testAccess is true, validate that permissions have propagated
 		if testAccess {
-			err = waitForUserProvisioning(service)
-			if err != nil {
+			if err = waitForUserProvisioning(service); err != nil {
 				return nil, fmt.Errorf("user provisioning validation failed: %w", err)
 			}
 		}
-
 		return service, nil
 
 	default:

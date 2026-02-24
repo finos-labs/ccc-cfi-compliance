@@ -1,0 +1,44 @@
+instances:
+
+  - id: main-aws
+    type: aws
+    properties:
+      region: us-east-1
+
+    rules:
+      permitted-regions: [us-east-1]
+
+    services:
+      - type: object-storage
+      - type: logging
+        aws-cloud-trail-log-group-name: cfi-test-log-group
+
+  - id: main-azure
+    type: azure
+    properties:
+      region: eastus
+      azure-subscription-id: c1cedd8e-bf91-4d7d-a4cc-45700402a2a1
+      azure-resource-group: cfi_test
+
+    rules:
+      permitted-regions: [eastus]
+
+    services:
+      - type: object-storage
+        azure-storage-account: storagecfitesting2026
+      - type: logging 
+        azure-log-analytics-workspace-id: eef48f13-9113-4a14-95e6-beef93dc8a33
+
+  - id: main-gcp
+    type: gcp
+    properties:
+      region: us-central1
+      gcp-project-id: nodal-time-474015-p5
+
+    rules:
+      permitted-regions: [us-central1]
+
+    services:
+      - type: object-storage
+      - type: logging
+        gcp-log-bucket-name: cfi-test-log-bucket

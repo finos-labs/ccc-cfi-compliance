@@ -18,7 +18,7 @@ validity_commentary: >
   - Requires IAM configuration at project or organization level
 
 query: |
-  gcloud projects get-iam-policy ${GCPProjectID} \
+  gcloud projects get-iam-policy ${GcpProjectId} \
     --format=json
 
 rules:

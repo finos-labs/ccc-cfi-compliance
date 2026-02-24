@@ -3,13 +3,13 @@ package main
 import (
 	"time"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // RunConfig is the configuration for running compliance tests
 type RunConfig struct {
 	ServiceName    string // e.g., "object-storage", "iam"
-	CloudParams    environment.CloudParams
+	Instance       types.InstanceConfig
 	OutputDir      string
 	Timeout        time.Duration
 	ResourceFilter string
