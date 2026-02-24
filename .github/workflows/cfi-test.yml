@@ -10,12 +10,6 @@ concurrency:
 
 on:
   workflow_dispatch:
-    inputs:
-      run_prowler:
-        description: 'Run Prowler security scans'
-        required: false
-        default: false
-        type: boolean
   push:
     branches:
       - '**'
@@ -64,7 +58,8 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       OUTPUT_DIR: results
       PROWLER_BRANCH: master
-      RUN_PROWLER: ${{ github.event.inputs.run_prowler == 'true' }}
+      RUN_PROWLER: ${{ contains(matrix.target.test-frameworks || fromJson('[]'), 'prowler') }}
+      RUN_CFI: ${{ contains(matrix.target.test-frameworks || fromJson('[]'), 'cfi') }}
       TARGET_ID: ${{ matrix.target.id }}
       TARGET_NAME: ${{ matrix.target.name }}
       TARGET_PATH: ${{ matrix.target.path }}
@@ -189,6 +184,7 @@ jobs:
           echo "✅ Prowler metadata modifications completed"
 
       - name: Run Compliance Tests
+        if: env.RUN_CFI == 'true'
         id: compliance-tests
         continue-on-error: true
         run: |
@@ -234,15 +230,17 @@ jobs:
             fi
           fi
 
-          # Copy all compliance test results (HTML reports and OCSF JSON)
-          cd "$GITHUB_WORKSPACE/testing/output"
-          if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
-            for f in *.ocsf.json *.html; do
-              [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
-            done
-            echo "✅ Successfully captured compliance test output for $TARGET_ID"
-          else
-            echo "⚠️  No compliance test output files found for $TARGET_ID"
+          # Copy compliance test results (if CFI tests were run)
+          if [ "${{ env.RUN_CFI }}" = "true" ]; then
+            cd "$GITHUB_WORKSPACE/testing/output"
+            if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
+              for f in *.ocsf.json *.html; do
+                [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
+              done
+              echo "✅ Successfully captured compliance test output for $TARGET_ID"
+            else
+              echo "⚠️  No compliance test output files found for $TARGET_ID"
+            fi
           fi
 
       - name: Upload test results

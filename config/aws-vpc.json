@@ -5,5 +5,9 @@
     "name": "CCC AWS VPC Terraform Module",
     "description": "This module creates a secure AWS VPC with subnets, NAT gateways, routing, and advanced networking capabilities.",
     "path": "remote/aws/vpc",
+    "test-frameworks": [
+        "cfi", 
+        "prowler"
+    ],
     "git": "https://github.com/terraform-aws-modules/terraform-aws-vpc"
 }
