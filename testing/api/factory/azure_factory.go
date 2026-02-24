@@ -21,10 +21,9 @@ type AzureFactory struct {
 // NewAzureFactory creates a new Azure factory
 func NewAzureFactory(instance types.InstanceConfig) *AzureFactory {
 	ctx := context.Background()
-	cloudParams := instance.CloudParams()
 
 	// Create IAM service once and cache it
-	iamService, err := iam.NewAzureIAMService(ctx, cloudParams)
+	iamService, err := iam.NewAzureIAMService(ctx, instance)
 	if err != nil {
 		fmt.Printf("⚠️  Warning: Failed to create Azure IAM service: %v\n", err)
 	}

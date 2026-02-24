@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSLoggingService implements Service for AWS CloudTrail
@@ -16,12 +16,13 @@ type AWSLoggingService struct {
 	*generic.AWSService
 	cloudTrailClient *cloudtrail.Client
 	ctx              context.Context
-	cloudParams      *environment.CloudParams
-	testParams       *environment.TestParams
+	cloudParams *types.CloudParams
+	instance    types.InstanceConfig
+	testParams       *types.TestParams
 }
 
 // NewAWSLoggingService creates a new AWS logging service using default credential chain
-func NewAWSLoggingService(ctx context.Context, cloudParams *environment.CloudParams, testParams *environment.TestParams) (*AWSLoggingService, error) {
+func NewAWSLoggingService(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, instance types.InstanceConfig) (*AWSLoggingService, error) {
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
 	if err != nil {
 		return nil, err
@@ -31,13 +32,14 @@ func NewAWSLoggingService(ctx context.Context, cloudParams *environment.CloudPar
 		AWSService:       generic.NewAWSService(ctx),
 		cloudTrailClient: cloudtrail.NewFromConfig(cfg),
 		ctx:              ctx,
-		cloudParams:      cloudParams,
+		cloudParams: cloudParams,
+		instance:    instance,
 		testParams:       testParams,
 	}, nil
 }
 
 // NewAWSLoggingServiceWithCredentials creates a new AWS logging service with explicit credentials
-func NewAWSLoggingServiceWithCredentials(ctx context.Context, cloudParams *environment.CloudParams, testParams *environment.TestParams, accessKeyID, secretAccessKey, sessionToken string) (*AWSLoggingService, error) {
+func NewAWSLoggingServiceWithCredentials(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, accessKeyID, secretAccessKey, sessionToken string) (*AWSLoggingService, error) {
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(cloudParams.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, sessionToken)),
@@ -56,20 +58,20 @@ func NewAWSLoggingServiceWithCredentials(ctx context.Context, cloudParams *envir
 }
 
 // TestParams returns the test parameters
-func (s *AWSLoggingService) TestParams() *environment.TestParams {
+func (s *AWSLoggingService) TestParams() *types.TestParams {
 	return s.testParams
 }
 
 // CloudParams returns the cloud-specific parameters
-func (s *AWSLoggingService) CloudParams() *environment.CloudParams {
+func (s *AWSLoggingService) CloudParams() *types.CloudParams {
 	return s.cloudParams
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
-func (s *AWSLoggingService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *AWSLoggingService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
 	trailName := s.DiscoverCloudTrailName()
 
-	return []environment.TestParams{
+	return []types.TestParams{
 		{
 			ServiceType:         "logging",
 			ProviderServiceType: "cloudtrail",
@@ -79,7 +81,7 @@ func (s *AWSLoggingService) GetOrProvisionTestableResources() ([]environment.Tes
 			UID:                 trailName,
 			ReportFile:          "cloudtrail-" + trailName,
 			ReportTitle:         "CloudTrail: " + trailName,
-			CloudParams:         *s.cloudParams,
+			Instance:   s.instance,
 		},
 	}, nil
 }
@@ -144,18 +146,6 @@ func (s *AWSLoggingService) queryCloudTrailLogs(resourceID string, lookbackMinut
 			entry.Identity = *event.Username
 		}
 		entries = append(entries, entry)
-	}
-
-	if len(entries) == 0 {
-		return []LogEntry{
-			{
-				Identity:  "cloudtrail",
-				Action:    "QueryLogs",
-				Resource:  resourceID,
-				Timestamp: time.Now(),
-				Result:    "No " + eventType + " events found in lookback period",
-			},
-		}, nil
 	}
 
 	return entries, nil

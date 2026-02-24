@@ -27,7 +27,7 @@ func NewGCPFactory(instance types.InstanceConfig) *GCPFactory {
 	var iamService generic.Service
 	if cloudParams.GcpProjectId != "" {
 		var err error
-		iamService, err = iam.NewGCPIAMService(ctx, cloudParams.GcpProjectId)
+		iamService, err = iam.NewGCPIAMService(ctx, instance)
 		if err != nil {
 			fmt.Printf("⚠️  Warning: Failed to create GCP IAM service: %v\n", err)
 		}

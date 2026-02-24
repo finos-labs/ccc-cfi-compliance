@@ -1,0 +1,37 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
+	"gopkg.in/yaml.v3"
+)
+
+// LoadEnvironment loads and parses an environment.yaml file
+func LoadEnvironment(path string) (*types.EnvironmentConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read environment file %s: %w", path, err)
+	}
+	var config types.EnvironmentConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse environment file %s: %w", path, err)
+	}
+	return &config, nil
+}
+
+// FindInstance finds an instance by ID - convenience wrapper on EnvironmentConfig
+func FindInstance(config *types.EnvironmentConfig, id string) (*types.InstanceConfig, error) {
+	for i, inst := range config.Instances {
+		if inst.ID == id {
+			return &config.Instances[i], nil
+		}
+	}
+	ids := make([]string, len(config.Instances))
+	for i, inst := range config.Instances {
+		ids[i] = inst.ID
+	}
+	return nil, fmt.Errorf("instance '%s' not found (available: %s)", id, strings.Join(ids, ", "))
+}

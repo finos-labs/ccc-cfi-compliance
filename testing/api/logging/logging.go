@@ -15,6 +15,19 @@ type LogEntry struct {
 	Result    string    `json:"result"`    // Result/status of the action
 }
 
+// serviceParamString retrieves a string value from service params by camelCase key
+func serviceParamString(serviceParams map[string]interface{}, key string) string {
+	if serviceParams == nil {
+		return ""
+	}
+	if v, ok := serviceParams[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // Service provides operations for cloud logging testing
 // This interface abstracts CloudTrail (AWS), Cloud Audit Logs (GCP), and Azure Monitor
 type Service interface {

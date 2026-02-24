@@ -9,7 +9,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -18,11 +18,11 @@ import (
 type GCPStorageService struct {
 	client      *storage.Client
 	ctx         context.Context
-	cloudParams environment.CloudParams
+	instance types.InstanceConfig
 }
 
 // NewGCPStorageService creates a new GCP Cloud Storage service using default credentials
-func NewGCPStorageService(ctx context.Context, cloudParams environment.CloudParams) (*GCPStorageService, error) {
+func NewGCPStorageService(ctx context.Context, instance types.InstanceConfig) (*GCPStorageService, error) {
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCP storage client: %w", err)
@@ -31,12 +31,12 @@ func NewGCPStorageService(ctx context.Context, cloudParams environment.CloudPara
 	return &GCPStorageService{
 		client:      client,
 		ctx:         ctx,
-		cloudParams: cloudParams,
+		instance:    instance,
 	}, nil
 }
 
 // NewGCPStorageServiceWithCredentials creates a new GCP Storage service with service account credentials
-func NewGCPStorageServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, identity *iam.Identity) (*GCPStorageService, error) {
+func NewGCPStorageServiceWithCredentials(ctx context.Context, instance types.InstanceConfig, identity *iam.Identity) (*GCPStorageService, error) {
 	// Extract service account key JSON from identity
 	serviceAccountKey := identity.Credentials["service_account_key"]
 	if serviceAccountKey == "" {
@@ -53,15 +53,15 @@ func NewGCPStorageServiceWithCredentials(ctx context.Context, cloudParams enviro
 	return &GCPStorageService{
 		client:      client,
 		ctx:         ctx,
-		cloudParams: cloudParams,
+		instance:    instance,
 	}, nil
 }
 
 // ListBuckets lists all GCS buckets in the project
 func (s *GCPStorageService) ListBuckets() ([]Bucket, error) {
-	projectID := s.cloudParams.GCPProjectID
+	projectID := s.instance.Properties.GcpProjectId
 	if projectID == "" {
-		return nil, fmt.Errorf("GCPProjectID not set in CloudParams")
+		return nil, fmt.Errorf("GcpProjectId not set in CloudParams")
 	}
 
 	fmt.Printf("📦 Listing buckets in project: %s\n", projectID)
@@ -89,8 +89,8 @@ func (s *GCPStorageService) ListBuckets() ([]Bucket, error) {
 
 // CreateBucket creates a new GCS bucket
 func (s *GCPStorageService) CreateBucket(bucketID string) (*Bucket, error) {
-	projectID := s.cloudParams.GCPProjectID
-	region := s.cloudParams.Region
+	projectID := s.instance.Properties.GcpProjectId
+	region := s.instance.Properties.Region
 	if region == "" {
 		region = "US" // Default to multi-region US
 	}
@@ -263,7 +263,7 @@ func (s *GCPStorageService) EnsureDefaultResourceExists(buckets []Bucket, err er
 	}
 
 	// Create a default test bucket
-	projectID := s.cloudParams.GCPProjectID
+	projectID := s.instance.Properties.GcpProjectId
 	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(projectID))
 	fmt.Printf("📦 No buckets found. Creating default test bucket: %s\n", defaultBucketName)
 
@@ -314,10 +314,10 @@ func (s *GCPStorageService) GetObjectRetentionDurationDays(bucketID string, obje
 }
 
 // GetOrProvisionTestableResources returns all GCS buckets as testable resources
-func (s *GCPStorageService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-	projectID := s.cloudParams.GCPProjectID
+func (s *GCPStorageService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
+	projectID := s.instance.Properties.GcpProjectId
 	if projectID == "" {
-		return nil, fmt.Errorf("GCPProjectID not set in CloudParams")
+		return nil, fmt.Errorf("GcpProjectId not set in CloudParams")
 	}
 
 	// List all buckets and ensure at least one exists
@@ -327,10 +327,10 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]environment.Tes
 	}
 
 	// Convert buckets to TestParams (2 per bucket: service + port)
-	resources := make([]environment.TestParams, 0, len(buckets)*2)
+	resources := make([]types.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
 		// PerService: Resource-level tests (policy checks, configuration validation)
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 fmt.Sprintf("projects/%s/buckets/%s", projectID, bucket.Name),
 			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
@@ -339,12 +339,12 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]environment.Tes
 			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
-			CloudParams:         s.cloudParams,
+			Instance:            s.instance,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
 		endpoint := fmt.Sprintf("%s.storage.googleapis.com", bucket.Name)
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 fmt.Sprintf("projects/%s/buckets/%s", projectID, bucket.Name),
 			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
@@ -356,7 +356,7 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]environment.Tes
 			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
-			CloudParams:         s.cloudParams,
+			Instance:            s.instance,
 		})
 	}
 
@@ -365,9 +365,9 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]environment.Tes
 
 // CheckUserProvisioned validates that credentials can access GCS
 func (s *GCPStorageService) CheckUserProvisioned() error {
-	projectID := s.cloudParams.GCPProjectID
+	projectID := s.instance.Properties.GcpProjectId
 	if projectID == "" {
-		return fmt.Errorf("GCPProjectID not set")
+		return fmt.Errorf("GcpProjectId not set")
 	}
 
 	// Try to list buckets as validation
@@ -517,4 +517,3 @@ func (s *GCPStorageService) UpdateResourcePolicy() error {
 
 	return nil
 }
-

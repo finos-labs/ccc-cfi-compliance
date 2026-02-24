@@ -4,9 +4,6 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
   I want to ensure all administrative access attempts are logged
   So that audit trails are maintained for compliance
 
-  Background:
-    Given a cloud api for "{Instance}" in "api"
-
   @Policy @object-storage @vpc
   Scenario: Admin logging compliance
     When I attempt policy check "admin-logging" for control "CCC.Core.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
@@ -14,7 +11,8 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
 
   @Behavioural @object-storage
   Scenario: Verify admin actions are logged with identity and timestamp
-    Given I call "{api}" with "GetServiceAPI" using argument "{ServiceType}"
+    Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "{ServiceType}"
     And I refer to "{result}" as "theService"
     Given I call "{api}" with "GetServiceAPI" using argument "logging"
     And I refer to "{result}" as "loggingService"

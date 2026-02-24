@@ -13,9 +13,9 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	generic "github.com/robmoffat/standard-cucumber-steps/go"
 )
 
@@ -32,45 +32,87 @@ func NewTestSuite() *TestSuite {
 	}
 }
 
-// setupServiceParams sets up parameters for service tests
-// Accepts any struct and populates Props using reflection
+// setupServiceParams populates Props from a struct (using field names) or a map (using raw keys).
 func (suite *TestSuite) setupServiceParams(params any) {
-	// Use reflection to automatically populate all fields from the params struct
 	v := reflect.ValueOf(params)
 
-	// Handle pointer to struct
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
-	// Only process if it's a struct
-	if v.Kind() != reflect.Struct {
-		return
-	}
-
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Field(i)
-		value := v.Field(i)
-		suite.Props[field.Name] = value.Interface() // Use .Interface() to get the actual value, not reflect.Value
+	switch v.Kind() {
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			field := t.Field(i)
+			value := v.Field(i)
+			suite.Props[field.Name] = value.Interface()
+		}
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			suite.Props[fmt.Sprintf("%v", key.Interface())] = v.MapIndex(key).Interface()
+		}
 	}
 }
 
 // InitializeServiceScenario initializes the scenario context for service testing
-func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, params environment.TestParams) {
+func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, params types.TestParams) {
 	// Setup before each scenario
 	sc.Before(func(ctx context.Context, s *godog.Scenario) (context.Context, error) {
 		suite.Props = make(map[string]interface{})
 		suite.AsyncManager = generic.NewAsyncTaskManager()
-		suite.ClearAttachments() // Clear attachments from previous scenario
+		suite.ClearAttachments()
+		// Populate from top-level TestParams fields (UID, ResourceName, etc.)
 		suite.setupServiceParams(params)
-		suite.setupServiceParams(params.CloudParams)
+		// Populate Props (already enriched with CloudParams, service props, and rules)
 		suite.setupServiceParams(params.Props)
+		// Expose the full Instance so the factory can be created in cloud_steps.go
+		suite.Props["Instance"] = params.Instance
 		return ctx, nil
 	})
 
 	// Register all cloud steps (which includes generic steps)
 	suite.RegisterSteps(sc)
+}
+
+// kebabToTitleCase converts a kebab-case string to TitleCase.
+// e.g. "azure-storage-account" → "AzureStorageAccount"
+func kebabToTitleCase(s string) string {
+	parts := strings.Split(s, "-")
+	for i, p := range parts {
+		if len(p) > 0 {
+			parts[i] = strings.ToUpper(p[:1]) + p[1:]
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+// enrichParamsProps populates params.Props with all instance-level properties so they are
+// visible in the HTML report. Props are also used for step template substitution at runtime.
+func enrichParamsProps(params types.TestParams) types.TestParams {
+	if params.Props == nil {
+		params.Props = make(map[string]interface{})
+	}
+	// CloudParams struct fields already use Go field names (TitleCase)
+	cp := params.Instance.CloudParams()
+	cpVal := reflect.ValueOf(cp)
+	cpType := cpVal.Type()
+	for i := 0; i < cpVal.NumField(); i++ {
+		s := fmt.Sprintf("%v", cpVal.Field(i).Interface())
+		if s != "" {
+			params.Props[cpType.Field(i).Name] = s
+		}
+	}
+	// Service and rule keys come from YAML (kebab-case) — convert to TitleCase
+	for _, svc := range params.Instance.Services {
+		for k, v := range svc.Properties {
+			params.Props[kebabToTitleCase(k)] = v
+		}
+	}
+	for k, v := range params.Instance.Rules {
+		params.Props[kebabToTitleCase(k)] = v
+	}
+	return params
 }
 
 // BasicServiceRunner provides functionality for running service-specific compliance tests
@@ -96,15 +138,15 @@ func (r *BasicServiceRunner) Run() int {
 
 	log.Printf("🚀 Starting CCC Compliance Tests")
 	log.Printf("   Service: %s", config.ServiceName)
-	log.Printf("   Provider: %s", config.CloudParams.Provider)
+	log.Printf("   Provider: %s", config.Instance.Properties.Provider)
 	log.Println()
 
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 	defer cancel()
 
-	// Create cloud factory
-	cloudFactory, err := factory.NewFactory(factory.CloudProvider(config.CloudParams.Provider), config.CloudParams)
+	// Create cloud factory with the full InstanceConfig so every service can find its properties
+	cloudFactory, err := factory.NewFactory(factory.CloudProvider(config.Instance.Properties.Provider), config.Instance)
 	if err != nil {
 		log.Fatalf("Failed to create factory: %v", err)
 	}
@@ -174,7 +216,7 @@ type TestStats struct {
 }
 
 // runTests executes tests for all resources
-func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environment.TestParams, featuresPaths []string) TestStats {
+func (r *BasicServiceRunner) runTests(ctx context.Context, resources []types.TestParams, featuresPaths []string) TestStats {
 	stats := TestStats{}
 
 	for i, resource := range resources {
@@ -217,7 +259,7 @@ func (r *BasicServiceRunner) runTests(ctx context.Context, resources []environme
 }
 
 // runResourceTest runs tests for a single resource
-func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environment.TestParams, featuresPaths []string, catalogTypes []string) string {
+func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params types.TestParams, featuresPaths []string, catalogTypes []string) string {
 	// Create a safe filename from ReportFile or fall back to ResourceName
 	baseName := params.ReportFile
 	if baseName == "" {
@@ -239,6 +281,10 @@ func (r *BasicServiceRunner) runResourceTest(ctx context.Context, params environ
 	// Create HTML and OCSF output files
 	htmlReportPath := reportPath + ".html"
 	ocsfReportPath := reportPath + ".ocsf.json"
+
+	// Enrich params.Props with instance/service/rules properties before creating the formatter
+	// so they appear in the HTML report and are available for step template substitution.
+	params = enrichParamsProps(params)
 
 	// Create formatter factory
 	formatterFactory := reporters.NewFormatterFactory(params, suite.CloudWorld)

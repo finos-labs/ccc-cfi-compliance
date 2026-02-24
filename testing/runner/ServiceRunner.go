@@ -16,7 +16,7 @@ type RunConfig struct {
 	Tags           []string // Tag filters to AND with service tags (e.g., ["@CCC.Core.CN01", "@Policy"])
 }
 
-// ServiceRunner is the interface for running compliance tests for a specific service
+// ServiceRunner is the interface for running a suite of compliance tests for a specific service
 type ServiceRunner interface {
 	Run() int
 

@@ -17,7 +17,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	generic "github.com/robmoffat/standard-cucumber-steps/go"
 	"gopkg.in/yaml.v3"
 )
@@ -84,7 +84,7 @@ func (c *Connection) startOutputReader(reader io.Reader) {
 // CloudWorld extends PropsWorld with cloud-specific functionality
 type CloudWorld struct {
 	*generic.PropsWorld
-	Attachments []environment.Attachment // CFI-specific: Store attachments for the current scenario
+	Attachments []types.Attachment // CFI-specific: Store attachments for the current scenario
 	mu          sync.RWMutex
 }
 
@@ -92,7 +92,7 @@ type CloudWorld struct {
 func NewCloudWorld() *CloudWorld {
 	return &CloudWorld{
 		PropsWorld:  generic.NewPropsWorld(),
-		Attachments: make([]environment.Attachment, 0),
+		Attachments: make([]types.Attachment, 0),
 	}
 }
 
@@ -100,7 +100,7 @@ func NewCloudWorld() *CloudWorld {
 func (cw *CloudWorld) Attach(name, mediaType string, data []byte) {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
-	cw.Attachments = append(cw.Attachments, environment.Attachment{
+	cw.Attachments = append(cw.Attachments, types.Attachment{
 		Name:      name,
 		MediaType: mediaType,
 		Data:      data,
@@ -108,22 +108,22 @@ func (cw *CloudWorld) Attach(name, mediaType string, data []byte) {
 	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
 }
 
-// GetAttachments returns a copy of the current attachments (implements environment.AttachmentProvider)
-func (cw *CloudWorld) GetAttachments() []environment.Attachment {
+// GetAttachments returns a copy of the current attachments (implements types.AttachmentProvider)
+func (cw *CloudWorld) GetAttachments() []types.Attachment {
 	cw.mu.RLock()
 	defer cw.mu.RUnlock()
 
 	// Return a copy to avoid race conditions
-	attachmentsCopy := make([]environment.Attachment, len(cw.Attachments))
+	attachmentsCopy := make([]types.Attachment, len(cw.Attachments))
 	copy(attachmentsCopy, cw.Attachments)
 	return attachmentsCopy
 }
 
-// ClearAttachments clears all attachments (implements environment.AttachmentProvider)
+// ClearAttachments clears all attachments (implements types.AttachmentProvider)
 func (cw *CloudWorld) ClearAttachments() {
 	cw.mu.Lock()
 	defer cw.mu.Unlock()
-	cw.Attachments = make([]environment.Attachment, 0)
+	cw.Attachments = make([]types.Attachment, 0)
 }
 
 // iAttachToTestOutput attaches content to the test output (CFI-specific step)
@@ -526,16 +526,19 @@ func (cw *CloudWorld) getSSLSupportReportWithSTARTTLS(reportName, testType, host
 	return cw.runTestSSL(reportName, testType, hostName, port, true)
 }
 
-// aCloudAPIForProviderIn initializes a cloud API factory for the specified provider
-// Example: Given a cloud api for "aws" in "myAPI"
-func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string) error {
-	// Resolve the provider name (in case it's a variable reference)
-	providerResolved := cw.HandleResolve(providerName)
-	providerStr := fmt.Sprintf("%v", providerResolved)
+// aCloudAPIForProviderIn initializes a cloud API factory from the given instance.
+// Example: Given a cloud api for "{Instance}" in "api"
+func (cw *CloudWorld) aCloudAPIForProviderIn(instanceArg string, apiName string) error {
+	// Resolve the argument — expects a types.InstanceConfig (e.g. from {Instance})
+	resolved := cw.HandleResolve(instanceArg)
+	instance, ok := resolved.(types.InstanceConfig)
+	if !ok {
+		return fmt.Errorf("expected an InstanceConfig for %q, got %T", instanceArg, resolved)
+	}
 
-	// Convert provider string to CloudProvider type
+	// Derive provider from the instance properties
 	var provider factory.CloudProvider
-	switch providerStr {
+	switch instance.Properties.Provider {
 	case "aws":
 		provider = factory.ProviderAWS
 	case "azure":
@@ -543,21 +546,15 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 	case "gcp":
 		provider = factory.ProviderGCP
 	default:
-		return fmt.Errorf("unsupported cloud provider: %s (must be aws, azure, or gcp)", providerStr)
+		return fmt.Errorf("unsupported cloud provider %q in instance %q", instance.Properties.Provider, instance.ID)
 	}
 
-	// Get CloudParams from Props (populated by setupWithParams)
-	var cloudParams = cw.Props["CloudParams"].(environment.CloudParams)
-
-	// Create the factory
-	f, err := factory.NewFactory(provider, cloudParams)
+	f, err := factory.NewFactory(provider, instance)
 	if err != nil {
-		return fmt.Errorf("failed to create factory for provider %s: %w", providerStr, err)
+		return fmt.Errorf("failed to create factory for instance %q: %w", instance.ID, err)
 	}
 
-	// Store the factory in Props with the given API name
 	cw.Props[apiName] = f
-
 	return nil
 }
 

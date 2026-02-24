@@ -23,7 +23,7 @@ func NewAWSFactory(instance types.InstanceConfig) *AWSFactory {
 	ctx := context.Background()
 
 	// Create IAM service once and cache it
-	iamService, err := iam.NewAWSIAMService(ctx)
+	iamService, err := iam.NewAWSIAMService(ctx, instance)
 	if err != nil {
 		fmt.Printf("⚠️  Warning: Failed to create AWS IAM service: %v\n", err)
 	}

@@ -4,6 +4,19 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 )
 
+// serviceParamString retrieves a string value from service params by camelCase key
+func serviceParamString(serviceParams map[string]interface{}, key string) string {
+	if serviceParams == nil {
+		return ""
+	}
+	if v, ok := serviceParams[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // Bucket represents a storage bucket/container
 type Bucket struct {
 	ID     string // Unique identifier (name for AWS S3, Azure Storage Account + Container)

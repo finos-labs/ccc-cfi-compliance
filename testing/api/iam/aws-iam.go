@@ -18,12 +18,13 @@ import (
 type AWSIAMService struct {
 	client           *iam.Client
 	ctx              context.Context
+	instance         types.InstanceConfig
 	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
 	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewAWSIAMService creates a new AWS IAM service using default credentials
-func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
+func NewAWSIAMService(ctx context.Context, instance types.InstanceConfig) (*AWSIAMService, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -32,6 +33,7 @@ func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
 	return &AWSIAMService{
 		client:           iam.NewFromConfig(cfg),
 		ctx:              ctx,
+		instance:         instance,
 		provisionedUsers: make(map[string]*Identity),
 		accessLevels:     make(map[string]string),
 	}, nil

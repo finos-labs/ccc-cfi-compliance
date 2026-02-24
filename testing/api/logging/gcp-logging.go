@@ -2,23 +2,23 @@ package logging
 
 import (
 	"context"
-	"time"
 
 	"cloud.google.com/go/logging/logadmin"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // GCPLoggingService implements Service for GCP Cloud Audit Logs
 type GCPLoggingService struct {
 	logAdminClient *logadmin.Client
 	ctx            context.Context
-	cloudParams    *environment.CloudParams
-	testParams     *environment.TestParams
+	cloudParams *types.CloudParams
+	instance    types.InstanceConfig
+	testParams     *types.TestParams
 }
 
 // NewGCPLoggingService creates a new GCP logging service
-func NewGCPLoggingService(ctx context.Context, cloudParams *environment.CloudParams, testParams *environment.TestParams) (*GCPLoggingService, error) {
-	client, err := logadmin.NewClient(ctx, cloudParams.GCPProjectID)
+func NewGCPLoggingService(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, instance types.InstanceConfig) (*GCPLoggingService, error) {
+	client, err := logadmin.NewClient(ctx, cloudParams.GcpProjectId)
 	if err != nil {
 		return nil, err
 	}
@@ -26,25 +26,26 @@ func NewGCPLoggingService(ctx context.Context, cloudParams *environment.CloudPar
 	return &GCPLoggingService{
 		logAdminClient: client,
 		ctx:            ctx,
-		cloudParams:    cloudParams,
+		cloudParams: cloudParams,
+		instance:    instance,
 		testParams:     testParams,
 	}, nil
 }
 
 // TestParams returns the test parameters
-func (s *GCPLoggingService) TestParams() *environment.TestParams {
+func (s *GCPLoggingService) TestParams() *types.TestParams {
 	return s.testParams
 }
 
 // CloudParams returns the cloud-specific parameters
-func (s *GCPLoggingService) CloudParams() *environment.CloudParams {
+func (s *GCPLoggingService) CloudParams() *types.CloudParams {
 	return s.cloudParams
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
-func (s *GCPLoggingService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *GCPLoggingService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
 	resourceName := "cloud-audit-logs"
-	return []environment.TestParams{
+	return []types.TestParams{
 		{
 			ServiceType:         "logging",
 			ProviderServiceType: "cloud-audit-logs",
@@ -54,7 +55,7 @@ func (s *GCPLoggingService) GetOrProvisionTestableResources() ([]environment.Tes
 			UID:                 resourceName,
 			ReportFile:          "cloud-audit-logs",
 			ReportTitle:         "Cloud Audit Logs",
-			CloudParams:         *s.cloudParams,
+			Instance:   s.instance,
 		},
 	}, nil
 }
@@ -81,41 +82,23 @@ func (s *GCPLoggingService) UpdateResourcePolicy() error {
 
 // QueryAdminLogs queries Cloud Audit Logs for admin activity events
 func (s *GCPLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-default",
-			Action:    "QueryAdminLogs",
-			Resource:  resourceID,
-			Timestamp: time.Now(),
-			Result:    "Admin Activity audit logs are enabled by default in GCP",
-		},
-	}, nil
+	// TODO: Implement actual GCP Cloud Audit Logs querying
+	// Admin Activity audit logs are enabled by default in GCP
+	return []LogEntry{}, nil
 }
 
 // QueryDataWriteLogs queries Cloud Audit Logs for data write events
 func (s *GCPLoggingService) QueryDataWriteLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-not-configured",
-			Action:    "QueryDataWriteLogs",
-			Resource:  resourceID,
-			Timestamp: time.Now(),
-			Result:    "DATA_WRITE audit logs must be explicitly enabled in IAM policy",
-		},
-	}, nil
+	// TODO: Implement actual GCP Cloud Audit Logs querying
+	// DATA_WRITE audit logs must be explicitly enabled in IAM policy
+	return []LogEntry{}, nil
 }
 
 // QueryDataReadLogs queries Cloud Audit Logs for data read events
 func (s *GCPLoggingService) QueryDataReadLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return []LogEntry{
-		{
-			Identity:  "cloud-audit-logs-not-configured",
-			Action:    "QueryDataReadLogs",
-			Resource:  resourceID,
-			Timestamp: time.Now(),
-			Result:    "DATA_READ audit logs must be explicitly enabled in IAM policy",
-		},
-	}, nil
+	// TODO: Implement actual GCP Cloud Audit Logs querying
+	// DATA_READ audit logs must be explicitly enabled in IAM policy
+	return []LogEntry{}, nil
 }
 
 // Close releases resources

@@ -16,7 +16,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSS3Service implements Service for AWS S3
@@ -25,12 +25,12 @@ type AWSS3Service struct {
 	client      *s3.Client
 	config      aws.Config
 	ctx         context.Context
-	cloudParams environment.CloudParams
+	instance types.InstanceConfig
 }
 
 // NewAWSS3Service creates a new AWS S3 service using default credentials
-func NewAWSS3Service(ctx context.Context, cloudParams environment.CloudParams) (*AWSS3Service, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
+func NewAWSS3Service(ctx context.Context, instance types.InstanceConfig) (*AWSS3Service, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(instance.Properties.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -40,12 +40,12 @@ func NewAWSS3Service(ctx context.Context, cloudParams environment.CloudParams) (
 		client:      s3.NewFromConfig(cfg),
 		config:      cfg,
 		ctx:         ctx,
-		cloudParams: cloudParams,
+		instance:    instance,
 	}, nil
 }
 
 // NewAWSS3ServiceWithCredentials creates a new AWS S3 service with specific credentials from an Identity
-func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, identity *iam.Identity) (*AWSS3Service, error) {
+func NewAWSS3ServiceWithCredentials(ctx context.Context, instance types.InstanceConfig, identity *iam.Identity) (*AWSS3Service, error) {
 	// Extract credentials from the map
 	accessKeyID := identity.Credentials["access_key_id"]
 	secretAccessKey := identity.Credentials["secret_access_key"]
@@ -58,7 +58,7 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment
 	fmt.Printf("   Has Session Token: %v\n", sessionToken != "")
 
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(cloudParams.Region),
+		config.WithRegion(instance.Properties.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKeyID,
 			secretAccessKey,
@@ -74,7 +74,7 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment
 		client:      s3.NewFromConfig(cfg),
 		config:      cfg,
 		ctx:         ctx,
-		cloudParams: cloudParams,
+		instance:    instance,
 	}, nil
 }
 
@@ -111,7 +111,7 @@ func (s *AWSS3Service) ListBuckets() ([]Bucket, error) {
 func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	input := &s3.CreateBucketInput{
@@ -126,7 +126,7 @@ func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 	return &Bucket{
 		ID:     bucketID,
 		Name:   bucketID,
-		Region: s.cloudParams.Region,
+		Region: s.instance.Properties.Region,
 	}, nil
 }
 
@@ -134,7 +134,7 @@ func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	_, err := regionalClient.DeleteBucket(s.ctx, &s3.DeleteBucketInput{
@@ -151,7 +151,7 @@ func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.ListObjectsV2(s.ctx, &s3.ListObjectsV2Input{
@@ -222,7 +222,7 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
@@ -305,7 +305,7 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 	}
 
 	// Create a default test bucket
-	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(s.cloudParams.Region))
+	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(s.instance.Properties.Region))
 	fmt.Printf("📦 No buckets found. Creating default test bucket: %s\n", defaultBucketName)
 
 	bucket, err := s.CreateBucket(defaultBucketName)
@@ -321,7 +321,7 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 func (s *AWSS3Service) GetBucketRetentionDurationDays(bucketID string) (int, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Get Object Lock configuration
@@ -355,7 +355,7 @@ func (s *AWSS3Service) GetBucketRetentionDurationDays(bucketID string) (int, err
 func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Get object retention
@@ -385,7 +385,7 @@ func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID 
 // Returns two TestParams per bucket:
 // 1. PerService - for policy/configuration checks
 // 2. PerPort - for TLS/endpoint connectivity tests
-func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, error) {
 	// List all buckets and ensure at least one exists
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
@@ -396,7 +396,7 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 	cloudTrailName := s.DiscoverCloudTrailName()
 
 	// Convert buckets to TestParams (2 per bucket: service + port)
-	resources := make([]environment.TestParams, 0, len(buckets)*2)
+	resources := make([]types.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
 		// Build Props with discovered values
 		props := map[string]interface{}{
@@ -404,7 +404,7 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 		}
 
 		// PerService: Resource-level tests (policy checks, configuration validation)
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
@@ -413,13 +413,13 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
-			CloudParams:         s.cloudParams,
+			Instance:            s.instance,
 			Props:               props,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
-		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.cloudParams.Region)
-		resources = append(resources, environment.TestParams{
+		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.instance.Properties.Region)
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
@@ -431,7 +431,7 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
-			CloudParams:         s.cloudParams,
+			Instance:            s.instance,
 			Props:               props,
 		})
 	}
