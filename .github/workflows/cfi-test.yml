@@ -10,6 +10,12 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      run_prowler:
+        description: 'Run Prowler security scans'
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - '**'
@@ -58,6 +64,7 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       OUTPUT_DIR: results
       PROWLER_BRANCH: master
+      RUN_PROWLER: ${{ github.event.inputs.run_prowler == 'true' }}
       TARGET_ID: ${{ matrix.target.id }}
       TARGET_NAME: ${{ matrix.target.name }}
       TARGET_PATH: ${{ matrix.target.path }}
@@ -120,6 +127,7 @@ jobs:
           echo "✅ testssl.sh installed"
 
       - name: Cache Python Poetry virtualenv
+        if: env.RUN_PROWLER == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -130,6 +138,7 @@ jobs:
           restore-keys: prowler-
 
       - name: Install Prowler and Python deps
+        if: env.RUN_PROWLER == 'true'
         run: |
           git clone -b ${{ env.PROWLER_BRANCH }} --single-branch https://github.com/prowler-cloud/prowler
           cd prowler
@@ -137,6 +146,7 @@ jobs:
           poetry install
 
       - name: Run Prowler Scan
+        if: env.RUN_PROWLER == 'true'
         id: prowler-scan
         continue-on-error: true
         run: |
@@ -157,8 +167,8 @@ jobs:
           echo "✅ Prowler scan completed for $TARGET_ID"
 
       - name: Modify Prowler metadata
+        if: always() && env.RUN_PROWLER == 'true'
         id: modify-prowler-metadata
-        if: always()
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -213,14 +223,15 @@ jobs:
           # Create output directory
           mkdir -p ${{ env.OUTPUT_DIR }}
 
-          # Copy Prowler OCSF results
-          cd "$GITHUB_WORKSPACE/prowler/output"
-
-          if [ -f "scan-modified.ocsf.json" ]; then
-            cp "scan-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-prowler.ocsf.json"
-            echo "✅ Successfully captured Prowler output for $TARGET_ID"
-          else
-            echo "⚠️  No Prowler OCSF file found for $TARGET_ID"
+          # Copy Prowler OCSF results (if Prowler was run)
+          if [ "${{ env.RUN_PROWLER }}" = "true" ]; then
+            cd "$GITHUB_WORKSPACE/prowler/output"
+            if [ -f "scan-modified.ocsf.json" ]; then
+              cp "scan-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-prowler.ocsf.json"
+              echo "✅ Successfully captured Prowler output for $TARGET_ID"
+            else
+              echo "⚠️  No Prowler OCSF file found for $TARGET_ID"
+            fi
           fi
 
           # Copy all compliance test results (HTML reports and OCSF JSON)
