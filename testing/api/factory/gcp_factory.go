@@ -42,8 +42,6 @@ func NewGCPFactory(instance types.InstanceConfig) *GCPFactory {
 
 // GetServiceAPI returns a generic service API client for the given service type
 func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	cloudParams := f.instance.CloudParams()
-
 	switch serviceID {
 	case "iam":
 		return f.iamService, nil
@@ -52,7 +50,7 @@ func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 		return objstorage.NewGCPStorageService(f.ctx, f.instance)
 
 	case "logging":
-		service, err := logging.NewGCPLoggingService(f.ctx, &cloudParams, nil, f.instance)
+		service, err := logging.NewGCPLoggingService(f.ctx, &f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create GCP logging service: %w", err)
 		}

@@ -18,19 +18,17 @@ type AzureLoggingService struct {
 	logsClient         *azquery.LogsClient
 	credential         azcore.TokenCredential
 	ctx                context.Context
-	cloudParams *types.CloudParams
-	instance    types.InstanceConfig
-	testParams         *types.TestParams
+	instance           types.InstanceConfig
 }
 
 // NewAzureLoggingService creates a new Azure logging service using default credential chain
-func NewAzureLoggingService(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, instance types.InstanceConfig) (*AzureLoggingService, error) {
+func NewAzureLoggingService(ctx context.Context, instance *types.InstanceConfig) (*AzureLoggingService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
 	}
 
-	activityLogsClient, err := armmonitor.NewActivityLogsClient(cloudParams.AzureSubscriptionID, cred, nil)
+	activityLogsClient, err := armmonitor.NewActivityLogsClient(instance.CloudParams().AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -45,20 +43,8 @@ func NewAzureLoggingService(ctx context.Context, cloudParams *types.CloudParams,
 		logsClient:         logsClient,
 		credential:         cred,
 		ctx:                ctx,
-		cloudParams: cloudParams,
-		instance:    instance,
-		testParams:         testParams,
+		instance:           *instance,
 	}, nil
-}
-
-// TestParams returns the test parameters
-func (s *AzureLoggingService) TestParams() *types.TestParams {
-	return s.testParams
-}
-
-// CloudParams returns the cloud-specific parameters
-func (s *AzureLoggingService) CloudParams() *types.CloudParams {
-	return s.cloudParams
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
@@ -74,7 +60,7 @@ func (s *AzureLoggingService) GetOrProvisionTestableResources() ([]types.TestPar
 			UID:                 resourceName,
 			ReportFile:          "azure-monitor",
 			ReportTitle:         "Azure Monitor",
-			Instance:   s.instance,
+			Instance:            s.instance,
 		},
 	}, nil
 }
@@ -109,7 +95,7 @@ func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes 
 	filter := fmt.Sprintf("eventTimestamp ge '%s' and eventTimestamp le '%s' and resourceGroupName eq '%s'",
 		startTime.UTC().Format(time.RFC3339),
 		endTime.UTC().Format(time.RFC3339),
-		s.cloudParams.AzureResourceGroup)
+		s.instance.CloudParams().AzureResourceGroup)
 
 	pager := s.activityLogsClient.NewListPager(filter, nil)
 

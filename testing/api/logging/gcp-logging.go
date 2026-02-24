@@ -11,14 +11,12 @@ import (
 type GCPLoggingService struct {
 	logAdminClient *logadmin.Client
 	ctx            context.Context
-	cloudParams *types.CloudParams
-	instance    types.InstanceConfig
-	testParams     *types.TestParams
+	instance       types.InstanceConfig
 }
 
 // NewGCPLoggingService creates a new GCP logging service
-func NewGCPLoggingService(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, instance types.InstanceConfig) (*GCPLoggingService, error) {
-	client, err := logadmin.NewClient(ctx, cloudParams.GcpProjectId)
+func NewGCPLoggingService(ctx context.Context, instance *types.InstanceConfig) (*GCPLoggingService, error) {
+	client, err := logadmin.NewClient(ctx, instance.CloudParams().GcpProjectId)
 	if err != nil {
 		return nil, err
 	}
@@ -26,20 +24,8 @@ func NewGCPLoggingService(ctx context.Context, cloudParams *types.CloudParams, t
 	return &GCPLoggingService{
 		logAdminClient: client,
 		ctx:            ctx,
-		cloudParams: cloudParams,
-		instance:    instance,
-		testParams:     testParams,
+		instance:       *instance,
 	}, nil
-}
-
-// TestParams returns the test parameters
-func (s *GCPLoggingService) TestParams() *types.TestParams {
-	return s.testParams
-}
-
-// CloudParams returns the cloud-specific parameters
-func (s *GCPLoggingService) CloudParams() *types.CloudParams {
-	return s.cloudParams
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
@@ -55,7 +41,7 @@ func (s *GCPLoggingService) GetOrProvisionTestableResources() ([]types.TestParam
 			UID:                 resourceName,
 			ReportFile:          "cloud-audit-logs",
 			ReportTitle:         "Cloud Audit Logs",
-			Instance:   s.instance,
+			Instance:            s.instance,
 		},
 	}, nil
 }

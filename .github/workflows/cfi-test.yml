@@ -189,20 +189,21 @@ jobs:
 
           chmod +x run-compliance-tests.sh
 
-          # Build command with provider-specific parameters
-          if [ "$TARGET_PROVIDER" = "aws" ]; then
-            ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
-          elif [ "$TARGET_PROVIDER" = "azure" ]; then
-            ./run-compliance-tests.sh --provider azure --output "output" \
-              --region "$TF_VAR_location" \
-              --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              --azure-resource-group "$TF_VAR_resource_group_name" \
-              --azure-storage-account "$TF_VAR_storage_account_name"
-          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-            ./run-compliance-tests.sh --provider gcp --output "output" \
-              --region "$TF_VAR_gcp_region" \
-              --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
-          fi
+          # Map provider to instance ID (from environment.yaml)
+          case "$TARGET_PROVIDER" in
+            aws)   INSTANCE_ID="main-aws" ;;
+            azure) INSTANCE_ID="main-azure" ;;
+            gcp)   INSTANCE_ID="main-gcp" ;;
+            *)     echo "❌ Unknown provider: $TARGET_PROVIDER"; exit 1 ;;
+          esac
+
+          # Map config service to compliance service type (storage → object-storage)
+          case "$TARGET_SERVICE" in
+            storage) SERVICE_TYPE="object-storage" ;;
+            *)       SERVICE_TYPE="$TARGET_SERVICE" ;;
+          esac
+
+          ./run-compliance-tests.sh --instance "$INSTANCE_ID" --service "$SERVICE_TYPE" --output "output"
 
           echo "✅ Compliance tests completed for $TARGET_ID"
 

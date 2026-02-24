@@ -23,7 +23,7 @@ type AzureBlobService struct {
 	storageClient *armstorage.AccountsClient // For normal storage operations
 	credential    azcore.TokenCredential
 	ctx           context.Context
-	instance   types.InstanceConfig
+	instance      *types.InstanceConfig
 	elevator      *elevation.AzureStorageElevator // Handles access elevation (RBAC + network)
 }
 
@@ -33,14 +33,14 @@ func (s *AzureBlobService) storageAccountName() string {
 }
 
 // NewAzureBlobService creates a new Azure Blob Storage service using default credentials
-func NewAzureBlobService(ctx context.Context, cloudParams types.CloudParams, instance types.InstanceConfig) (*AzureBlobService, error) {
+func NewAzureBlobService(ctx context.Context, instance *types.InstanceConfig) (*AzureBlobService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
 	// Create storage client for normal operations
-	storageClient, err := armstorage.NewAccountsClient(cloudParams.AzureSubscriptionID, cred, nil)
+	storageClient, err := armstorage.NewAccountsClient(instance.CloudParams().AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage accounts client: %w", err)
 	}
@@ -49,8 +49,8 @@ func NewAzureBlobService(ctx context.Context, cloudParams types.CloudParams, ins
 	elevator, err := elevation.NewAzureStorageElevator(
 		ctx,
 		cred,
-		cloudParams.AzureSubscriptionID,
-		cloudParams.AzureResourceGroup,
+		instance.CloudParams().AzureSubscriptionID,
+		instance.CloudParams().AzureResourceGroup,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure storage elevator: %w", err)
@@ -60,7 +60,7 @@ func NewAzureBlobService(ctx context.Context, cloudParams types.CloudParams, ins
 		storageClient: storageClient,
 		credential:    cred,
 		ctx:           ctx,
-		instance:   instance,
+		instance:      instance,
 		elevator:      elevator,
 	}, nil
 }
@@ -114,7 +114,7 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams types.C
 		storageClient: storageClient,
 		credential:    cred,
 		ctx:           ctx,
-		instance:   instance,
+		instance:      &instance,
 		elevator:      elevator,
 	}, nil
 }
@@ -568,7 +568,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
-			Instance:            s.instance,
+			Instance:            *s.instance,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
@@ -585,7 +585,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
-			Instance:            s.instance,
+			Instance:            *s.instance,
 		})
 	}
 
@@ -819,4 +819,3 @@ func (s *AzureBlobService) UpdateResourcePolicy() error {
 
 	return nil
 }
-

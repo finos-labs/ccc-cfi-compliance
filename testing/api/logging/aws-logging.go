@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
@@ -16,14 +15,12 @@ type AWSLoggingService struct {
 	*generic.AWSService
 	cloudTrailClient *cloudtrail.Client
 	ctx              context.Context
-	cloudParams *types.CloudParams
-	instance    types.InstanceConfig
-	testParams       *types.TestParams
+	instance         types.InstanceConfig
 }
 
 // NewAWSLoggingService creates a new AWS logging service using default credential chain
-func NewAWSLoggingService(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, instance types.InstanceConfig) (*AWSLoggingService, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
+func NewAWSLoggingService(ctx context.Context, instance *types.InstanceConfig) (*AWSLoggingService, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(instance.CloudParams().Region))
 	if err != nil {
 		return nil, err
 	}
@@ -32,39 +29,8 @@ func NewAWSLoggingService(ctx context.Context, cloudParams *types.CloudParams, t
 		AWSService:       generic.NewAWSService(ctx),
 		cloudTrailClient: cloudtrail.NewFromConfig(cfg),
 		ctx:              ctx,
-		cloudParams: cloudParams,
-		instance:    instance,
-		testParams:       testParams,
+		instance:         *instance,
 	}, nil
-}
-
-// NewAWSLoggingServiceWithCredentials creates a new AWS logging service with explicit credentials
-func NewAWSLoggingServiceWithCredentials(ctx context.Context, cloudParams *types.CloudParams, testParams *types.TestParams, accessKeyID, secretAccessKey, sessionToken string) (*AWSLoggingService, error) {
-	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(cloudParams.Region),
-		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, sessionToken)),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return &AWSLoggingService{
-		AWSService:       generic.NewAWSService(ctx),
-		cloudTrailClient: cloudtrail.NewFromConfig(cfg),
-		ctx:              ctx,
-		cloudParams:      cloudParams,
-		testParams:       testParams,
-	}, nil
-}
-
-// TestParams returns the test parameters
-func (s *AWSLoggingService) TestParams() *types.TestParams {
-	return s.testParams
-}
-
-// CloudParams returns the cloud-specific parameters
-func (s *AWSLoggingService) CloudParams() *types.CloudParams {
-	return s.cloudParams
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
@@ -81,7 +47,7 @@ func (s *AWSLoggingService) GetOrProvisionTestableResources() ([]types.TestParam
 			UID:                 trailName,
 			ReportFile:          "cloudtrail-" + trailName,
 			ReportTitle:         "CloudTrail: " + trailName,
-			Instance:   s.instance,
+			Instance:            s.instance,
 		},
 	}, nil
 }

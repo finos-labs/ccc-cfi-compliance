@@ -37,14 +37,12 @@ func NewAzureFactory(instance types.InstanceConfig) *AzureFactory {
 
 // GetServiceAPI returns a generic service API client for the given service type
 func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
-	cloudParams := f.instance.CloudParams()
-
 	switch serviceID {
 	case "iam":
 		return f.iamService, nil
 
 	case "object-storage":
-		service, err := objstorage.NewAzureBlobService(f.ctx, cloudParams, f.instance)
+		service, err := objstorage.NewAzureBlobService(f.ctx, &f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure service '%s': %w", serviceID, err)
 		}
@@ -54,7 +52,7 @@ func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) 
 		return service, nil
 
 	case "logging":
-		service, err := logging.NewAzureLoggingService(f.ctx, &cloudParams, nil, f.instance)
+		service, err := logging.NewAzureLoggingService(f.ctx, &f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Azure logging service: %w", err)
 		}
