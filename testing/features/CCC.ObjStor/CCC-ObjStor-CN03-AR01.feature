@@ -6,7 +6,7 @@ Feature: CCC.ObjStor.CN03.AR01 - Bucket Soft Delete and Recovery
   This ensures protection against accidental bucket deletion.
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 

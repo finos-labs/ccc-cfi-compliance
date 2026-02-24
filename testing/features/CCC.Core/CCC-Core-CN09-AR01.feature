@@ -5,7 +5,7 @@ Feature: CCC.Core.CN09.AR01 - Access Logging Separation
   So that log integrity is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage access logging compliance

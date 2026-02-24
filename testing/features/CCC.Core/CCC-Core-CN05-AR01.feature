@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
   So that data integrity is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Unauthorized data modification requests are blocked

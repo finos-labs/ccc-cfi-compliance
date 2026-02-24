@@ -10,7 +10,6 @@ type EnvironmentConfig struct {
 // InstanceConfig represents a named cloud environment instance
 type InstanceConfig struct {
 	ID         string                 `yaml:"id"`
-	Type       string                 `yaml:"type"`
 	Properties CloudParams            `yaml:"properties"`
 	Services   []ServiceConfig        `yaml:"services"`
 	Rules      map[string]interface{} `yaml:"rules"`
@@ -23,11 +22,9 @@ type ServiceConfig struct {
 	Properties map[string]interface{}
 }
 
-// CloudParams returns the instance's CloudParams with Provider set from the instance type.
+// CloudParams returns the instance's CloudParams (Provider is already in Properties).
 func (ic InstanceConfig) CloudParams() CloudParams {
-	params := ic.Properties
-	params.Provider = ic.Type
-	return params
+	return ic.Properties
 }
 
 // ServiceProperties returns the properties map for the named service type, or nil if not found.

@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR06 - Block All Unauthorized Requests
   So that the principle of least privilege is enforced
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: All unauthorized requests are blocked

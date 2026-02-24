@@ -5,7 +5,7 @@ Feature: CCC.Core.CN08.AR02 - Replication Status Visibility
   So that data synchronization can be monitored
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage replication status is visible

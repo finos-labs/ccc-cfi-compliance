@@ -5,7 +5,7 @@ Feature: CCC.Core.CN10.AR01 - Replication Destination Trust
   So that data sovereignty and trust perimeter requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage replication destination compliance

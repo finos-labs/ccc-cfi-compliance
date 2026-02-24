@@ -5,7 +5,7 @@ Feature: CCC.ObjStor.CN05.AR02 - New Version ID on Modification
   So that changes are tracked
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Modified objects receive new version identifiers

@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR02 - Block Unauthorized Administrative Access
   So that service configuration is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Unauthorized administrative access is blocked

@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR04 - Block Unauthorized External Data Requests
   So that data exfiltration is prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: External unauthorized data requests are blocked

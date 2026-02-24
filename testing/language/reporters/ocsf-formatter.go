@@ -189,7 +189,7 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 		}
 
 		resource := OCSFResource{
-			CloudPartition: f.params.Instance.Type,
+			CloudPartition: f.params.Instance.Properties.Provider,
 			Region:         f.params.Instance.Properties.Region,
 			Data: OCSFResourceData{
 				Details: fmt.Sprintf("%s service on %s:%s", f.params.Protocol, f.params.HostName, f.params.PortNumber),

@@ -6,7 +6,7 @@ Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
   This ensures retention policies cannot be shortened or removed, protecting against data loss.
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 

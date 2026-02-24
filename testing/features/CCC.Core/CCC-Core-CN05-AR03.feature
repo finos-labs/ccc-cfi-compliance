@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR03 - Block Cross-Tenant Access
   So that multi-tenant isolation is maintained
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Cross-tenant access is blocked without explicit allowlist

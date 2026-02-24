@@ -61,7 +61,7 @@ func main() {
 	}
 
 	log.Printf("🚀 Starting CCC CFI Compliance Tests")
-	log.Printf("   Instance: %s (%s)", inst.ID, inst.Type)
+	log.Printf("   Instance: %s (%s)", inst.ID, inst.Properties.Provider)
 	log.Println()
 
 	// Prepare output directory

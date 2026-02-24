@@ -5,7 +5,7 @@ Feature: CCC.Core.CN03.AR03 - MFA for UI Viewing
   So that sensitive data access is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: UI viewing requires multi-factor authentication

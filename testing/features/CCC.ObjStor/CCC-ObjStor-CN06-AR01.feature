@@ -5,7 +5,7 @@ Feature: CCC.ObjStor.CN06.AR01 - Access Logs in Separate Data Store
   So that log integrity is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Access logs are stored in a separate data store

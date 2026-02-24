@@ -5,7 +5,7 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
   So that data confidentiality is protected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage encryption compliance

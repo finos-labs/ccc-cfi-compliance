@@ -5,7 +5,7 @@ Feature: CCC.Core.CN05.AR05 - Hide Service Existence from External Requests
   So that service discovery attacks are prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: External requests do not reveal service existence

@@ -5,7 +5,7 @@ Feature: CCC.ObjStor.CN05.AR04 - Retain Versions on Delete
   So that deleted data can be recovered
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Object versions are retained after deletion

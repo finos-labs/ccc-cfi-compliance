@@ -5,7 +5,7 @@ Feature: CCC.Core.CN06.AR02 - Child Resource Location Compliance
   So that data residency requirements are met for all resources
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Child resources are in approved regions

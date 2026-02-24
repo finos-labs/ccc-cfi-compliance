@@ -5,7 +5,7 @@ Feature: CCC.Core.CN03.AR01 - Multi-Factor Authentication for Destructive Operat
   So that accidental or malicious deletions are prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage delete protection compliance

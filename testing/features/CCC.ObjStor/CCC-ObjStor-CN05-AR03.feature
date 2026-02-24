@@ -5,7 +5,7 @@ Feature: CCC.ObjStor.CN05.AR03 - Recovery of Previous Versions
   So that data can be restored after modifications
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Previous object versions can be recovered

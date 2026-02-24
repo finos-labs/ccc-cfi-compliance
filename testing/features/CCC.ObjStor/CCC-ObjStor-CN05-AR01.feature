@@ -5,7 +5,7 @@ Feature: CCC.ObjStor.CN05.AR01 - Versioning with Unique Identifiers
   So that version tracking is enabled
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Objects are stored with unique version identifiers

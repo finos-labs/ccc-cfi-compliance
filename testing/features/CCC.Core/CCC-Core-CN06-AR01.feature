@@ -5,7 +5,7 @@ Feature: CCC.Core.CN06.AR01 - Resource Location Compliance
   So that data residency and sovereignty requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Object storage region compliance

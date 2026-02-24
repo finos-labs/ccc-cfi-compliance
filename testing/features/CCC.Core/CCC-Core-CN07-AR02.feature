@@ -5,7 +5,7 @@ Feature: CCC.Core.CN07.AR02 - Log Enumeration Activities
   So that reconnaissance attempts can be investigated
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Enumeration activities are logged

@@ -5,7 +5,7 @@ Feature: CCC.Core.CN07.AR01 - Publish Enumeration Activity Events
   So that reconnaissance attempts are detected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy @object-storage
   Scenario: Enumeration activities publish events to monitored channels
