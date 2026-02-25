@@ -27,7 +27,6 @@ instances:
       - type: object-storage
         azure-storage-account: storagecfitesting2026
       - type: logging 
-        azure-log-analytics-workspace-id: eef48f13-9113-4a14-95e6-beef93dc8a33
 
   - id: main-gcp
     properties:
