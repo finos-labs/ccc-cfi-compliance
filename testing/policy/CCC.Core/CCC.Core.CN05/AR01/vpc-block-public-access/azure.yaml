@@ -1,0 +1,36 @@
+name: VNet Block Public Ingress (Azure)
+service_type: vpc
+requirement_text: >
+  When an attempt is made to modify data on the service or a child
+  resource, the service MUST block requests from unauthorized entities.
+  Network security groups in the VNet's resource group must not allow
+  unrestricted public ingress (* or 0.0.0.0/0).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that no NSGs in the resource group have inbound rules
+  allowing traffic from * or 0.0.0.0/0. Unrestricted public ingress increases
+  the risk of unauthorized access. Strengths:
+  - Checks all NSGs in the VNet's resource group
+  - Detects overly permissive source prefixes
+  - Aligns with network isolation best practices
+  Limitations:
+  - Scoped to resource group; NSGs in other RGs associated with the VNet
+    are not checked
+  - Does not validate subnet-level associations
+  - Azure list may not include securityRules in all CLI versions; if the
+    query fails, ensure az network nsg list returns full objects
+
+query: |
+  az network nsg list \
+    --resource-group ${AzureResourceGroup} \
+    --query "[?length(securityRules[?direction=='Inbound' && access=='Allow' && (sourceAddressPrefix=='*' || sourceAddressPrefix=='0.0.0.0/0')]) > \`0\`]" \
+    --output json
+
+rules:
+  - jsonpath: "$"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Validates that no NSGs in the resource group have Allow Inbound rules
+      with source * or 0.0.0.0/0. An empty array indicates compliance.

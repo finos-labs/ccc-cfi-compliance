@@ -1,0 +1,38 @@
+name: GCP Cloud Storage Cross-Tenant Access Block
+service_type: object-storage
+requirement_text: >
+  When administrative access or configuration change is attempted on the service
+  or a child resource in a multi-tenant environment, the service MUST refuse
+  requests across tenant boundaries unless the origin is explicitly included
+  in a pre-approved allowlist.
+
+validity_score: 6
+validity_commentary: >
+  Cross-tenant (cross-project) access in GCP Storage is granted via IAM policy
+  bindings with principals from other projects (e.g. serviceAccount:...@other-project.iam.gserviceaccount.com).
+  This query checks the bucket IAM policy and validates cross-project members
+  are in permitted-project-ids. Strengths:
+  - Directly queries bucket IAM policy
+  - Identifies serviceAccount members from other projects
+  - Uses permitted-project-ids for explicit allowlist
+  Limitations:
+  - user: and group: members from outside the project not analyzed
+  - Organization-level bindings are not checked
+
+query: |
+  BINDINGS=$(gcloud storage buckets get-iam-policy gs://${ResourceName} --project=${GcpProjectId} --format="json(bindings)" 2>/dev/null || echo '{"bindings":[]}')
+  echo "$BINDINGS" | jq --arg p "${GcpProjectId}" '{
+    crossProjectIds: [
+      .bindings[]?.members[]? |
+      select(startswith("serviceAccount:")) |
+      capture("serviceAccount:(?<sa>[^@]+)@(?<proj>[^.]+)\\.iam\\.gserviceaccount\\.com") |
+      select(.proj != $p) | .proj
+    ] | unique
+  }' 2>/dev/null || echo '{"crossProjectIds": []}'
+
+rules:
+  - jsonpath: "$.crossProjectIds"
+    expected_values: ["${PermittedProjectIds}"]
+    description: >
+      Validates that cross-project service account members are in
+      permitted-project-ids. Empty permitted = no cross-project allowed.

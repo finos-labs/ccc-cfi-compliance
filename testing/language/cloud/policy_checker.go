@@ -96,19 +96,16 @@ func (c *PolicyChecker) ExecuteQuery(query string) (string, error) {
 	return string(output), nil
 }
 
-// EvaluateRule checks if a single rule passes against the query output
-func (c *PolicyChecker) EvaluateRule(rule types.Rule, queryOutput string) types.RuleResult {
+// EvaluateRule checks if a single rule passes against the query output.
+// If validation_rule is present, regex match is used. Otherwise, actual values
+// must be a subset of expected_values (allowlist check).
+func (c *PolicyChecker) EvaluateRule(rule types.Rule, queryOutput string, props map[string]interface{}) types.RuleResult {
 	result := types.RuleResult{
 		JSONPath:       rule.JSONPath,
-		ExpectedValues: make([]string, len(rule.ExpectedValues)),
+		ExpectedValues: make([]string, 0),
 		ValidationRule: rule.ValidationRule,
 		Description:    rule.Description,
 		Passed:         false,
-	}
-
-	// Convert expected values to strings
-	for i, v := range rule.ExpectedValues {
-		result.ExpectedValues[i] = fmt.Sprintf("%v", v)
 	}
 
 	// Parse the JSON output
@@ -125,34 +122,104 @@ func (c *PolicyChecker) EvaluateRule(rule types.Rule, queryOutput string) types.
 		return result
 	}
 
-	// Get the actual value - handle nil (JSON null) as "null" string for matching
-	var actualValue string
+	// Collect actual values - support single value or array
+	var actualValues []string
 	if value == nil {
-		actualValue = "null"
+		actualValues = []string{"null"}
 	} else {
-		actualValue = fmt.Sprintf("%v", value)
+		actualValues = valuesToSlice(value)
 	}
-	result.ActualValue = actualValue
+	result.ActualValue = fmt.Sprintf("%v", actualValues)
 
-	// Check against validation rule (regex)
+	// Resolve expected values (allowlist) - may reference props e.g. ${PermittedAccountIds}
+	allowedSet := resolveExpectedValues(rule.ExpectedValues, props)
+	for k := range allowedSet {
+		result.ExpectedValues = append(result.ExpectedValues, k)
+	}
+
+	// Check against validation rule (regex) or expected values (allowlist)
 	if rule.ValidationRule != "" {
 		regex, err := regexp.Compile(rule.ValidationRule)
 		if err != nil {
 			result.Error = fmt.Sprintf("invalid validation regex %s: %v", rule.ValidationRule, err)
 			return result
 		}
-		result.Passed = regex.MatchString(actualValue)
+		result.Passed = regex.MatchString(result.ActualValue)
 	} else {
-		// Check against expected values
-		for _, expected := range result.ExpectedValues {
-			if actualValue == expected {
-				result.Passed = true
+		// Allowlist: every actual value must be in expected set. Empty actual = pass.
+		result.Passed = true
+		for _, a := range actualValues {
+			if a != "" && !allowedSet[a] {
+				result.Passed = false
 				break
 			}
 		}
 	}
 
 	return result
+}
+
+// valuesToSlice converts a jsonpath result to a slice of strings.
+func valuesToSlice(value interface{}) []string {
+	if value == nil {
+		return nil
+	}
+	switch v := value.(type) {
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if item != nil {
+				out = append(out, strings.TrimSpace(fmt.Sprintf("%v", item)))
+			}
+		}
+		return out
+	default:
+		return []string{strings.TrimSpace(fmt.Sprintf("%v", value))}
+	}
+}
+
+// resolveExpectedValues builds the allowlist from ExpectedValues, resolving ${Param} refs from props.
+func resolveExpectedValues(expected []any, props map[string]interface{}) map[string]bool {
+	allowed := make(map[string]bool)
+	if props == nil {
+		return allowed
+	}
+	paramRef := regexp.MustCompile(`^\$\{([^}]+)\}$`)
+	for _, ev := range expected {
+		s := strings.TrimSpace(fmt.Sprintf("%v", ev))
+		if m := paramRef.FindStringSubmatch(s); len(m) == 2 {
+			paramName := m[1]
+			if pv, ok := props[paramName]; ok && pv != nil {
+				// Param value can be comma-separated string or slice
+				switch v := pv.(type) {
+				case []interface{}:
+					for _, item := range v {
+						allowed[strings.TrimSpace(fmt.Sprintf("%v", item))] = true
+					}
+			default:
+				raw := fmt.Sprintf("%v", pv)
+				// Handle comma-separated string or Go slice format "[a b c]"
+				if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
+					raw = strings.Trim(raw, "[]")
+					for _, part := range strings.Fields(raw) {
+						if t := strings.TrimSpace(part); t != "" {
+							allowed[t] = true
+						}
+					}
+				} else {
+					for _, part := range strings.Split(raw, ",") {
+						if t := strings.TrimSpace(part); t != "" {
+							allowed[t] = true
+						}
+					}
+				}
+			}
+			}
+		} else if s != "" {
+			allowed[s] = true
+		}
+	}
+	return allowed
 }
 
 // RunPolicy executes a complete policy check using values from Props
@@ -195,7 +262,7 @@ func (c *PolicyChecker) RunPolicy(props map[string]interface{}, policyPath strin
 	// Evaluate each rule
 	result.RuleResults = make([]types.RuleResult, len(policyDef.Rules))
 	for i, rule := range policyDef.Rules {
-		ruleResult := c.EvaluateRule(rule, output)
+		ruleResult := c.EvaluateRule(rule, output, props)
 		result.RuleResults[i] = ruleResult
 		if !ruleResult.Passed {
 			result.Passed = false

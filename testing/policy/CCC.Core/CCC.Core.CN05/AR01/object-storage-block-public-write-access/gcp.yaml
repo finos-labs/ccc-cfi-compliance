@@ -1,0 +1,36 @@
+name: GCP Cloud Storage Public Access Prevention
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify data on the service or a child
+  resource, the service MUST block requests from unauthorized entities.
+  Public access prevention ensures the bucket is not world-writable.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that GCP Cloud Storage has public access prevention
+  enabled. When set to 'enforced', the bucket cannot be made public via
+  IAM or ACLs, reducing the risk of unauthorized data modification.
+  Strengths:
+  - Prevents allUsers and allAuthenticatedUsers access when enforced
+  - Cannot be overridden by IAM policy or ACL changes
+  - Aligns with Google security best practices
+  Limitations:
+  - Does not validate IAM policies for principle of least privilege
+  - Behavioral testing (CN05-AR01) verifies unauthorized modification is blocked at runtime
+  - 'inherited' uses org-level policy; org policy should restrict public access
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(iamConfiguration.publicAccessPrevention)"
+
+rules:
+  - jsonpath: "$.iamConfiguration.publicAccessPrevention"
+    expected_values:
+      - "enforced"
+      - "inherited"
+    validation_rule: "^(enforced|inherited)$"
+    description: >
+      Validates that public access prevention is configured. 'enforced' blocks
+      public access at the bucket level. 'inherited' uses the organization
+      policy; the org should have restrictedPublicAccess or similar. When
+      unspecified, the bucket could be made public via IAM bindings.

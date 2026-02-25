@@ -1,0 +1,35 @@
+name: VPC Block Public Ingress (GCP)
+service_type: vpc
+requirement_text: >
+  When an attempt is made to modify data on the service or a child
+  resource, the service MUST block requests from unauthorized entities.
+  Firewall rules on the VPC network must not allow unrestricted public
+  ingress (0.0.0.0/0).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that no firewall rules on the network allow ingress
+  from 0.0.0.0/0. Unrestricted public ingress increases the risk of
+  unauthorized access. Strengths:
+  - Directly queries firewall rules for the network
+  - Detects overly permissive source ranges
+  - Aligns with network isolation best practices
+  Limitations:
+  - Does not validate instance-level tags or service accounts
+  - Does not check for IPv6 (::/0) public access
+  - Implicit deny rules and hierarchy policies may provide additional controls
+
+query: |
+  gcloud compute firewall-rules list \
+    --filter="network:${ResourceName} AND direction=INGRESS AND sourceRanges:0.0.0.0/0" \
+    --project=${GcpProjectId} \
+    --format="json"
+
+rules:
+  - jsonpath: "$"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Validates that no firewall rules on the network allow ingress from
+      0.0.0.0/0. An empty array indicates compliance. Any rule returned
+      would have overly permissive public access.

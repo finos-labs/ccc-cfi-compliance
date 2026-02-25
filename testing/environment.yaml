@@ -7,6 +7,9 @@ instances:
 
     rules:
       permitted-regions: [us-east-1]
+      # CN05.AR03: AWS account IDs allowed for cross-account bucket access. Empty = none.
+      # Comma-separated, e.g. "123456789012,234567890123"
+      permitted-account-ids: ""
 
     services:
       - type: object-storage
@@ -22,6 +25,9 @@ instances:
 
     rules:
       permitted-regions: [eastus]
+      # CN05.AR03: Storage accounts allowed as object replication destinations. Empty = none.
+      # Account names or full resource IDs, e.g. ["partner-dest", "/subscriptions/.../storageAccounts/partner-dest"]
+      permitted-destination-storage-accounts: []
 
     services:
       - type: object-storage
@@ -36,6 +42,9 @@ instances:
 
     rules:
       permitted-regions: [us-central1]
+      # CN05.AR03: GCP project IDs allowed for cross-project bucket access. Empty = none.
+      # Comma-separated, e.g. "partner-proj-1,partner-proj-2"
+      permitted-project-ids: ""
 
     services:
       - type: object-storage

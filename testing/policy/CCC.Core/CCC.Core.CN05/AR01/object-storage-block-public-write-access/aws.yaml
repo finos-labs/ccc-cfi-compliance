@@ -1,0 +1,54 @@
+name: S3 Block Public Access Configuration
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify data on the service or a child
+  resource, the service MUST block requests from unauthorized entities.
+  Block Public Access ensures the bucket is not world-writable.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that S3 Block Public Access is configured.
+  When enabled, it prevents ACLs and bucket policies that would grant
+  public access, reducing the risk of unauthorized data modification.
+  Strengths:
+  - Directly queries the bucket's Block Public Access settings
+  - All four settings block different vectors for public access
+  - Account-level settings can reinforce bucket-level configuration
+  Limitations:
+  - Does not validate IAM policies or bucket policies for principle of least privilege
+  - Existing public ACLs are not automatically removed when Block Public Access is enabled
+  - Behavioral testing (CN05-AR01) verifies unauthorized modification is blocked at runtime
+
+query: |
+  aws s3api get-public-access-block \
+    --bucket ${ResourceName} \
+    --output json
+
+rules:
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicAcls"
+    expected_values: ["true"]
+    validation_rule: "^true$"
+    description: >
+      BlockPublicAcls prevents new public ACLs from being added. When true,
+      PUT Bucket ACL and PUT Object ACL fail if the ACL is public.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.IgnorePublicAcls"
+    expected_values: ["true"]
+    validation_rule: "^true$"
+    description: >
+      IgnorePublicAcls causes existing public ACLs to be ignored. Combined
+      with BlockPublicAcls, this ensures no public access via ACLs.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicPolicy"
+    expected_values: ["true"]
+    validation_rule: "^true$"
+    description: >
+      BlockPublicPolicy blocks new public bucket policies. Prevents
+      bucket policies that would grant public access.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.RestrictPublicBuckets"
+    expected_values: ["true"]
+    validation_rule: "^true$"
+    description: >
+      RestrictPublicBuckets restricts access to buckets with public
+      policies to only authorized users within the AWS account.
