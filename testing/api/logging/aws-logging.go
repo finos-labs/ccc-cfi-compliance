@@ -2,20 +2,22 @@ package logging
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSLoggingService implements Service for AWS CloudTrail
 type AWSLoggingService struct {
-	*generic.AWSService
 	cloudTrailClient *cloudtrail.Client
 	ctx              context.Context
 	instance         types.InstanceConfig
+	cloudTrailName   string
+	cloudTrailCached bool
 }
 
 // NewAWSLoggingService creates a new AWS logging service using default credential chain
@@ -26,11 +28,61 @@ func NewAWSLoggingService(ctx context.Context, instance *types.InstanceConfig) (
 	}
 
 	return &AWSLoggingService{
-		AWSService:       generic.NewAWSService(ctx),
 		cloudTrailClient: cloudtrail.NewFromConfig(cfg),
 		ctx:              ctx,
 		instance:         *instance,
 	}, nil
+}
+
+// DiscoverCloudTrailName finds the CloudTrail trail name for the account
+// Priority:
+// 1. AWS_CLOUDTRAIL_NAME environment variable (allows override)
+// 2. First multi-region trail found via CloudTrail API
+// 3. First trail found via CloudTrail API
+// Returns empty string if no trail is found
+func (s *AWSLoggingService) DiscoverCloudTrailName() string {
+	if s.cloudTrailCached {
+		return s.cloudTrailName
+	}
+	s.cloudTrailCached = true
+
+	if trailName := os.Getenv("AWS_CLOUDTRAIL_NAME"); trailName != "" {
+		s.cloudTrailName = trailName
+		return s.cloudTrailName
+	}
+
+	cfg, err := config.LoadDefaultConfig(s.ctx)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Failed to load AWS config for CloudTrail discovery: %v\n", err)
+		return ""
+	}
+
+	client := cloudtrail.NewFromConfig(cfg)
+	result, err := client.DescribeTrails(s.ctx, &cloudtrail.DescribeTrailsInput{})
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Failed to describe CloudTrail trails: %v\n", err)
+		return ""
+	}
+
+	if len(result.TrailList) == 0 {
+		fmt.Printf("⚠️  Warning: No CloudTrail trails found in account\n")
+		return ""
+	}
+
+	for _, trail := range result.TrailList {
+		if trail.IsMultiRegionTrail != nil && *trail.IsMultiRegionTrail && trail.Name != nil {
+			s.cloudTrailName = *trail.Name
+			fmt.Printf("✅ Discovered multi-region CloudTrail: %s\n", s.cloudTrailName)
+			return s.cloudTrailName
+		}
+	}
+
+	if result.TrailList[0].Name != nil {
+		s.cloudTrailName = *result.TrailList[0].Name
+		fmt.Printf("✅ Discovered CloudTrail: %s\n", s.cloudTrailName)
+	}
+
+	return s.cloudTrailName
 }
 
 // GetOrProvisionTestableResources returns testable resources for the logging service
@@ -48,6 +100,7 @@ func (s *AWSLoggingService) GetOrProvisionTestableResources() ([]types.TestParam
 			ReportFile:          "cloudtrail-" + trailName,
 			ReportTitle:         "CloudTrail: " + trailName,
 			Instance:            s.instance,
+			Props:               map[string]interface{}{"AWSCloudTrailName": trailName},
 		},
 	}, nil
 }

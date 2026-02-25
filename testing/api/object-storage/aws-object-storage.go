@@ -14,17 +14,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSS3Service implements Service for AWS S3
 type AWSS3Service struct {
-	*generic.AWSService
-	client      *s3.Client
-	config      aws.Config
-	ctx         context.Context
+	client   *s3.Client
+	config   aws.Config
+	ctx      context.Context
 	instance types.InstanceConfig
 }
 
@@ -36,11 +34,10 @@ func NewAWSS3Service(ctx context.Context, instance types.InstanceConfig) (*AWSS3
 	}
 
 	return &AWSS3Service{
-		AWSService:  generic.NewAWSService(ctx),
-		client:      s3.NewFromConfig(cfg),
-		config:      cfg,
-		ctx:         ctx,
-		instance:    instance,
+		client:   s3.NewFromConfig(cfg),
+		config:   cfg,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
@@ -70,11 +67,10 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, instance types.Instance
 	}
 
 	return &AWSS3Service{
-		AWSService:  generic.NewAWSService(ctx),
-		client:      s3.NewFromConfig(cfg),
-		config:      cfg,
-		ctx:         ctx,
-		instance:    instance,
+		client:   s3.NewFromConfig(cfg),
+		config:   cfg,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
@@ -392,17 +388,9 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, er
 		return nil, fmt.Errorf("failed to list buckets: %w", err)
 	}
 
-	// Discover CloudTrail name for policy checks (uses embedded AWSService)
-	cloudTrailName := s.DiscoverCloudTrailName()
-
 	// Convert buckets to TestParams (2 per bucket: service + port)
 	resources := make([]types.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
-		// Build Props with discovered values
-		props := map[string]interface{}{
-			"AWSCloudTrailName": cloudTrailName,
-		}
-
 		// PerService: Resource-level tests (policy checks, configuration validation)
 		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
@@ -414,7 +402,6 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, er
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
 			Instance:            s.instance,
-			Props:               props,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
@@ -432,7 +419,6 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, er
 			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			Instance:            s.instance,
-			Props:               props,
 		})
 	}
 

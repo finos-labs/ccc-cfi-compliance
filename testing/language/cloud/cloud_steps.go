@@ -192,6 +192,14 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 
 	// Policy assessment steps
 	ctx.Step(`^I attempt policy check "([^"]*)" for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)" and provider "([^"]*)"$`, cw.attemptPolicyCheck)
+
+	// Placeholder for scenarios with no concrete assertion yet
+	ctx.Step(`^no-op required$`, cw.noOpRequired)
+}
+
+// noOpRequired is a placeholder step for scenarios that document controls without yet having a concrete test.
+func (cw *CloudWorld) noOpRequired() error {
+	return nil
 }
 
 // opensslClientRequest creates an OpenSSL s_client connection with optional TLS version
