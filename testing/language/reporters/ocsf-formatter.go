@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog/formatters"
@@ -114,7 +115,11 @@ type OCSFResourceGroup struct {
 // Feature captures feature information
 func (f *OCSFFormatter) Feature(gd *messages.GherkinDocument, uri string, c []byte) {
 	if gd.Feature != nil {
-		f.currentFeature = gd.Feature.Name
+		name := gd.Feature.Name
+		if parts := strings.Split(name, " - "); len(parts) > 0 {
+			name = strings.TrimSpace(parts[0])
+		}
+		f.currentFeature = name
 	}
 }
 
