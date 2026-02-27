@@ -130,8 +130,14 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 
 	// Extract tags from pickle
 	var tagNames []string
+	productName := "CCC-Complete"
 	for _, tag := range pickle.Tags {
 		tagNames = append(tagNames, tag.Name)
+		if tag.Name == "@Policy" {
+			productName = "CCC-Complete (Policy)"
+		} else if tag.Name == "@Behavioural" {
+			productName = "CCC-Complete (Behavioural)"
+		}
 	}
 
 	finding := &OCSFFinding{
@@ -139,8 +145,8 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 		Metadata: OCSFMetadata{
 			EventCode: "ccc_compliance_test",
 			Product: OCSFProduct{
-				Name:       "CCC-Complete",
-				UID:        "CCC-Complete",
+				Name:       productName,
+				UID:        productName,
 				VendorName: "FINOS",
 				Version:    "0.1",
 			},
