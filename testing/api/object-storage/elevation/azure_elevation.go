@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -81,7 +82,7 @@ func (e *AzureStorageElevator) GetCurrentIdentityObjectID() (string, error) {
 		return "", fmt.Errorf("failed to get Graph API token: %w", err)
 	}
 
-	// Call Graph API to get current user/service principal
+	// Try /me first (works for users)
 	req, err := http.NewRequestWithContext(e.ctx, "GET", "https://graph.microsoft.com/v1.0/me", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
@@ -89,6 +90,26 @@ func (e *AzureStorageElevator) GetCurrentIdentityObjectID() (string, error) {
 	req.Header.Set("Authorization", "Bearer "+token.Token)
 
 	resp, err := http.DefaultClient.Do(req)
+
+	// If /me fails, it might be a service principal (standard for CI/GitHub Actions)
+	if err == nil && resp.StatusCode != 200 {
+		resp.Body.Close()
+
+		// Map common environment variables for client ID
+		clientID := os.Getenv("AZURE_CLIENT_ID")
+		if clientID == "" {
+			clientID = os.Getenv("ARM_CLIENT_ID")
+		}
+
+		if clientID != "" {
+			fmt.Printf("   ℹ️  /me failed, searching for service principal ID for client %s...\n", clientID)
+			query := fmt.Sprintf("https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId eq '%s'", clientID)
+			req, _ = http.NewRequestWithContext(e.ctx, "GET", query, nil)
+			req.Header.Set("Authorization", "Bearer "+token.Token)
+			resp, err = http.DefaultClient.Do(req)
+		}
+	}
+
 	if err != nil {
 		return "", fmt.Errorf("failed to call Graph API: %w", err)
 	}
@@ -104,12 +125,21 @@ func (e *AzureStorageElevator) GetCurrentIdentityObjectID() (string, error) {
 		return "", fmt.Errorf("failed to decode Graph API response: %w", err)
 	}
 
-	objectID, ok := result["id"].(string)
-	if !ok {
-		return "", fmt.Errorf("object ID not found in Graph API response")
+	// If it's a list (from servicePrincipals query)
+	if value, ok := result["value"].([]interface{}); ok && len(value) > 0 {
+		if first, ok := value[0].(map[string]interface{}); ok {
+			if id, ok := first["id"].(string); ok {
+				return id, nil
+			}
+		}
 	}
 
-	return objectID, nil
+	// If it's a direct object (from /me query)
+	if objectID, ok := result["id"].(string); ok {
+		return objectID, nil
+	}
+
+	return "", fmt.Errorf("object ID not found in Graph API response")
 }
 
 // ElevatePublicNetworkAccess enables public network access on a storage account
@@ -450,4 +480,3 @@ func (e *AzureStorageElevator) ResetStorageAccountAccess(storageAccountName stri
 func (e *AzureStorageElevator) GetState() *AzureStorageElevationState {
 	return e.state
 }
-

@@ -547,6 +547,12 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 
 	fmt.Printf("   Storage Account Resource ID for RBAC: %s\n", storageAccountResourceID)
 
+	// Elevate access before discovery to ensure we can list containers and interact with the data plane
+	if err := s.ElevateAccessForInspection(); err != nil {
+		fmt.Printf("   ⚠️  Warning: Failed to elevate access for discovery: %v\n", err)
+		// Continue anyway, we might already have access
+	}
+
 	// List all buckets and ensure at least one container exists per storage account
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
