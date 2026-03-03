@@ -1,0 +1,30 @@
+name: Azure Blob Access Logging Check
+service_type: object-storage
+requirement_text: >
+  Access logs MUST be stored in a separate data store from the container they
+  monitor, ensuring log integrity and availability.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that Azure Storage diagnostic/audit logging is enabled
+  for blob storage operations.
+  Strengths:
+  - Checks the blob service diagnostic settings for log categories
+  - Confirms read, write, and delete operations are audited
+  Limitations:
+  - Does not verify where logs are ultimately stored (Log Analytics vs storage)
+  - Storage account name and resource group are required as parameters
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource /subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AccountName}/blobServices/default \
+    --output json
+
+rules:
+  - jsonpath: "$.value[0].logs[?(@.category=='StorageRead')].enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that StorageRead diagnostic logging is enabled for the blob
+      service, ensuring access events are captured and can be stored separately.

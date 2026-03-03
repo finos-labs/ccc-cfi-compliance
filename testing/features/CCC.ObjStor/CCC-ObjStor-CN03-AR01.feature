@@ -29,3 +29,8 @@ Feature: CCC.ObjStor.CN03.AR01 - Bucket Soft Delete and Recovery
     And I attach "{result}" to the test output as "restored-buckets.json"
     When I call "{storage}" with "DeleteBucket" using argument "ccc-test-soft-delete"
     Then "{result}" is not an error
+
+  @Policy
+  Scenario: Test policy for bucket soft delete
+    When I attempt policy check "bucket-soft-delete" for control "CCC.ObjStor.CN03" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

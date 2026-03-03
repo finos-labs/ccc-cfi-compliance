@@ -1,0 +1,35 @@
+name: AWS S3 Object Retention Enforcement Check
+service_type: object-storage
+requirement_text: >
+  The service MUST prevent deletion or modification of objects under active
+  retention, maintaining data integrity and compliance requirements.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 Object Lock is enabled in Compliance mode,
+  which prevents deletion or modification of objects during the retention period
+  by any user including administrators.
+  Strengths:
+  - Compliance mode cannot be overridden by any user
+  - Directly confirms Object Lock is active with an enforcement rule
+  - Industry standard for WORM (Write Once Read Many) compliance
+  Limitations:
+  - Does not check per-object retention tags
+
+query: |
+  aws s3api get-object-lock-configuration \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.ObjectLockConfiguration.ObjectLockEnabled"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: Verifies that Object Lock is enabled on the bucket.
+  - jsonpath: "$.ObjectLockConfiguration.Rule.DefaultRetention.Mode"
+    expected_values:
+      - "COMPLIANCE"
+    validation_rule: "^COMPLIANCE$"
+    description: >
+      Verifies that compliance mode is active, preventing any user from
+      deleting or modifying objects before the retention period expires.

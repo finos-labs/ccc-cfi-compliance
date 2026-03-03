@@ -1,0 +1,28 @@
+name: GCP Cloud Storage Soft Delete Check
+service_type: object-storage
+requirement_text: >
+  When an object storage bucket deletion is attempted, the bucket MUST be
+  fully recoverable for a set time-frame after deletion is requested.
+
+validity_score: 9
+validity_commentary: >
+  GCP Cloud Storage supports bucket soft delete via the softDeletePolicy.
+  This check validates that the soft delete retention duration is set to a
+  non-zero value, ensuring deleted buckets and objects can be recovered.
+  Strengths:
+  - Directly checks the soft delete policy configuration
+  - GCP soft delete is a native feature providing bucket-level recovery
+  Limitations:
+  - Does not verify the exact minimum retention duration required
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(softDeletePolicy)"
+
+rules:
+  - jsonpath: "$.softDeletePolicy.retentionDurationSeconds"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Verifies that the soft delete retention duration is set to a positive
+      number of seconds, enabling bucket and object recovery after deletion.

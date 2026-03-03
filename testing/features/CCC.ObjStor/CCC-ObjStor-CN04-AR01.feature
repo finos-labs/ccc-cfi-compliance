@@ -41,3 +41,8 @@ Feature: CCC.ObjStor.CN04.AR01
     Then "{result}" should be greater than "1"
     And I attach "{result}" to the test output as "retention-period-days.json"
     And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "retention-period-test.txt"
+
+  @Policy
+  Scenario: Test policy for default object retention
+    When I attempt policy check "object-default-retention" for control "CCC.ObjStor.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

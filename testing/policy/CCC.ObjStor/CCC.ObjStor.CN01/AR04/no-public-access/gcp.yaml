@@ -1,0 +1,27 @@
+name: GCP Cloud Storage Block Public Access Check
+service_type: object-storage
+requirement_text: >
+  The service MUST enforce access control so that only authorised identities
+  can read, list, write, or create objects and buckets.
+
+validity_score: 10
+validity_commentary: >
+  This query validates that Uniform Bucket-Level Access is enabled on the GCP
+  bucket, which prevents unauthenticated or ACL-based public access.
+  Strengths:
+  - Directly verifies the IAM configuration for uniform access
+  - When UBLA is enabled, only IAM bindings control access — no public ACLs
+  - Consistent with GCP security best practices
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(iamConfiguration.uniformBucketLevelAccess)"
+
+rules:
+  - jsonpath: "$.iamConfiguration.uniformBucketLevelAccess.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that Uniform Bucket-Level Access is enabled, preventing
+      unauthenticated access via legacy ACLs.

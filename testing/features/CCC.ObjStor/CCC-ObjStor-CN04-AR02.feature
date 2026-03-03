@@ -67,3 +67,8 @@ Feature: CCC.ObjStor.CN04.AR02
     And I attach "{result}" to the test output as "read-protected-object.json"
     And "{readResult.Name}" is "readable-protected-object.txt"
     And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "readable-protected-object.txt"
+
+  @Policy
+  Scenario: Test policy for object retention enforcement
+    When I attempt policy check "object-retention-enforcement" for control "CCC.ObjStor.CN04" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

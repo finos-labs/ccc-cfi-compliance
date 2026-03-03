@@ -36,3 +36,8 @@ Feature: CCC.ObjStor.CN01.AR03
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "write-create-bucket-result.json"
     And I call "{storage}" with "DeleteBucket" using argument "{result.ID}"
+
+  @Policy
+  Scenario: Test policy for bucket creation access control
+    When I attempt policy check "no-public-access" for control "CCC.ObjStor.CN01" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

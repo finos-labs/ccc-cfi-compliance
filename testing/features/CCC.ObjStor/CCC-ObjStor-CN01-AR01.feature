@@ -37,6 +37,6 @@ Feature: CCC.ObjStor.CN01.AR01
     And I attach "{result}" to the test output as "read-list-objects-result.json"
 
   @Policy
-  Scenario: Test policy
-    # no policy check required for this test
-    Then no-op required
+  Scenario: Test policy for bucket access control
+    When I attempt policy check "no-public-access" for control "CCC.ObjStor.CN01" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

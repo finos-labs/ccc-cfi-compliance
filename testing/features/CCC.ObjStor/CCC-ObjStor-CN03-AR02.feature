@@ -23,3 +23,8 @@ Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
     When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error
     And "{result}" should equal "{originalRetention}"
+
+  @Policy
+  Scenario: Test policy for immutable bucket retention lock
+    When I attempt policy check "bucket-retention-lock" for control "CCC.ObjStor.CN03" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
