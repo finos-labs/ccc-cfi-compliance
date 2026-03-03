@@ -148,7 +148,7 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 	finding := &OCSFFinding{
 		Message: pickle.Name,
 		Metadata: OCSFMetadata{
-			EventCode: "ccc_compliance_test",
+			EventCode: pickle.Name,
 			Product: OCSFProduct{
 				Name:       productName,
 				UID:        productName,
