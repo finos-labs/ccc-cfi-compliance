@@ -5,9 +5,9 @@ Feature: CCC.Core.CN06.AR01 - Resource Location Compliance
   So that data residency and sovereignty requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage region compliance
     When I attempt policy check "object-storage-region" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

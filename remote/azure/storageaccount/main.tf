@@ -69,3 +69,20 @@ module "storage_account" {
     }
   }
 }
+
+# Enable read, write, delete logging for blob service (Storage Analytics)
+# The AVM module doesn't support blob_properties.logging, so we enable it via Azure CLI
+resource "terraform_data" "blob_logging" {
+  triggers_replace = [module.storage_account.resource_id]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      az storage logging update \
+        --services b \
+        --log rwd \
+        --retention 7 \
+        --account-name ${module.storage_account.name} \
+        --auth-mode login
+    EOT
+  }
+}

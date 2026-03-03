@@ -17,8 +17,8 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/language/generic"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
+	generic "github.com/robmoffat/standard-cucumber-steps/go"
 	"gopkg.in/yaml.v3"
 )
 
@@ -84,20 +84,88 @@ func (c *Connection) startOutputReader(reader io.Reader) {
 // CloudWorld extends PropsWorld with cloud-specific functionality
 type CloudWorld struct {
 	*generic.PropsWorld
-	mu sync.RWMutex
+	Attachments []types.Attachment // CFI-specific: Store attachments for the current scenario
+	mu          sync.RWMutex
 }
 
 // NewCloudWorld creates a new CloudWorld instance
 func NewCloudWorld() *CloudWorld {
 	return &CloudWorld{
-		PropsWorld: generic.NewPropsWorld(),
+		PropsWorld:  generic.NewPropsWorld(),
+		Attachments: make([]types.Attachment, 0),
 	}
+}
+
+// Attach adds an attachment to the current scenario (CFI-specific)
+func (cw *CloudWorld) Attach(name, mediaType string, data []byte) {
+	cw.mu.Lock()
+	defer cw.mu.Unlock()
+	cw.Attachments = append(cw.Attachments, types.Attachment{
+		Name:      name,
+		MediaType: mediaType,
+		Data:      data,
+	})
+	fmt.Printf("📎 Attached: %s (%s, %d bytes)\n", name, mediaType, len(data))
+}
+
+// GetAttachments returns a copy of the current attachments (implements types.AttachmentProvider)
+func (cw *CloudWorld) GetAttachments() []types.Attachment {
+	cw.mu.RLock()
+	defer cw.mu.RUnlock()
+
+	// Return a copy to avoid race conditions
+	attachmentsCopy := make([]types.Attachment, len(cw.Attachments))
+	copy(attachmentsCopy, cw.Attachments)
+	return attachmentsCopy
+}
+
+// ClearAttachments clears all attachments (implements types.AttachmentProvider)
+func (cw *CloudWorld) ClearAttachments() {
+	cw.mu.Lock()
+	defer cw.mu.Unlock()
+	cw.Attachments = make([]types.Attachment, 0)
+}
+
+// iAttachToTestOutput attaches content to the test output (CFI-specific step)
+func (cw *CloudWorld) iAttachToTestOutput(content, name string) error {
+	resolved := cw.HandleResolve(content)
+
+	// Determine the media type and convert to bytes
+	var data []byte
+	var mediaType string
+
+	switch v := resolved.(type) {
+	case error:
+		// Handle errors specifically - convert to text
+		data = []byte(v.Error())
+		mediaType = "text/plain"
+	case string:
+		data = []byte(v)
+		mediaType = "text/plain"
+	case []byte:
+		data = v
+		mediaType = "application/octet-stream"
+	default:
+		// Try to convert to JSON for complex objects
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("failed to marshal attachment: %w", err)
+		}
+		data = jsonData
+		mediaType = "application/json"
+	}
+
+	cw.Attach(name, mediaType, data)
+	return nil
 }
 
 // RegisterSteps registers all cloud-specific step definitions
 func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// Register generic steps first
 	cw.PropsWorld.RegisterSteps(ctx)
+
+	// CFI-specific attachment step
+	ctx.Step(`^I attach "([^"]*)" to the test output as "([^"]*)"$`, cw.iAttachToTestOutput)
 
 	// Cloud-specific steps matching README.md
 
@@ -124,6 +192,14 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 
 	// Policy assessment steps
 	ctx.Step(`^I attempt policy check "([^"]*)" for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)" and provider "([^"]*)"$`, cw.attemptPolicyCheck)
+
+	// Placeholder for scenarios with no concrete assertion yet
+	ctx.Step(`^no-op required$`, cw.noOpRequired)
+}
+
+// noOpRequired is a placeholder step for scenarios that document controls without yet having a concrete test.
+func (cw *CloudWorld) noOpRequired() error {
+	return nil
 }
 
 // opensslClientRequest creates an OpenSSL s_client connection with optional TLS version
@@ -458,16 +534,19 @@ func (cw *CloudWorld) getSSLSupportReportWithSTARTTLS(reportName, testType, host
 	return cw.runTestSSL(reportName, testType, hostName, port, true)
 }
 
-// aCloudAPIForProviderIn initializes a cloud API factory for the specified provider
-// Example: Given a cloud api for "aws" in "myAPI"
-func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string) error {
-	// Resolve the provider name (in case it's a variable reference)
-	providerResolved := cw.HandleResolve(providerName)
-	providerStr := fmt.Sprintf("%v", providerResolved)
+// aCloudAPIForProviderIn initializes a cloud API factory from the given instance.
+// Example: Given a cloud api for "{Instance}" in "api"
+func (cw *CloudWorld) aCloudAPIForProviderIn(instanceArg string, apiName string) error {
+	// Resolve the argument — expects a types.InstanceConfig (e.g. from {Instance})
+	resolved := cw.HandleResolve(instanceArg)
+	instance, ok := resolved.(types.InstanceConfig)
+	if !ok {
+		return fmt.Errorf("expected an InstanceConfig for %q, got %T", instanceArg, resolved)
+	}
 
-	// Convert provider string to CloudProvider type
+	// Derive provider from the instance properties
 	var provider factory.CloudProvider
-	switch providerStr {
+	switch instance.Properties.Provider {
 	case "aws":
 		provider = factory.ProviderAWS
 	case "azure":
@@ -475,21 +554,15 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(providerName string, apiName string
 	case "gcp":
 		provider = factory.ProviderGCP
 	default:
-		return fmt.Errorf("unsupported cloud provider: %s (must be aws, azure, or gcp)", providerStr)
+		return fmt.Errorf("unsupported cloud provider %q in instance %q", instance.Properties.Provider, instance.ID)
 	}
 
-	// Get CloudParams from Props (populated by setupWithParams)
-	var cloudParams = cw.Props["CloudParams"].(environment.CloudParams)
-
-	// Create the factory
-	f, err := factory.NewFactory(provider, cloudParams)
+	f, err := factory.NewFactory(provider, instance)
 	if err != nil {
-		return fmt.Errorf("failed to create factory for provider %s: %w", providerStr, err)
+		return fmt.Errorf("failed to create factory for instance %q: %w", instance.ID, err)
 	}
 
-	// Store the factory in Props with the given API name
 	cw.Props[apiName] = f
-
 	return nil
 }
 
@@ -504,27 +577,7 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 	checkNameResolved := fmt.Sprintf("%v", cw.HandleResolve(checkName))
 	controlResolved := fmt.Sprintf("%v", cw.HandleResolve(control))
 	arResolved := fmt.Sprintf("%v", cw.HandleResolve(ar))
-	serviceTypeResolved := fmt.Sprintf("%v", cw.HandleResolve(serviceType))
-	resourceNameResolved := fmt.Sprintf("%v", cw.HandleResolve(resourceName))
 	providerResolved := fmt.Sprintf("%v", cw.HandleResolve(provider))
-
-	// Get CloudParams from Props
-	cloudParams, ok := cw.Props["CloudParams"].(environment.CloudParams)
-	if !ok {
-		return fmt.Errorf("CloudParams not found in Props")
-	}
-
-	// Build TestParams from resolved data
-	testParams := environment.TestParams{
-		ResourceName: resourceNameResolved,
-		ServiceType:  serviceTypeResolved,
-		CloudParams:  cloudParams,
-	}
-
-	// Get UID if available
-	if uid := cw.HandleResolve("{UID}"); uid != nil && uid != "{UID}" {
-		testParams.UID = fmt.Sprintf("%v", uid)
-	}
 
 	// Build the policy file path directly
 	// Directory structure: policy/{CatalogType}/{Control}/{AR}/{check-name}/{provider}.yaml
@@ -564,17 +617,9 @@ func (cw *CloudWorld) attemptPolicyCheck(checkName, control, ar, serviceType, re
 		return fmt.Errorf("failed to parse policy file %s: %w", policyPath, err)
 	}
 
-	// If service type doesn't match, return pass (policy not applicable to this service)
-	if policyDef.ServiceType != serviceTypeResolved {
-		cw.Props["result"] = true
-		fmt.Printf("Policy %s skipped: service type %s doesn't match resource service type %s\n",
-			checkNameResolved, policyDef.ServiceType, serviceTypeResolved)
-		return nil
-	}
-
-	// Create policy checker and run the policy
+	// Create policy checker and run the policy using Props for parameter substitution
 	checker := NewPolicyChecker(policyBaseDir)
-	result, err := checker.RunPolicy(testParams, policyPath)
+	result, err := checker.RunPolicy(cw.Props, policyPath)
 	if err != nil {
 		cw.Props["result"] = false
 		return fmt.Errorf("failed to run policy %s: %w", policyPath, err)

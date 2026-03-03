@@ -5,9 +5,9 @@ Feature: CCC.Core.CN03.AR04 - API Authentication for Viewing
   So that unauthorized data viewing is prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: API viewing requires credential and trust perimeter origin
     # This control requires behavioral testing - verifying API auth mechanisms
     # Cannot be verified with a simple policy check

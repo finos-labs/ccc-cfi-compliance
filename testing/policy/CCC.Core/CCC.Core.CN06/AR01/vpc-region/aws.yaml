@@ -18,7 +18,7 @@ validity_commentary: >
 
 query: |
   aws ec2 describe-subnets \
-    --filters Name=vpc-id,Values=${VPC_ID}
+    --filters Name=vpc-id,Values=${UID}
 
 rules:
   - jsonpath: "$.Subnets[*].AvailabilityZone"

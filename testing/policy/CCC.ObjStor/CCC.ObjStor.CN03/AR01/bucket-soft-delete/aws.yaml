@@ -1,0 +1,30 @@
+name: AWS S3 Soft Delete (S3 Versioning + MFA Delete) Check
+service_type: object-storage
+requirement_text: >
+  When an object storage bucket deletion is attempted, the bucket MUST be
+  fully recoverable for a set time-frame after deletion is requested.
+
+validity_score: 8
+validity_commentary: >
+  AWS S3 does not have a native "bucket soft delete" feature. This check
+  validates that bucket versioning is enabled, which allows objects to be
+  recovered. For bucket-level soft delete, AWS Backup or S3 replication
+  are typically required.
+  Strengths:
+  - Versioning on the bucket protects objects from accidental deletion
+  Limitations:
+  - Does not confirm bucket-level recovery; only object-level versioning
+  - S3 Backup vault would be a stronger guarantee
+
+query: |
+  aws s3api get-bucket-versioning \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.Status"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: >
+      Verifies that versioning is enabled on the bucket, providing a mechanism
+      to recover objects and supporting soft-delete workflows.

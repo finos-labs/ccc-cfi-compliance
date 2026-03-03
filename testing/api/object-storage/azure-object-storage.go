@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -14,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage/elevation"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AzureBlobService implements Service for Azure Blob Storage
@@ -22,19 +23,24 @@ type AzureBlobService struct {
 	storageClient *armstorage.AccountsClient // For normal storage operations
 	credential    azcore.TokenCredential
 	ctx           context.Context
-	cloudParams   environment.CloudParams
+	instance      *types.InstanceConfig
 	elevator      *elevation.AzureStorageElevator // Handles access elevation (RBAC + network)
 }
 
+// storageAccountName returns the Azure storage account name from service params
+func (s *AzureBlobService) storageAccountName() string {
+	return serviceParamString(s.instance.ServiceProperties("object-storage"), "azure-storage-account")
+}
+
 // NewAzureBlobService creates a new Azure Blob Storage service using default credentials
-func NewAzureBlobService(ctx context.Context, cloudParams environment.CloudParams) (*AzureBlobService, error) {
+func NewAzureBlobService(ctx context.Context, instance *types.InstanceConfig) (*AzureBlobService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
 	// Create storage client for normal operations
-	storageClient, err := armstorage.NewAccountsClient(cloudParams.AzureSubscriptionID, cred, nil)
+	storageClient, err := armstorage.NewAccountsClient(instance.CloudParams().AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage accounts client: %w", err)
 	}
@@ -43,8 +49,8 @@ func NewAzureBlobService(ctx context.Context, cloudParams environment.CloudParam
 	elevator, err := elevation.NewAzureStorageElevator(
 		ctx,
 		cred,
-		cloudParams.AzureSubscriptionID,
-		cloudParams.AzureResourceGroup,
+		instance.CloudParams().AzureSubscriptionID,
+		instance.CloudParams().AzureResourceGroup,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure storage elevator: %w", err)
@@ -54,13 +60,13 @@ func NewAzureBlobService(ctx context.Context, cloudParams environment.CloudParam
 		storageClient: storageClient,
 		credential:    cred,
 		ctx:           ctx,
-		cloudParams:   cloudParams,
+		instance:      instance,
 		elevator:      elevator,
 	}, nil
 }
 
 // NewAzureBlobServiceWithCredentials creates a new Azure Blob Storage service with service principal credentials
-func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, identity *iam.Identity) (*AzureBlobService, error) {
+func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams types.CloudParams, instance types.InstanceConfig, identity *iam.Identity) (*AzureBlobService, error) {
 	// Extract service principal credentials
 	clientID := identity.Credentials["client_id"]
 	if clientID == "" {
@@ -108,7 +114,7 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environ
 		storageClient: storageClient,
 		credential:    cred,
 		ctx:           ctx,
-		cloudParams:   cloudParams,
+		instance:      &instance,
 		elevator:      elevator,
 	}, nil
 }
@@ -116,11 +122,11 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams environ
 // ListBuckets lists all containers in the identified storage account
 // In Azure, a "bucket" is represented as "resourceGroup/storageAccount/containerName"
 func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	fmt.Printf("📦 Using storage account: %s\n", storageAccountName)
 
 	buckets := []Bucket{}
-	resourceGroup := s.cloudParams.AzureResourceGroup
+	resourceGroup := s.instance.Properties.AzureResourceGroup
 
 	// Get the storage account location
 	account, err := s.storageClient.GetProperties(s.ctx, resourceGroup, storageAccountName, nil)
@@ -128,7 +134,7 @@ func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
 		return nil, fmt.Errorf("failed to get storage account properties: %w", err)
 	}
 
-	location := s.cloudParams.Region
+	location := s.instance.Properties.Region
 	if account.Location != nil {
 		location = *account.Location
 	}
@@ -154,7 +160,7 @@ func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
 // CreateBucket creates a new container in the storage account
 // bucketID is the container name
 func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 	fmt.Printf("📦 Creating container %s in storage account %s...\n", containerName, storageAccountName)
 
@@ -169,14 +175,14 @@ func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
 	return &Bucket{
 		ID:     containerName,
 		Name:   containerName,
-		Region: s.cloudParams.Region,
+		Region: s.instance.Properties.Region,
 	}, nil
 }
 
 // DeleteBucket deletes a container from the storage account
 // bucketID is the container name
 func (s *AzureBlobService) DeleteBucket(bucketID string) error {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 	fmt.Printf("🗑️  Deleting container %s from storage account %s...\n", containerName, storageAccountName)
 	return s.deleteContainer(storageAccountName, containerName)
@@ -184,8 +190,8 @@ func (s *AzureBlobService) DeleteBucket(bucketID string) error {
 
 // GetBucketRegion returns the region where the storage account is located
 func (s *AzureBlobService) GetBucketRegion(bucketID string) (string, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
-	account, err := s.storageClient.GetProperties(s.ctx, s.cloudParams.AzureResourceGroup, storageAccountName, nil)
+	storageAccountName := s.storageAccountName()
+	account, err := s.storageClient.GetProperties(s.ctx, s.instance.Properties.AzureResourceGroup, storageAccountName, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get storage account properties: %w", err)
 	}
@@ -200,7 +206,7 @@ func (s *AzureBlobService) GetBucketRegion(bucketID string) (string, error) {
 // ListObjects lists all blobs in a container
 // bucketID is the container name
 func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Get blob service client
@@ -245,7 +251,7 @@ func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
 // CreateObject creates a new blob in a container
 // bucketID is the container name
 func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Convert string to []byte
@@ -292,7 +298,7 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data s
 // ReadObject reads a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Get blob client
@@ -334,7 +340,7 @@ func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object
 // DeleteObject deletes a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) DeleteObject(bucketID string, objectID string) error {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Get blob client
@@ -466,7 +472,7 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 
 // GetBucketRetentionDurationDays retrieves the retention policy duration in days for a container
 func (s *AzureBlobService) GetBucketRetentionDurationDays(bucketID string) (int, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Get container client
@@ -492,7 +498,7 @@ func (s *AzureBlobService) GetBucketRetentionDurationDays(bucketID string) (int,
 
 // GetObjectRetentionDurationDays retrieves the retention policy duration in days for a blob
 func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
 	// Get blob client
@@ -527,19 +533,25 @@ func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objec
 // Returns two TestParams per container:
 // 1. PerService - for policy/configuration checks
 // 2. PerPort - for TLS/endpoint connectivity tests
-func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
 	// Validate that storage account name is set
-	if s.cloudParams.AzureStorageAccount == "" {
+	if s.storageAccountName() == "" {
 		return nil, fmt.Errorf("AzureStorageAccount not set in CloudParams")
 	}
 
 	// Build the storage account resource ID for RBAC
 	storageAccountResourceID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
-		s.cloudParams.AzureSubscriptionID,
-		s.cloudParams.AzureResourceGroup,
-		s.cloudParams.AzureStorageAccount)
+		s.instance.Properties.AzureSubscriptionID,
+		s.instance.Properties.AzureResourceGroup,
+		s.storageAccountName())
 
 	fmt.Printf("   Storage Account Resource ID for RBAC: %s\n", storageAccountResourceID)
+
+	// Elevate access before discovery to ensure we can list containers and interact with the data plane
+	if err := s.ElevateAccessForInspection(); err != nil {
+		fmt.Printf("   ⚠️  Warning: Failed to elevate access for discovery: %v\n", err)
+		// Continue anyway, we might already have access
+	}
 
 	// List all buckets and ensure at least one container exists per storage account
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
@@ -550,24 +562,24 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 	// Convert containers to TestParams (2 per container: service + port)
 	// UID is the storage account resource ID (for RBAC scope)
 	// ResourceName is the container name (for test identification)
-	resources := make([]environment.TestParams, 0, len(buckets)*2)
+	resources := make([]types.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
 		// PerService: Resource-level tests (policy checks, configuration validation)
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 storageAccountResourceID,
 			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
 			ReportTitle:         bucket.Name,
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
-			CloudParams:         s.cloudParams,
+			CatalogTypes:        []string{"CCC.ObjStor"},
+			TagFilter:           []string{"@object-storage", "@PerService"},
+			Instance:            *s.instance,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
-		endpoint := fmt.Sprintf("%s.blob.core.windows.net", s.cloudParams.AzureStorageAccount)
-		resources = append(resources, environment.TestParams{
+		endpoint := fmt.Sprintf("%s.blob.core.windows.net", s.storageAccountName())
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 storageAccountResourceID,
 			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
@@ -577,9 +589,9 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 			Protocol:            "https",
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
-			CloudParams:         s.cloudParams,
+			CatalogTypes:        []string{"CCC.ObjStor"},
+			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
+			Instance:            *s.instance,
 		})
 	}
 
@@ -589,7 +601,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]environment.Test
 // CheckUserProvisioned validates that the given identity can access Azure Blob Storage
 // This performs a simple list operation to ensure credentials have propagated
 func (s *AzureBlobService) CheckUserProvisioned() error {
-	_, err := s.listContainersForAccount(s.cloudParams.AzureStorageAccount)
+	_, err := s.listContainersForAccount(s.storageAccountName())
 	if err != nil {
 		return fmt.Errorf("credentials not ready for Azure Blob Storage access: %w", err)
 	}
@@ -605,7 +617,7 @@ func (s *AzureBlobService) SetObjectPermission(bucketID, objectID string, permis
 // ListDeletedBuckets lists all soft-deleted containers in the storage account
 // Azure supports container-level soft delete for CN03.AR01
 func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	if storageAccountName == "" {
 		return nil, fmt.Errorf("no storage account name provided")
 	}
@@ -637,7 +649,7 @@ func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
 				buckets = append(buckets, Bucket{
 					ID:     *container.Name,
 					Name:   *container.Name,
-					Region: s.cloudParams.Region,
+					Region: s.instance.Properties.Region,
 				})
 			}
 		}
@@ -649,7 +661,7 @@ func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
 // RestoreBucket restores a soft-deleted container
 // Azure supports container-level soft delete for CN03.AR01
 func (s *AzureBlobService) RestoreBucket(bucketID string) error {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	if storageAccountName == "" {
 		return fmt.Errorf("no storage account name provided")
 	}
@@ -705,13 +717,13 @@ func (s *AzureBlobService) RestoreBucket(bucketID string) error {
 // SetBucketRetentionDurationDays attempts to modify the immutability policy
 // For CN03.AR02, this should fail if the policy is locked
 func (s *AzureBlobService) SetBucketRetentionDurationDays(bucketID string, days int) error {
-	storageAccountName := s.cloudParams.AzureStorageAccount
+	storageAccountName := s.storageAccountName()
 	if storageAccountName == "" {
 		return fmt.Errorf("no storage account name provided")
 	}
 
 	// Create BlobContainersClient for managing container properties
-	containersClient, err := armstorage.NewBlobContainersClient(s.cloudParams.AzureSubscriptionID, s.credential, nil)
+	containersClient, err := armstorage.NewBlobContainersClient(s.instance.Properties.AzureSubscriptionID, s.credential, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create blob containers client: %w", err)
 	}
@@ -722,7 +734,7 @@ func (s *AzureBlobService) SetBucketRetentionDurationDays(bucketID string, days 
 
 	_, err = containersClient.CreateOrUpdateImmutabilityPolicy(
 		s.ctx,
-		s.cloudParams.AzureResourceGroup,
+		s.instance.Properties.AzureResourceGroup,
 		storageAccountName,
 		bucketID,
 		&armstorage.BlobContainersClientCreateOrUpdateImmutabilityPolicyOptions{
@@ -744,9 +756,72 @@ func (s *AzureBlobService) SetBucketRetentionDurationDays(bucketID string, days 
 }
 
 func (s *AzureBlobService) ElevateAccessForInspection() error {
-	return s.elevator.ElevateStorageAccountAccess(s.cloudParams.AzureStorageAccount)
+	return s.elevator.ElevateStorageAccountAccess(s.storageAccountName())
 }
 
 func (s *AzureBlobService) ResetAccess() error {
-	return s.elevator.ResetStorageAccountAccess(s.cloudParams.AzureStorageAccount)
+	return s.elevator.ResetStorageAccountAccess(s.storageAccountName())
+}
+
+// UpdateBucketPolicy updates container access policy (used for admin action logging tests)
+// containerName is just the container name; storage account is taken from cloudParams
+func (s *AzureBlobService) UpdateBucketPolicy(containerName string, policyTag string) (*Bucket, error) {
+	storageAccountName := s.storageAccountName()
+
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+
+	// Set metadata as a simple admin action that will be logged
+	_, err = containerClient.SetMetadata(s.ctx, &container.SetMetadataOptions{
+		Metadata: map[string]*string{
+			"test_policy_tag": &policyTag,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to update container metadata: %w", err)
+	}
+
+	return &Bucket{
+		ID:   fmt.Sprintf("%s/%s", storageAccountName, containerName),
+		Name: containerName,
+	}, nil
+}
+
+// UpdateResourcePolicy updates the storage account tags to trigger Activity Log entries.
+// Azure Activity Log only captures control plane (ARM) operations, so we update tags
+// rather than container metadata (which is a data plane operation).
+func (s *AzureBlobService) UpdateResourcePolicy() error {
+	storageAccountName := s.storageAccountName()
+
+	// Get current storage account to preserve existing tags
+	account, err := s.storageClient.GetProperties(s.ctx, s.instance.Properties.AzureResourceGroup, storageAccountName, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get storage account properties: %w", err)
+	}
+
+	// Copy existing tags or create new map
+	tags := make(map[string]*string)
+	if account.Tags != nil {
+		for k, v := range account.Tags {
+			tags[k] = v
+		}
+	}
+
+	// Add/update our compliance test tag with timestamp
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	tags["ccc_compliance_test"] = &timestamp
+
+	// Update storage account with new tags (control plane operation - will appear in Activity Log)
+	_, err = s.storageClient.Update(s.ctx, s.instance.Properties.AzureResourceGroup, storageAccountName, armstorage.AccountUpdateParameters{
+		Tags: tags,
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update storage account tags: %w", err)
+	}
+
+	return nil
 }

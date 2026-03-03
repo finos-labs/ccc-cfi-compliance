@@ -5,10 +5,9 @@ Feature: CCC.Core.CN07.AR02 - Log Enumeration Activities
   So that reconnaissance attempts can be investigated
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Enumeration activities are logged
-    # This control requires runtime logging verification
-    # Covered by CN09.AR01 access logging configuration
-    Then no-op required
+    When I attempt policy check "enumeration-logging-policy" for control "CCC.Core.CN07" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

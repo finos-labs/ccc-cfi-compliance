@@ -15,7 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"github.com/google/uuid"
 )
 
@@ -24,7 +24,7 @@ type AzureIAMService struct {
 	authClient       *armauthorization.RoleAssignmentsClient
 	ctx              context.Context
 	credential       azcore.TokenCredential
-	cloudParams      environment.CloudParams
+	instance         types.InstanceConfig
 	httpClient       *http.Client
 	tenantID         string
 	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
@@ -32,21 +32,22 @@ type AzureIAMService struct {
 }
 
 // NewAzureIAMService creates a new Azure IAM service using default credentials
-func NewAzureIAMService(ctx context.Context, cloudParams environment.CloudParams) (*AzureIAMService, error) {
+func NewAzureIAMService(ctx context.Context, instance types.InstanceConfig) (*AzureIAMService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
-	return newAzureIAMServiceInternal(ctx, cloudParams, cred)
+	return newAzureIAMServiceInternal(ctx, instance, cred)
 }
 
 // NewAzureIAMServiceWithCredentials creates a new Azure IAM service with specific credentials
-func NewAzureIAMServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, cred azcore.TokenCredential) (*AzureIAMService, error) {
-	return newAzureIAMServiceInternal(ctx, cloudParams, cred)
+func NewAzureIAMServiceWithCredentials(ctx context.Context, instance types.InstanceConfig, cred azcore.TokenCredential) (*AzureIAMService, error) {
+	return newAzureIAMServiceInternal(ctx, instance, cred)
 }
 
-func newAzureIAMServiceInternal(ctx context.Context, cloudParams environment.CloudParams, cred azcore.TokenCredential) (*AzureIAMService, error) {
+func newAzureIAMServiceInternal(ctx context.Context, instance types.InstanceConfig, cred azcore.TokenCredential) (*AzureIAMService, error) {
+	cloudParams := instance.CloudParams()
 	authClient, err := armauthorization.NewRoleAssignmentsClient(cloudParams.AzureSubscriptionID, cred, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization client: %w", err)
@@ -62,7 +63,7 @@ func newAzureIAMServiceInternal(ctx context.Context, cloudParams environment.Clo
 		authClient:       authClient,
 		ctx:              ctx,
 		credential:       cred,
-		cloudParams:      cloudParams,
+		instance:         instance,
 		httpClient:       &http.Client{Timeout: 30 * time.Second},
 		tenantID:         tenantID,
 		provisionedUsers: make(map[string]*Identity),
@@ -216,7 +217,7 @@ func (s *AzureIAMService) provisionUserInternal(userName string) (*Identity, err
 	identity.Credentials["object_id"] = spObjectID       // Service principal object ID
 	identity.Credentials["app_object_id"] = objectID     // Application object ID
 	identity.Credentials["secret_id"] = secretID         // Secret ID for cleanup
-	identity.Credentials["subscription_id"] = s.cloudParams.AzureSubscriptionID
+	identity.Credentials["subscription_id"] = s.instance.Properties.AzureSubscriptionID
 	identity.Credentials["display_name"] = displayName
 
 	if isExisting {
@@ -382,7 +383,7 @@ func (s *AzureIAMService) getRoleDefinitionForLevel(serviceID string, level stri
 	// Azure built-in role definition IDs
 	// Format: /subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/{roleId}
 
-	baseRolePath := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions", s.cloudParams.AzureSubscriptionID)
+	baseRolePath := fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions", s.instance.Properties.AzureSubscriptionID)
 
 	switch level {
 	case "none":
@@ -427,12 +428,12 @@ func (s *AzureIAMService) parseScope(serviceID string) string {
 		if len(parts) > 0 {
 			accountName := parts[len(parts)-1]
 			return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s",
-				s.cloudParams.AzureSubscriptionID, s.cloudParams.AzureResourceGroup, accountName)
+				s.instance.Properties.AzureSubscriptionID, s.instance.Properties.AzureResourceGroup, accountName)
 		}
 	}
 
 	// Default: use resource group scope
-	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", s.cloudParams.AzureSubscriptionID, s.cloudParams.AzureResourceGroup)
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", s.instance.Properties.AzureSubscriptionID, s.instance.Properties.AzureResourceGroup)
 }
 
 func extractScopeFromAssignmentID(assignmentID string) string {
@@ -468,8 +469,8 @@ func toPtr(s string) *string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *AzureIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-	return []environment.TestParams{}, nil
+func (s *AzureIAMService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
+	return []types.TestParams{}, nil
 }
 
 func (s *AzureIAMService) CheckUserProvisioned() error {
@@ -485,6 +486,11 @@ func (s *AzureIAMService) ElevateAccessForInspection() error {
 // ResetAccess is a no-op for IAM services
 func (s *AzureIAMService) ResetAccess() error {
 	// No-op: IAM services don't have network-level access controls to reset
+	return nil
+}
+
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *AzureIAMService) UpdateResourcePolicy() error {
 	return nil
 }
 

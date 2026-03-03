@@ -11,58 +11,57 @@ import (
 	"strings"
 	"time"
 
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 var (
-	provider       = flag.String("provider", "", "Cloud provider (aws, azure, or gcp)")
-	service        = flag.String("service", "", "Service type to test (object-storage, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services.")
+	instance       = flag.String("instance", "", "Instance ID from environment.yaml (e.g. main-aws, main-azure)")
+	envFile        = flag.String("env-file", "", "Path to environment.yaml (default: environment.yaml in testing directory)")
+	service        = flag.String("service", "", "Service type to test (object-storage, logging, block-storage, relational-database, iam, load-balancer, security-group, vpc). If not specified, tests all services defined in the instance.")
 	outputDir      = flag.String("output", "", "Output directory for test reports (default: testing/output)")
 	timeout        = flag.Duration("timeout", 30*time.Minute, "Timeout for all tests")
 	resourceFilter = flag.String("resource", "", "Filter tests to a specific resource name")
 	tags           = flag.String("tags", "", "Space-separated tag filters ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')")
-
-	// Cloud configuration flags
-	region              = flag.String("region", "", "Cloud region")
-	azureSubscriptionID = flag.String("azure-subscription-id", "", "Azure subscription ID (required for Azure)")
-	azureResourceGroup  = flag.String("azure-resource-group", "", "Azure resource group (required for Azure)")
-	azureStorageAccount = flag.String("azure-storage-account", "", "Azure storage account name (required for Azure)")
-	gcpProjectID        = flag.String("gcp-project-id", "", "GCP project ID (required for GCP)")
 )
 
 func main() {
 	flag.Parse()
 
-	// Set default output directory if not specified
+	// Resolve the testing directory relative to this source file
+	_, filename, _, _ := runtime.Caller(0)
+	runnerDir := filepath.Dir(filename)
+	testingDir := filepath.Dir(runnerDir)
+
+	// Set default output directory
 	if *outputDir == "" {
-		// Get the testing directory (parent of runner directory)
-		_, filename, _, _ := runtime.Caller(0)
-		runnerDir := filepath.Dir(filename)
-		testingDir := filepath.Dir(runnerDir)
 		*outputDir = filepath.Join(testingDir, "output")
 	}
 
+	// Set default env file path
+	envFilePath := *envFile
+	if envFilePath == "" {
+		envFilePath = filepath.Join(testingDir, "environment.yaml")
+	}
+
 	// Validate required flags
-	if *provider == "" {
-		log.Fatal("Error: -provider flag is required (aws, azure, or gcp)")
+	if *instance == "" {
+		log.Fatal("Error: -instance flag is required (e.g. main-aws, main-azure, main-gcp)")
 	}
 
-	if *provider != "aws" && *provider != "azure" && *provider != "gcp" {
-		log.Fatalf("Error: invalid provider '%s' (must be aws, azure, or gcp)", *provider)
+	// Load types.yaml
+	envConfig, err := LoadEnvironment(envFilePath)
+	if err != nil {
+		log.Fatalf("Error loading environment file: %v", err)
 	}
 
-	// Build CloudParams from flags (priority) or environment variables (fallback)
-	cloudParams := buildCloudParams(*provider, *region, *azureSubscriptionID, *azureResourceGroup, *azureStorageAccount, *gcpProjectID)
-
-	// Validate provider-specific requirements
-	if err := validateCloudParams(*provider, cloudParams); err != nil {
+	// Find the requested instance
+	inst, err := FindInstance(envConfig, *instance)
+	if err != nil {
 		log.Fatalf("Error: %v", err)
 	}
 
-	// Log configuration
 	log.Printf("🚀 Starting CCC CFI Compliance Tests")
-	log.Printf("   Provider: %s", cloudParams.Provider)
-	log.Printf("   Region: %s", cloudParams.Region)
+	log.Printf("   Instance: %s (%s)", inst.ID, inst.Properties.Provider)
 	log.Println()
 
 	// Prepare output directory
@@ -76,31 +75,40 @@ func main() {
 	log.Printf("✅ Output directory ready")
 	log.Println()
 
-	// Determine which services to run
-	serviceTypes := environment.ServiceTypes
+	// Determine which services to run from the instance definition
+	servicesToRun := inst.Services
 	if *service != "" {
-		// Validate the service type
+		// Validate and filter to the requested service type
 		validService := false
-		for _, st := range environment.ServiceTypes {
+		for _, st := range types.ServiceTypes {
 			if st == *service {
 				validService = true
 				break
 			}
 		}
 		if !validService {
-			log.Fatalf("Error: invalid service '%s'. Valid services are: %s", *service, strings.Join(environment.ServiceTypes, ", "))
+			log.Fatalf("Error: invalid service '%s'. Valid services are: %s", *service, strings.Join(types.ServiceTypes, ", "))
 		}
-		serviceTypes = []string{*service}
+		var filtered []types.ServiceConfig
+		for _, svc := range inst.Services {
+			if svc.Type == *service {
+				filtered = append(filtered, svc)
+			}
+		}
+		if len(filtered) == 0 {
+			log.Fatalf("Error: service '%s' is not defined in instance '%s'", *service, inst.ID)
+		}
+		servicesToRun = filtered
 		log.Printf("   Service: %s", *service)
 		log.Println()
 	}
 
-	// Assemble list of service runners - one for each service type
+	// Build one runner per service
 	var runners []ServiceRunner
-	for _, serviceName := range serviceTypes {
+	for i := range servicesToRun {
 		runners = append(runners, NewBasicServiceRunner(RunConfig{
-			ServiceName:    serviceName,
-			CloudParams:    cloudParams,
+			ServiceName:    servicesToRun[i].Type,
+			Instance:       *inst,
 			OutputDir:      *outputDir,
 			Timeout:        *timeout,
 			ResourceFilter: *resourceFilter,
@@ -142,7 +150,6 @@ func main() {
 	log.Printf("   Failed: %d", totalFailed)
 	log.Println(strings.Repeat("=", 60))
 
-	// Report final results and exit
 	if totalFailed > 0 {
 		log.Println("❌ Some runners had test failures")
 		os.Exit(1)
@@ -151,7 +158,7 @@ func main() {
 		os.Exit(1)
 	} else if totalPassed == 0 {
 		log.Println("⚠️  No runners executed any tests")
-		os.Exit(0) // Not a failure - just nothing to do
+		os.Exit(0)
 	} else {
 		log.Println("✅ All runners passed")
 		os.Exit(0)
@@ -160,7 +167,6 @@ func main() {
 
 // combineOCSFFiles combines all *ocsf.json files in the output directory into a single combined_ocsf.json file
 func combineOCSFFiles(outputDir string) error {
-	// Find all OCSF JSON files in the output directory
 	pattern := filepath.Join(outputDir, "*ocsf.json")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -174,30 +180,22 @@ func combineOCSFFiles(outputDir string) error {
 
 	log.Printf("   Found %d OCSF file(s) to combine", len(files))
 
-	// Combine all JSON arrays into a single array
 	var combined []interface{}
-
 	for _, file := range files {
-		// Read the file
 		data, err := os.ReadFile(file)
 		if err != nil {
 			log.Printf("   ⚠️  Warning: Failed to read %s: %v", filepath.Base(file), err)
 			continue
 		}
-
-		// Parse the JSON array
 		var items []interface{}
 		if err := json.Unmarshal(data, &items); err != nil {
 			log.Printf("   ⚠️  Warning: Failed to parse %s: %v", filepath.Base(file), err)
 			continue
 		}
-
-		// Add items to the combined array
 		combined = append(combined, items...)
 		log.Printf("   Added %d item(s) from %s", len(items), filepath.Base(file))
 	}
 
-	// Write the combined array to a new file
 	combinedPath := filepath.Join(outputDir, "combined.ocsf.json")
 	combinedData, err := json.MarshalIndent(combined, "", "  ")
 	if err != nil {
@@ -209,74 +207,21 @@ func combineOCSFFiles(outputDir string) error {
 	}
 
 	log.Printf("   Total items in combined file: %d", len(combined))
-
 	return nil
 }
 
-// buildCloudParams constructs CloudParams from command-line flags
-func buildCloudParams(provider, region, azureSubscriptionID, azureResourceGroup, azureStorageAccount, gcpProjectID string) environment.CloudParams {
-	params := environment.CloudParams{
-		Provider: provider,
-		Region:   region,
-	}
-
-	// Only set provider-specific fields
-	switch provider {
-	case "azure":
-		params.AzureSubscriptionID = azureSubscriptionID
-		params.AzureResourceGroup = azureResourceGroup
-		params.AzureStorageAccount = azureStorageAccount
-	case "gcp":
-		params.GCPProjectID = gcpProjectID
-	case "aws":
-		// AWS only needs Provider and Region
-	}
-
-	return params
-}
-
 // parseTags parses a space-separated tags string into a slice of tags
-// Ensures each tag has @ prefix if it's a simple tag name
 func parseTags(tagsStr string) []string {
 	if tagsStr == "" {
 		return nil
 	}
-
 	parts := strings.Fields(tagsStr)
 	tags := make([]string, 0, len(parts))
-
 	for _, tag := range parts {
-		// Ensure tag has @ prefix if it's a simple tag name (not negated with ~)
 		if !strings.HasPrefix(tag, "@") && !strings.HasPrefix(tag, "~") {
 			tag = "@" + tag
 		}
 		tags = append(tags, tag)
 	}
-
 	return tags
-}
-
-// validateCloudParams validates that required parameters are set for the provider
-func validateCloudParams(provider string, cloudParams environment.CloudParams) error {
-	// Region is required for all providers
-	if cloudParams.Region == "" {
-		return fmt.Errorf("region is required (use --region flag)")
-	}
-
-	// Provider-specific validation
-	switch provider {
-	case "azure":
-		if cloudParams.AzureSubscriptionID == "" {
-			return fmt.Errorf("azure subscription ID is required (use --azure-subscription-id flag)")
-		}
-		if cloudParams.AzureResourceGroup == "" {
-			return fmt.Errorf("azure resource group is required (use --azure-resource-group flag)")
-		}
-	case "gcp":
-		if cloudParams.GCPProjectID == "" {
-			return fmt.Errorf("GCP project ID is required (use --gcp-project-id flag)")
-		}
-	}
-
-	return nil
 }

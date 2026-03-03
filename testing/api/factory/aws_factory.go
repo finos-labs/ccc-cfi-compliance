@@ -6,32 +6,32 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/logging"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSFactory implements the Factory interface for AWS
 type AWSFactory struct {
-	ctx         context.Context
-	cloudParams environment.CloudParams
-	iamService  generic.Service
+	ctx        context.Context
+	instance   types.InstanceConfig
+	iamService generic.Service
 }
 
 // NewAWSFactory creates a new AWS factory
-func NewAWSFactory(cloudParams environment.CloudParams) *AWSFactory {
+func NewAWSFactory(instance types.InstanceConfig) *AWSFactory {
 	ctx := context.Background()
 
 	// Create IAM service once and cache it
-	iamService, err := iam.NewAWSIAMService(ctx)
+	iamService, err := iam.NewAWSIAMService(ctx, instance)
 	if err != nil {
-		// Log error but don't fail - IAM service might not be needed
 		fmt.Printf("⚠️  Warning: Failed to create AWS IAM service: %v\n", err)
 	}
 
 	return &AWSFactory{
-		ctx:         ctx,
-		cloudParams: cloudParams,
-		iamService:  iamService,
+		ctx:        ctx,
+		instance:   instance,
+		iamService: iamService,
 	}
 }
 
@@ -45,16 +45,20 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 		return f.iamService, nil
 
 	case "object-storage":
-		service, err := objstorage.NewAWSS3Service(f.ctx, f.cloudParams)
+		service, err := objstorage.NewAWSS3Service(f.ctx, f.instance)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AWS service '%s': %w", serviceID, err)
 		}
-
-		// Elevate access for testing
 		if err := service.ElevateAccessForInspection(); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
 		}
+		return service, nil
 
+	case "logging":
+		service, err := logging.NewAWSLoggingService(f.ctx, &f.instance)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS logging service: %w", err)
+		}
 		return service, nil
 
 	default:
@@ -73,24 +77,18 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 		return f.iamService, nil
 
 	case "object-storage":
-		service, err := objstorage.NewAWSS3ServiceWithCredentials(f.ctx, f.cloudParams, identity)
+		service, err := objstorage.NewAWSS3ServiceWithCredentials(f.ctx, f.instance, identity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create AWS service '%s' with identity: %w", serviceID, err)
 		}
-
-		// Elevate access for testing
 		if err := service.ElevateAccessForInspection(); err != nil {
 			fmt.Printf("⚠️  Warning: Failed to elevate access for %s: %v\n", serviceID, err)
 		}
-
-		// If testAccess is true, validate that permissions have propagated
 		if testAccess {
-			err = waitForUserProvisioning(service)
-			if err != nil {
+			if err = waitForUserProvisioning(service); err != nil {
 				return nil, fmt.Errorf("user provisioning validation failed: %w", err)
 			}
 		}
-
 		return service, nil
 
 	default:

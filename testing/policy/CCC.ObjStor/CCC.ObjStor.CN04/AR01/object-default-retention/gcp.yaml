@@ -1,0 +1,30 @@
+name: GCP Cloud Storage Default Object Retention Check
+service_type: object-storage
+requirement_text: >
+  Objects MUST automatically receive a default retention policy upon upload,
+  protecting critical data from premature deletion or modification.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that a default object retention policy is configured on
+  the GCP Cloud Storage bucket. GCP's default object retention ensures all
+  objects created in the bucket automatically inherit the retention duration.
+  Strengths:
+  - Default retention is applied at bucket level, covering all new objects
+  - Directly queries the bucket retention policy configuration
+  Limitations:
+  - Does not validate whether the policy is locked (see CN03.AR02)
+  - Does not validate the specific minimum retention duration
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(retentionPolicy)"
+
+rules:
+  - jsonpath: "$.retentionPolicy.retentionPeriod"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Verifies that a retention period (in seconds) is configured and greater
+      than zero, ensuring newly created objects automatically inherit a
+      retention policy.

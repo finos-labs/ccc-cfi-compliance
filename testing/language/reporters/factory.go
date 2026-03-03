@@ -4,21 +4,21 @@ import (
 	"io"
 
 	"github.com/cucumber/godog/formatters"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
-// TestParams is an alias to environment.TestParams for backward compatibility
-type TestParams = environment.TestParams
+// TestParams is an alias to types.TestParams for backward compatibility
+type TestParams = types.TestParams
 
 // FormatterFactory creates formatters with embedded test parameters
 type FormatterFactory struct {
 	params             TestParams
-	attachmentProvider environment.AttachmentProvider
+	attachmentProvider types.AttachmentProvider
 }
 
 // NewFormatterFactory creates a new formatter factory with the given parameters
 // Optionally accepts an attachment provider as the second parameter
-func NewFormatterFactory(params TestParams, attachmentProvider ...environment.AttachmentProvider) *FormatterFactory {
+func NewFormatterFactory(params TestParams, attachmentProvider ...types.AttachmentProvider) *FormatterFactory {
 	ff := &FormatterFactory{
 		params: params,
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // CloudProvider represents the supported cloud providers
@@ -34,9 +34,10 @@ type Factory interface {
 	GetProvider() CloudProvider
 }
 
-// NewFactory creates a new factory for the specified cloud provider using cloud-specific configuration
-// Factories are cached per provider to ensure IAM service caching works across calls
-func NewFactory(provider CloudProvider, cloudParams environment.CloudParams) (Factory, error) {
+// NewFactory creates a new factory for the specified cloud provider.
+// instance carries all environment configuration, including service-specific properties.
+// Factories are cached per provider to ensure IAM service caching works across calls.
+func NewFactory(provider CloudProvider, instance types.InstanceConfig) (Factory, error) {
 	// Check cache first
 	if cachedFactory, exists := factoryCache[provider]; exists {
 		fmt.Printf("♻️  Using cached factory for provider: %s\n", provider)
@@ -48,11 +49,11 @@ func NewFactory(provider CloudProvider, cloudParams environment.CloudParams) (Fa
 	var factory Factory
 	switch provider {
 	case ProviderAWS:
-		factory = NewAWSFactory(cloudParams)
+		factory = NewAWSFactory(instance)
 	case ProviderAzure:
-		factory = NewAzureFactory(cloudParams)
+		factory = NewAzureFactory(instance)
 	case ProviderGCP:
-		factory = NewGCPFactory()
+		factory = NewGCPFactory(instance)
 	default:
 		return nil, fmt.Errorf("unsupported cloud provider: %s", provider)
 	}

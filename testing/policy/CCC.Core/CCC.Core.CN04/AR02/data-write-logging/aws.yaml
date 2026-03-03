@@ -1,0 +1,37 @@
+name: CloudTrail Data Events Write Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all data modification attempts 
+  (identity, timestamp, action, result).
+
+validity_score: 8
+validity_commentary: >
+  This query validates that CloudTrail is configured to log data events
+  for write operations across AWS services.
+  Strengths:
+  - Data events capture object-level write operations
+  - Events include identity, timestamp, action, and result
+  - Logs are stored separately from the source bucket
+  Limitations:
+  - Data events incur additional CloudTrail costs
+  - Must be explicitly enabled (not default)
+  - High-volume buckets may generate large log volumes
+
+query: |
+  aws cloudtrail get-event-selectors \
+    --trail-name ${AWSCloudTrailName}
+
+rules:
+  - jsonpath: "$.EventSelectors[?(@.DataResources)].ReadWriteType"
+    expected_values: ["All", "WriteOnly"]
+    validation_rule: ""
+    description: >
+      Validates that data events are configured to capture write operations.
+      Write operations include resource creation, modification, and deletion.
+
+  - jsonpath: "$.EventSelectors[?(@.DataResources)].DataResources[*].Type"
+    expected_values: []
+    validation_rule: "^AWS::.*$"
+    description: >
+      Validates that data event logging is configured for AWS resources.
+      Can be configured for S3, Lambda, DynamoDB, and other services.

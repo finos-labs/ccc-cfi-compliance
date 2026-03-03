@@ -1,0 +1,38 @@
+name: Azure Blob Object Retention Enforcement Check
+service_type: object-storage
+requirement_text: >
+  The service MUST prevent deletion or modification of objects under active
+  retention, maintaining data integrity and compliance requirements.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that a locked immutability policy is in place on the
+  Azure storage container, preventing deletion or modification of blobs during
+  the retention period.
+  Strengths:
+  - A Locked immutability policy cannot be shortened or removed
+  - Directly verifies the policy state and period
+  Limitations:
+  - Must be configured at the container level in Azure
+
+query: |
+  az storage container immutability-policy show \
+    --account-name ${AzureStorageAccount} \
+    --container-name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --output json
+
+rules:
+  - jsonpath: "$.properties.state"
+    expected_values:
+      - "Locked"
+    validation_rule: "^Locked$"
+    description: >
+      Verifies that the immutability policy is locked, enforcing retention
+      and preventing blob deletion or modification before the period expires.
+  - jsonpath: "$.properties.immutabilityPeriodSinceCreationInDays"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Verifies that the immutability period is a positive number of days,
+      confirming objects are actively protected from modification or deletion.

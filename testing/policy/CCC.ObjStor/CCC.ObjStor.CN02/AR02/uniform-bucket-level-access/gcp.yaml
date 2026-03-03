@@ -1,0 +1,26 @@
+name: GCP Cloud Storage Uniform Bucket-Level Access Check
+service_type: object-storage
+requirement_text: >
+  The service MUST enforce uniform bucket-level access, preventing ad-hoc 
+  object-level permissions.
+
+validity_score: 10
+validity_commentary: >
+  This query validates that Uniform Bucket-Level Access (UBLA) is enabled.
+  UBLA ensures that only IAM policies govern access to the bucket and its objects.
+  Strengths:
+  - Directly queries the UBLA configuration
+  - Guarantees no ad-hoc object ACLs can be used
+  - Consistent with GCP security best practices
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(iamConfiguration.uniformBucketLevelAccess)"
+
+rules:
+  - jsonpath: "$.iamConfiguration.uniformBucketLevelAccess.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that uniform Bucket-Level Access is enabled.

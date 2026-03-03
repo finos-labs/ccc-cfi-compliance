@@ -1,0 +1,35 @@
+name: AWS S3 Object Lock Retention Policy Check
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify the retention policy for an object storage
+  bucket, the service MUST prevent the policy from being modified.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 Object Lock is enabled with Compliance mode,
+  which prevents the retention period from being shortened or removed by any
+  user, including the root account.
+  Strengths:
+  - Compliance mode cannot be overridden by any user
+  - Directly checks the object lock configuration
+  - Confirms a default retention rule is in place
+  Limitations:
+  - Does not validate the specific retention duration value
+
+query: |
+  aws s3api get-object-lock-configuration \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.ObjectLockConfiguration.ObjectLockEnabled"
+    expected_values:
+      - "Enabled"
+    validation_rule: "^Enabled$"
+    description: Verifies that Object Lock is enabled on the bucket.
+  - jsonpath: "$.ObjectLockConfiguration.Rule.DefaultRetention.Mode"
+    expected_values:
+      - "COMPLIANCE"
+    validation_rule: "^COMPLIANCE$"
+    description: >
+      Verifies that the default retention mode is COMPLIANCE, preventing any
+      user from reducing or removing the retention period.

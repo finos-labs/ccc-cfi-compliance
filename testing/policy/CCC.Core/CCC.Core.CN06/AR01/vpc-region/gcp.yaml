@@ -18,7 +18,7 @@ validity_commentary: >
 query: |
   gcloud compute networks subnets list \
     --network=${ResourceName} \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --format=json
 
 rules:

@@ -1,0 +1,39 @@
+name: CloudTrail Management Events Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all access and changes by administrators 
+  (identity, timestamp, action, result).
+
+validity_score: 8
+validity_commentary: >
+  This query validates that CloudTrail is configured to log management events
+  for all AWS services. Management events include admin actions like resource
+  creation, configuration changes, and access control modifications.
+  Strengths:
+  - CloudTrail provides comprehensive admin event logging
+  - Events include identity (IAM user/role), timestamp, action, and result
+  - Logs are stored separately from the source bucket
+  Limitations:
+  - Does not validate CloudTrail log delivery status
+  - Does not verify log retention period
+  - Multi-region trail configuration should be verified separately
+
+query: |
+  aws cloudtrail get-event-selectors \
+    --trail-name ${AWSCloudTrailName}
+
+rules:
+  - jsonpath: "$.EventSelectors[*].IncludeManagementEvents"
+    expected_values: ["true"]
+    validation_rule: ""
+    description: >
+      Validates that management events are included in CloudTrail logging.
+      Management events capture admin operations like resource creation,
+      policy changes, and configuration updates across all AWS services.
+
+  - jsonpath: "$.EventSelectors[*].ReadWriteType"
+    expected_values: ["All", "WriteOnly"]
+    validation_rule: ""
+    description: >
+      Validates that CloudTrail captures write events (admin changes).
+      "All" captures both reads and writes, "WriteOnly" captures modifications.

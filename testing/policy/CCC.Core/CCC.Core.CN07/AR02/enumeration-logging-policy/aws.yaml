@@ -1,0 +1,20 @@
+name: AWS Enumeration Logging Policy Check
+service_type: object-storage
+requirement_text: >
+  Enumeration activities must be logged to a secure location.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that S3 server access logging is enabled for the bucket.
+  Enumeration activities (like ListObjects) are recorded in these logs.
+
+query: |
+  aws s3api get-bucket-logging \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.LoggingEnabled.TargetBucket"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Verifies that access logging is enabled.

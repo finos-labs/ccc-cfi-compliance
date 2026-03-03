@@ -5,9 +5,9 @@ Feature: CCC.Core.CN08.AR01 - Data Replication and Redundancy
   So that disaster recovery requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage replication compliance
     When I attempt policy check "object-storage-replication" for control "CCC.Core.CN08" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

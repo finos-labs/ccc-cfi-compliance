@@ -1,1 +1,30 @@
----
+name: GCP Cloud Storage HTTPS Policy Check
+service_type: object-storage
+requirement_text: >
+  When a port is exposed for non-SSH network traffic, all traffic MUST include 
+  a TLS handshake AND be encrypted using TLS 1.3 or higher.
+
+validity_score: 8
+validity_commentary: >
+  This check verifies that GCP Cloud Storage is accessed over HTTPS.
+  Strengths:
+  - GCS API explicitly requires TLS for all operations on the public endpoint
+  - Google manages the TLS termination and certificate lifecycle
+  - Organization-level policy 'constraints/storage.requireHttpsTrafficOnly'
+    can be used for universal enforcement
+  Limitations:
+  - GCP does not expose a per-bucket 'minimum TLS version' field
+  - TLS 1.3 is supported but cannot be set as the exclusive minimum yet
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.name"
+    expected_values: []
+    validation_rule: ".+"
+    description: >
+      Confirms the bucket exists. GCP Cloud Storage implicitly requires
+      TLS for all storage API operations. Per-bucket TLS configuration
+      is not exposed in GCP, as it is managed at the platform level.

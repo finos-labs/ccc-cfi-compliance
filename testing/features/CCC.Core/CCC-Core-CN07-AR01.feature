@@ -5,10 +5,9 @@ Feature: CCC.Core.CN07.AR01 - Publish Enumeration Activity Events
   So that reconnaissance attempts are detected
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Enumeration activities publish events to monitored channels
-    # This control requires runtime monitoring configuration verification
-    # CloudWatch/Azure Monitor/Cloud Monitoring alerts enforce this
-    Then no-op required
+    When I attempt policy check "enumeration-monitoring-policy" for control "CCC.Core.CN07" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

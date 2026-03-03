@@ -327,7 +327,7 @@ Runs a specific policy check against a cloud resource.
 **Example:**
 
 ```gherkin
-Given a cloud api for "{Provider}" in "api"
+Given a cloud api for "{Instance}" in "api"
 When I attempt policy check "s3-bucket-region" for control "CCC.Core.CN06" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
 Then "{result}" is true
 ```

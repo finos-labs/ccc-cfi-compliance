@@ -1,4 +1,4 @@
-@PerService @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR02
+@PerService @object-storage @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN03.AR02
 Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
   When an attempt is made to modify the retention policy for an object storage bucket,
   the service MUST prevent the policy from being modified.
@@ -6,19 +6,25 @@ Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
   This ensures retention policies cannot be shortened or removed, protecting against data loss.
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
-    And I call "{api}" with "GetServiceAPI" with parameter "object-storage"
+    Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 
+  @Behavioural
   Scenario: Service prevents modification of locked retention policy
-    When I call "{storage}" with "GetBucketRetentionDurationDays" with parameter "{ResourceName}"
+    When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error
     And I refer to "{result}" as "originalRetention"
     And I attach "{result}" to the test output as "original-retention-days.txt"
     And "{result}" should be greater than "0"
-    When I call "{storage}" with "SetBucketRetentionDurationDays" with parameters "{ResourceName}" and "1"
+    When I call "{storage}" with "SetBucketRetentionDurationDays" using arguments "{ResourceName}" and "1"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "set-retention-error.txt"
-    When I call "{storage}" with "GetBucketRetentionDurationDays" with parameter "{ResourceName}"
+    When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error
     And "{result}" should equal "{originalRetention}"
+
+  @Policy
+  Scenario: Test policy for immutable bucket retention lock
+    When I attempt policy check "bucket-retention-lock" for control "CCC.ObjStor.CN03" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

@@ -5,9 +5,9 @@ Feature: CCC.Core.CN05.AR04 - Block Unauthorized External Data Requests
   So that data exfiltration is prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: External unauthorized data requests are blocked
     # This control requires behavioral testing - attempting external access
     # Network policies and IAM policies enforce this at runtime

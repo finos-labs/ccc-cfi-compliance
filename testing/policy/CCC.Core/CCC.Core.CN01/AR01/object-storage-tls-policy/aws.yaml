@@ -1,1 +1,30 @@
----
+name: S3 Bucket HTTPS Enforcement Check
+service_type: object-storage
+requirement_text: >
+  When a port is exposed for non-SSH network traffic, all traffic MUST include 
+  a TLS handshake AND be encrypted using TLS 1.3 or higher.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 buckets are configured to enforce HTTPS 
+  via bucket policy. Strengths:
+  - Directly checks for a bucket policy that denies non-secure transport
+  - AWS enforces this at the bucket gateway for all incoming requests
+  Limitations:
+  - Does not explicitly check the TLS version (only that HTTPS is used)
+  - AWS does not yet provide a native bucket-level minimum TLS version field
+  - S3 globally enforces TLS 1.2 minimum since mid-2023
+
+query: |
+  aws s3api get-bucket-policy \
+    --bucket ${ResourceName} \
+    --output json
+
+rules:
+  - jsonpath: "$.Policy"
+    expected_values: []
+    validation_rule: "aws:SecureTransport.*(true|\"true\")"
+    description: >
+      Verifies that the bucket policy contains a condition requiring 
+      secure transport (HTTPS). A Deny statement with a condition 
+      'aws:SecureTransport: false' is the standard AWS enforcement pattern.

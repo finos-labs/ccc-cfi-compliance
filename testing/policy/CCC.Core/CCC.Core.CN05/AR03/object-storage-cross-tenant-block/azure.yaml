@@ -1,0 +1,40 @@
+name: Azure Storage Cross-Tenant Replication Block
+service_type: object-storage
+requirement_text: >
+  When administrative access or configuration change is attempted on the service
+  or a child resource in a multi-tenant environment, the service MUST refuse
+  requests across tenant boundaries unless the origin is explicitly included
+  in a pre-approved allowlist.
+
+validity_score: 8
+validity_commentary: >
+  This query validates Azure Storage object replication against
+  permitted-destination-storage-accounts. When allowCrossTenantReplication is
+  false, no cross-tenant replication is possible (pass). When true, all
+  replication policy destinations must be in the permitted list. Strengths:
+  - Directly queries replication policies and destination accounts
+  - Uses provider-specific allowlist for precise control
+  - Aligns with CIS and Prowler benchmarks
+  Limitations:
+  - Does not validate cross-tenant access via other mechanisms (e.g. SAS)
+  - Destination format (name vs resource ID) must match Azure API response
+
+query: |
+  ALLOW_XT=$(az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "properties.allowCrossTenantReplication" --output tsv 2>/dev/null || echo "false")
+  if [ "$ALLOW_XT" != "true" ]; then
+    echo '{"destinationAccounts": []}'
+  else
+    az rest --method get \
+      --url "https://management.azure.com/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/objectReplicationPolicies?api-version=2025-06-01" \
+      --query "{destinationAccounts: value[].properties.destinationAccount}" -o json 2>/dev/null || echo '{"destinationAccounts": []}'
+  fi
+
+rules:
+  - jsonpath: "$.destinationAccounts"
+    expected_values: ["${PermittedDestinationStorageAccounts}"]
+    description: >
+      Validates that when cross-tenant replication is enabled, all destination
+      storage accounts are in permitted-destination-storage-accounts.

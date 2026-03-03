@@ -1,0 +1,20 @@
+name: Azure Storage Enumeration Logging Policy Check
+service_type: object-storage
+requirement_text: >
+  Enumeration activities must be logged.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that diagnostic settings are configured for the storage account.
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource /subscriptions/${AzureSubscriptionId}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount} \
+    --output json
+
+rules:
+  - jsonpath: "$.value[0].logs[?(@.enabled==true)].category"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Verifies that at least one log category is enabled.

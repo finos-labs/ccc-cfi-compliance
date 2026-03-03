@@ -66,7 +66,7 @@ Feature: CCC.Core.CN01.AR07
 
     Then "{portNumber}" is "636"
 
-  @Policy @PerService
+  @Policy @PerService @object-storage
   Scenario: Security group enforces IANA port-protocol mapping
     When I attempt policy check "security-group-port-protocol" for control "CCC.Core.CN01" assessment requirement "AR07" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

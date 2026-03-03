@@ -1,0 +1,22 @@
+name: GCP Enumeration Monitoring Policy Check
+service_type: object-storage
+requirement_text: >
+  Enumeration activities must be monitored and generate events
+  that can be sent to monitored channels.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that at least one log sink exists for the project,
+  which allows logs to be exported to monitored channels like Pub/Sub,
+  BigQuery, or a separate Logging project.
+
+query: |
+  gcloud logging sinks list --project ${GcpProjectId} --format=json
+
+rules:
+  - jsonpath: "$.[0].name"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Verifies that at least one log sink is configured.
+      Sinks are used to export logs to monitored channels.

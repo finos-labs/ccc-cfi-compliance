@@ -3,15 +3,17 @@ package reporters
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/cucumber/godog/formatters"
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // HTMLFormatter is a godog formatter that generates HTML reports
@@ -36,7 +38,7 @@ type HTMLFormatter struct {
 	featureOpened      bool
 	stepKeywords       map[string]string              // Maps step AST node IDs to their keywords (Given/When/Then/And/But)
 	backgroundSteps    map[string]bool                // Maps step AST node IDs to whether they're from Background
-	attachmentProvider environment.AttachmentProvider // Provider for accessing attachments from PropsWorld
+	attachmentProvider types.AttachmentProvider // Provider for accessing attachments from PropsWorld
 	params             *TestParams                    // Optional test parameters
 	allTags            map[string]bool                // Tracks all unique tags seen
 }
@@ -294,7 +296,7 @@ func formatStepArgument(arg *messages.PickleStepArgument) string {
 }
 
 // formatAttachments renders attachments as HTML
-func formatAttachments(attachments []environment.Attachment) string {
+func formatAttachments(attachments []types.Attachment) string {
 	if len(attachments) == 0 {
 		return ""
 	}
@@ -331,9 +333,33 @@ func formatAttachments(attachments []environment.Attachment) string {
 }
 
 // generateHTML creates the HTML report using stats and bodyBuffer
-// appendStructFieldsToTable appends struct fields to the table builder using reflection
-// skipFieldName allows skipping a specific field (e.g., "CloudParams" to avoid duplication)
-func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v reflect.Value, skipFieldName string) {
+
+// propValueToString converts a value to a display string. Primitives are formatted with %v;
+// complex types (structs, maps, slices of non-strings) are JSON-marshalled for readability.
+func propValueToString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.String:
+		return rv.String()
+	case reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return fmt.Sprintf("%v", v)
+	default:
+		b, err := json.MarshalIndent(v, "", "  ")
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return fmt.Sprintf("<pre style=\"margin:0;white-space:pre-wrap;\">%s</pre>", string(b))
+	}
+}
+
+// appendStructFieldsToTable appends struct fields to the table builder using reflection.
+// Map fields (like Props) are expanded into one row per key, with complex values JSON-rendered.
+func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v reflect.Value) {
 	// Handle pointer to struct
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -349,35 +375,51 @@ func (f *HTMLFormatter) appendStructFieldsToTable(tableRows *strings.Builder, v 
 		field := t.Field(i)
 		value := v.Field(i)
 
-		// Skip the specified field if provided
-		if skipFieldName != "" && field.Name == skipFieldName {
-			continue
-		}
-
-		// Format the value based on its type
-		var valueStr string
 		switch value.Kind() {
 		case reflect.Slice:
-			// Handle slice types (like Labels, CatalogTypes)
 			if value.Len() > 0 {
 				items := make([]string, value.Len())
 				for j := 0; j < value.Len(); j++ {
 					items[j] = fmt.Sprintf("%v", value.Index(j).Interface())
 				}
-				valueStr = strings.Join(items, ", ")
-			} else {
-				valueStr = ""
+				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, strings.Join(items, ", ")))
+			}
+		case reflect.Map:
+			// Expand map entries as individual rows (e.g. Props)
+			keys := value.MapKeys()
+			// Sort for deterministic output
+			keyStrs := make([]string, len(keys))
+			for j, k := range keys {
+				keyStrs[j] = fmt.Sprintf("%v", k.Interface())
+			}
+			sort.Strings(keyStrs)
+			for _, k := range keyStrs {
+				val := value.MapIndex(reflect.ValueOf(k))
+				if !val.IsValid() {
+					continue
+				}
+				s := propValueToString(val.Interface())
+				if s != "" {
+					tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", k, s))
+				}
 			}
 		case reflect.Struct:
-			// Skip nested structs (like CloudParams) - they should be handled separately
-			continue
+			s := propValueToString(value.Interface())
+			if s != "" {
+				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, s))
+			}
+		case reflect.Ptr:
+			if !value.IsNil() {
+				s := propValueToString(value.Elem().Interface())
+				if s != "" {
+					tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, s))
+				}
+			}
 		default:
-			valueStr = fmt.Sprintf("%v", value.Interface())
-		}
-
-		// Only add non-empty values
-		if valueStr != "" {
-			tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, valueStr))
+			s := fmt.Sprintf("%v", value.Interface())
+			if s != "" {
+				tableRows.WriteString(fmt.Sprintf("<tr><th>%s</th><td>%s</td></tr>", field.Name, s))
+			}
 		}
 	}
 }
@@ -391,15 +433,7 @@ func (f *HTMLFormatter) generateHTML() string {
 	if f.params != nil {
 		var tableRows strings.Builder
 
-		// Add main params fields (excluding CloudParams to avoid duplication)
-		v := reflect.ValueOf(*f.params)
-		f.appendStructFieldsToTable(&tableRows, v, "CloudParams")
-
-		// Add CloudParams fields separately
-		cloudParamsField := v.FieldByName("CloudParams")
-		if cloudParamsField.IsValid() {
-			f.appendStructFieldsToTable(&tableRows, cloudParamsField, "")
-		}
+		f.appendStructFieldsToTable(&tableRows, reflect.ValueOf(*f.params))
 
 		if tableRows.Len() > 0 {
 			paramsTable = fmt.Sprintf(`
@@ -541,7 +575,7 @@ func NewHTMLFormatterWithParams(suite string, out io.Writer, params TestParams) 
 }
 
 // NewHTMLFormatterWithAttachments creates a new HTML formatter with test parameters and attachment provider
-func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider environment.AttachmentProvider) formatters.Formatter {
+func NewHTMLFormatterWithAttachments(suite string, out io.Writer, params TestParams, attachmentProvider types.AttachmentProvider) formatters.Formatter {
 	f := &HTMLFormatter{
 		out:                out,
 		title:              suite,

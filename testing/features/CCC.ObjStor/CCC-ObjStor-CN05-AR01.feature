@@ -1,11 +1,11 @@
-@PerService @CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
+@PerService @object-storage @CCC.ObjStor @CCC.ObjStor.CN05 @tlp-clear @tlp-green @tlp-amber @tlp-red
 Feature: CCC.ObjStor.CN05.AR01 - Versioning with Unique Identifiers
   As a security administrator
   I want to ensure objects are stored with unique identifiers
   So that version tracking is enabled
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
   @Policy
   Scenario: Objects are stored with unique version identifiers

@@ -8,7 +8,7 @@ import (
 
 	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"google.golang.org/api/option"
 	iampb "google.golang.org/genproto/googleapis/iam/v1"
 )
@@ -17,13 +17,13 @@ import (
 type GCPIAMService struct {
 	client           *admin.IamClient
 	ctx              context.Context
-	projectID        string
+	instance         types.InstanceConfig
 	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
 	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewGCPIAMService creates a new GCP IAM service using default credentials
-func NewGCPIAMService(ctx context.Context, projectID string) (*GCPIAMService, error) {
+func NewGCPIAMService(ctx context.Context, instance types.InstanceConfig) (*GCPIAMService, error) {
 	client, err := admin.NewIamClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCP IAM client: %w", err)
@@ -32,14 +32,14 @@ func NewGCPIAMService(ctx context.Context, projectID string) (*GCPIAMService, er
 	return &GCPIAMService{
 		client:           client,
 		ctx:              ctx,
-		projectID:        projectID,
+		instance:         instance,
 		provisionedUsers: make(map[string]*Identity),
 		accessLevels:     make(map[string]string),
 	}, nil
 }
 
 // NewGCPIAMServiceWithCredentials creates a new GCP IAM service with specific credentials
-func NewGCPIAMServiceWithCredentials(ctx context.Context, projectID string, credentialsJSON []byte) (*GCPIAMService, error) {
+func NewGCPIAMServiceWithCredentials(ctx context.Context, instance types.InstanceConfig, credentialsJSON []byte) (*GCPIAMService, error) {
 	client, err := admin.NewIamClient(ctx, option.WithCredentialsJSON(credentialsJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCP IAM client with credentials: %w", err)
@@ -48,7 +48,7 @@ func NewGCPIAMServiceWithCredentials(ctx context.Context, projectID string, cred
 	return &GCPIAMService{
 		client:           client,
 		ctx:              ctx,
-		projectID:        projectID,
+		instance:         instance,
 		provisionedUsers: make(map[string]*Identity),
 		accessLevels:     make(map[string]string),
 	}, nil
@@ -93,14 +93,14 @@ func (s *GCPIAMService) ProvisionUserWithAccess(userName string, serviceID strin
 func (s *GCPIAMService) provisionUserInternal(userName string) (*Identity, error) {
 	// Service account ID must be between 6-30 characters, lowercase, digits, hyphens
 	serviceAccountID := sanitizeServiceAccountID(userName)
-	serviceAccountEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAccountID, s.projectID)
+	serviceAccountEmail := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAccountID, s.instance.Properties.GcpProjectId)
 
 	var serviceAccount *adminpb.ServiceAccount
 	var accountAlreadyExists bool
 
 	// Check if service account already exists
 	getReq := &adminpb.GetServiceAccountRequest{
-		Name: fmt.Sprintf("projects/%s/serviceAccounts/%s", s.projectID, serviceAccountEmail),
+		Name: fmt.Sprintf("projects/%s/serviceAccounts/%s", s.instance.Properties.GcpProjectId, serviceAccountEmail),
 	}
 
 	existingAccount, err := s.client.GetServiceAccount(s.ctx, getReq)
@@ -113,7 +113,7 @@ func (s *GCPIAMService) provisionUserInternal(userName string) (*Identity, error
 		// Service account doesn't exist - create it
 		fmt.Printf("🤖 Creating service account %s...\n", serviceAccountEmail)
 		createReq := &adminpb.CreateServiceAccountRequest{
-			Name:      fmt.Sprintf("projects/%s", s.projectID),
+			Name:      fmt.Sprintf("projects/%s", s.instance.Properties.GcpProjectId),
 			AccountId: serviceAccountID,
 			ServiceAccount: &adminpb.ServiceAccount{
 				DisplayName: fmt.Sprintf("CCC Test User: %s", userName),
@@ -178,7 +178,7 @@ func (s *GCPIAMService) provisionUserInternal(userName string) (*Identity, error
 	// Store GCP-specific fields in Credentials map
 	identity.Credentials["email"] = serviceAccount.Email
 	identity.Credentials["unique_id"] = serviceAccount.UniqueId
-	identity.Credentials["project_id"] = s.projectID
+	identity.Credentials["project_id"] = s.instance.Properties.GcpProjectId
 	identity.Credentials["service_account_key"] = string(keyJSON)
 
 	if clientEmail, ok := keyData["client_email"].(string); ok {
@@ -294,7 +294,7 @@ func (s *GCPIAMService) DestroyUser(identity *Identity) error {
 		return fmt.Errorf("service account email not found in identity credentials")
 	}
 
-	serviceAccountName := fmt.Sprintf("projects/%s/serviceAccounts/%s", s.projectID, serviceAccountEmail)
+	serviceAccountName := fmt.Sprintf("projects/%s/serviceAccounts/%s", s.instance.Properties.GcpProjectId, serviceAccountEmail)
 
 	fmt.Printf("🗑️  Deleting service account %s...\n", serviceAccountEmail)
 
@@ -387,7 +387,7 @@ func (s *GCPIAMService) parseResourceName(serviceID string) string {
 	}
 
 	// Default: assume it's a project-level permission
-	return fmt.Sprintf("projects/%s", s.projectID)
+	return fmt.Sprintf("projects/%s", s.instance.Properties.GcpProjectId)
 }
 
 func (s *GCPIAMService) getResourcePolicy(ctx context.Context, resourceName string, req *iampb.GetIamPolicyRequest) (*iampb.Policy, error) {
@@ -453,8 +453,8 @@ func sanitizeServiceAccountID(userName string) string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *GCPIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-	return []environment.TestParams{}, nil
+func (s *GCPIAMService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
+	return []types.TestParams{}, nil
 }
 
 func (s *GCPIAMService) CheckUserProvisioned() error {
@@ -470,5 +470,10 @@ func (s *GCPIAMService) ElevateAccessForInspection() error {
 // ResetAccess is a no-op for IAM services
 func (s *GCPIAMService) ResetAccess() error {
 	// No-op: IAM services don't have network-level access controls to reset
+	return nil
+}
+
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *GCPIAMService) UpdateResourcePolicy() error {
 	return nil
 }
