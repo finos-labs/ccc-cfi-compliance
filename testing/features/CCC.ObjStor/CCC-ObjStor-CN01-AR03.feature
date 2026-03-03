@@ -11,6 +11,7 @@ Feature: CCC.ObjStor.CN01.AR03
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
 
+  @Behavioural
   Scenario: Service prevents creating bucket with no access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
@@ -22,6 +23,7 @@ Feature: CCC.ObjStor.CN01.AR03
     Then "{result}" is an error
     And I attach "{result}" to the test output as "no-access-create-bucket-error.txt"
 
+  @Behavioural
   Scenario: Service allows creating bucket with write access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-write", "{UID}", and "write"
     And I refer to "{result}" as "testUserWrite"

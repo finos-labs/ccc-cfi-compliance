@@ -13,6 +13,7 @@ Feature: CCC.ObjStor.CN01.AR04
     And I refer to "{result}" as "iamService"
     And "{result}" is not an error
 
+  @Behavioural
   Scenario: Service prevents writing object with read-only access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-read", "{UID}", and "read"
     And I refer to "{result}" as "testUserRead"
@@ -24,6 +25,7 @@ Feature: CCC.ObjStor.CN01.AR04
     Then "{result}" is an error
     And I attach "{result}" to the test output as "read-create-object-error.txt"
 
+  @Behavioural
   Scenario: Service allows writing object with write access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-write", "{UID}", and "write"
     And I refer to "{result}" as "testUserWrite"

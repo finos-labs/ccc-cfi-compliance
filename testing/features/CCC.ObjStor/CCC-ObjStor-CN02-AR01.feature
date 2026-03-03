@@ -12,6 +12,7 @@ Feature: CCC.ObjStor.CN02.AR01 - Uniform Bucket-Level Access (Consistent Allow)
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
 
+  @Behavioural
   Scenario: Service enforces uniform bucket-level access by rejecting object-level permissions
     When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object.txt", and "test data"
     Then "{result}" is not an error

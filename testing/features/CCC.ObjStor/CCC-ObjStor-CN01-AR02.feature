@@ -13,6 +13,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object.txt", and "test content"
     And "{result}" is not an error
 
+  @Behavioural
   Scenario: Service prevents reading object with no access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
@@ -24,6 +25,7 @@ Feature: CCC.ObjStor.CN01.AR02
     Then "{result}" is an error
     And I attach "{result}" to the test output as "no-access-read-object-error.txt"
 
+  @Behavioural
   Scenario: Service allows reading object with read access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-read", "{UID}", and "read"
     And I refer to "{result}" as "testUserRead"

@@ -10,6 +10,7 @@ Feature: CCC.ObjStor.CN03.AR02 - Immutable Bucket Retention Policy
     And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 
+  @Behavioural
   Scenario: Service prevents modification of locked retention policy
     When I call "{storage}" with "GetBucketRetentionDurationDays" using argument "{ResourceName}"
     Then "{result}" is not an error

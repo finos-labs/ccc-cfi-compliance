@@ -11,6 +11,7 @@ Feature: CCC.ObjStor.CN04.AR02
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
 
+  @Behavioural
   Scenario: Service prevents object deletion by write user during retention period
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-write", "{UID}", and "write"
     And I refer to "{result}" as "testUserWrite"
@@ -26,6 +27,7 @@ Feature: CCC.ObjStor.CN04.AR02
     And I attach "{result}" to the test output as "delete-protected-error.txt"
     And "{result}" should contain one of "retention, locked, immutable, protected"
 
+  @Behavioural
   Scenario: Service prevents object deletion by admin user during retention period
     When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "admin-protected-object.txt", and "compliance data"
     Then "{result}" is not an error
@@ -34,6 +36,7 @@ Feature: CCC.ObjStor.CN04.AR02
     And I attach "{result}" to the test output as "admin-delete-protected-error.txt"
     And "{result}" should contain "retention"
 
+  @Behavioural
   Scenario: Service prevents object modification during retention period
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-write", "{UID}", and "write"
     And I refer to "{result}" as "testUserWrite"
@@ -48,6 +51,7 @@ Feature: CCC.ObjStor.CN04.AR02
     And I attach "{result}" to the test output as "modify-protected-error.txt"
     And "{result}" should contain one of "retention, locked, immutable, protected, exists"
 
+  @Behavioural
   Scenario: Service allows object read access during retention period
     When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "readable-protected-object.txt", and "readable data"
     Then "{result}" is not an error

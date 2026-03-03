@@ -11,7 +11,7 @@ Feature: CCC.ObjStor.CN01.AR01
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
 
-  @Destructive
+  @Behavioural
   Scenario: Service prevents reading bucket with no access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
@@ -23,6 +23,7 @@ Feature: CCC.ObjStor.CN01.AR01
     Then "{result}" is an error
     And I attach "{result}" to the test output as "no-access-list-error.txt"
 
+  @Behavioural
   Scenario: Service allows reading bucket with read access
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-read", "{UID}", and "read"
     And I refer to "{result}" as "testUserRead"
@@ -38,3 +39,4 @@ Feature: CCC.ObjStor.CN01.AR01
   @Policy
   Scenario: Test policy
     # no policy check required for this test
+    Then no-op required

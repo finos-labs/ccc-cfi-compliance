@@ -10,6 +10,7 @@ Feature: CCC.ObjStor.CN03.AR01 - Bucket Soft Delete and Recovery
     And I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
 
+  @Behavioural
   Scenario: Service supports bucket soft delete and recovery
     When I call "{storage}" with "CreateBucket" using argument "ccc-test-soft-delete"
     Then "{result}" is not an error
