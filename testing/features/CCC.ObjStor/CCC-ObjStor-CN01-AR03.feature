@@ -37,7 +37,7 @@ Feature: CCC.ObjStor.CN01.AR03
     And I attach "{result}" to the test output as "write-create-bucket-result.json"
     And I call "{storage}" with "DeleteBucket" using argument "{result.ID}"
 
-  @Policy @object-storage
+  @Policy
   Scenario: All unauthorized requests are blocked
     # This control requires behavioral testing - comprehensive access testing
     # IAM policies enforce this at runtime

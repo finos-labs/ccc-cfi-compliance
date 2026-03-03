@@ -1,10 +1,10 @@
-@ssh @tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01 @tls
+@tlp-clear @tlp-green @tlp-amber @tlp-red @CCC.Core @CCC.Core.CN01 @tls
 Feature: CCC.Core.CN01.AR02
   As a security administrator
   I want to ensure all SSH network traffic uses SSHv2 or higher
   So that SSH connections are properly encrypted and secure
 
-  @Behavioural @PerPort
+  @Behavioural @PerPort @ssh
   Scenario: Verify SSH protocol version
     SSH protocol version 2 (SSH-2.0) is required as SSH-1 has known security vulnerabilities
     including man-in-the-middle attacks and session hijacking. This test ensures that the
@@ -16,7 +16,7 @@ Feature: CCC.Core.CN01.AR02
     And I close connection "{connection}"
     Then "{connection}" state is closed
 
-  @Behavioural @PerPort
+  @Behavioural @PerPort @ssh
   Scenario: Verify SSH uses strong ciphers
     Weak ciphers like 3DES-CBC, RC4, and DES-CBC3-SHA are vulnerable to various attacks
     including SWEET32 (for 3DES) and multiple known vulnerabilities in RC4. This test ensures
@@ -30,7 +30,7 @@ Feature: CCC.Core.CN01.AR02
       | RC4          | offered |
       | DES-CBC3-SHA | offered |
 
-  @Behavioural @PerPort
+  @Behavioural @PerPort @ssh
   Scenario: Verify SSH server configuration
     Proper SSH server configuration includes valid, unexpired certificates and a complete
     certificate chain of trust. This ensures that the SSH service can be authenticated
@@ -43,7 +43,7 @@ Feature: CCC.Core.CN01.AR02
       | cert_expirationStatus | ok      |
       | cert_chain_of_trust   | passed. |
 
-  @Policy @PerService
+  @Policy @PerService @object-storage
   Scenario: Security group restricts SSH port access
     When I attempt policy check "security-group-ssh-port" for control "CCC.Core.CN01" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

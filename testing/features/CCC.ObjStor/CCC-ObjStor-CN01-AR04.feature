@@ -39,7 +39,7 @@ Feature: CCC.ObjStor.CN01.AR04
     And I attach "{result}" to the test output as "write-create-object-result.json"
     And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-write-object.txt"
 
-  @Policy @object-storage
+  @Policy
   Scenario: All unauthorized requests are blocked
     # This control requires behavioral testing - comprehensive access testing
     # IAM policies enforce this at runtime

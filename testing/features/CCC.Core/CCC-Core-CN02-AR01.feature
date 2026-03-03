@@ -7,11 +7,6 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
   Background:
     Given a cloud api for "{Instance}" in "api"
 
-  @Policy @object-storage
-  Scenario: Object storage encryption compliance
-    When I attempt policy check "object-storage-encryption" for control "CCC.Core.CN02" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
-    Then "{result}" is true
-
   @Behavioural @object-storage
   Scenario: Verify objects are encrypted at rest
     Given I call "{api}" with "GetServiceAPI" using argument "object-storage"
@@ -23,3 +18,8 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
     And "{uploadResult.EncryptionAlgorithm}" is "AES256"
     And I attach "{uploadResult}" to the test output as "Upload Result with Encryption Details"
     And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-encryption-check.txt"
+
+  @Policy @object-storage
+  Scenario: Object storage encryption compliance
+    When I attempt policy check "object-storage-encryption" for control "CCC.Core.CN02" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

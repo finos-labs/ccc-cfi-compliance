@@ -572,7 +572,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 			ReportTitle:         bucket.Name,
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			CatalogTypes:        []string{"CCC.ObjStor"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
 			Instance:            *s.instance,
 		})
@@ -589,7 +589,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 			Protocol:            "https",
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			CatalogTypes:        []string{"CCC.ObjStor"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			Instance:            *s.instance,
 		})

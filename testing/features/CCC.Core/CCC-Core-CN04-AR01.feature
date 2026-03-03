@@ -4,8 +4,18 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
   I want to ensure all administrative access attempts are logged
   So that audit trails are maintained for compliance
 
-  @Policy @object-storage @vpc
-  Scenario: Admin logging compliance
+  @Policy @object-storage
+  Scenario: Object storage admin logging compliance
+    When I attempt policy check "admin-logging" for control "CCC.Core.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
+  @Policy @vpc
+  Scenario: VPC admin logging compliance
+    When I attempt policy check "admin-logging" for control "CCC.Core.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
+  @Policy @load-balancer
+  Scenario: Load balancer admin logging compliance
     When I attempt policy check "admin-logging" for control "CCC.Core.CN04" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
@@ -25,5 +35,5 @@ Feature: CCC.Core.CN04.AR01 - Log Administrative Access Attempts
     And I refer to "{result}" as "adminLogs"
     And I attach "{adminLogs}" to the test output as "Admin Activity Logs"
     Then "{adminLogs}" is an array of objects with at least the following contents
-      | result    | 
-      | Succeeded | 
+      | result    |
+      | Succeeded |

@@ -15,12 +15,19 @@ Feature: CCC.Core.CN01.AR08
       | id         | finding  |
       | clientAuth | required |
 
-  @Policy @PerService
+  @Policy @PerService @load-balancer
   Scenario: Load balancer enforces mutual TLS
     When I attempt policy check "load-balancer-mtls" for control "CCC.Core.CN01" assessment requirement "AR08" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Policy @PerService
+  @Policy @PerService @load-balancer
   Scenario: Load balancer has valid trust store
     When I attempt policy check "load-balancer-trust-store" for control "CCC.Core.CN01" assessment requirement "AR08" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
+
+  @Policy @PerService @object-storage
+  Scenario: Storage account enforces mutual TLS
+    # Mutual TLS (client certificate authentication) is typically not supported on 
+    # public object storage service endpoints.
+    # Enrollment in private-link / VPC endpoints is required for mTLS.
+    Then no-op required

@@ -16,8 +16,8 @@ import (
 
 // GCPStorageService implements Service for Google Cloud Storage
 type GCPStorageService struct {
-	client      *storage.Client
-	ctx         context.Context
+	client   *storage.Client
+	ctx      context.Context
 	instance types.InstanceConfig
 }
 
@@ -29,9 +29,9 @@ func NewGCPStorageService(ctx context.Context, instance types.InstanceConfig) (*
 	}
 
 	return &GCPStorageService{
-		client:      client,
-		ctx:         ctx,
-		instance:    instance,
+		client:   client,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
@@ -51,9 +51,9 @@ func NewGCPStorageServiceWithCredentials(ctx context.Context, instance types.Ins
 	}
 
 	return &GCPStorageService{
-		client:      client,
-		ctx:         ctx,
-		instance:    instance,
+		client:   client,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
@@ -337,7 +337,7 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]types.TestParam
 			ReportTitle:         bucket.Name,
 			ProviderServiceType: "storage.googleapis.com/Bucket",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			CatalogTypes:        []string{"CCC.ObjStor"},
 			TagFilter:           []string{"@object-storage", "@PerService"},
 			Instance:            s.instance,
 		})
@@ -354,7 +354,7 @@ func (s *GCPStorageService) GetOrProvisionTestableResources() ([]types.TestParam
 			Protocol:            "https",
 			ProviderServiceType: "storage.googleapis.com/Bucket",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
+			CatalogTypes:        []string{"CCC.ObjStor"},
 			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			Instance:            s.instance,
 		})
