@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage/elevation"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
@@ -824,4 +825,84 @@ func (s *AzureBlobService) UpdateResourcePolicy() error {
 	}
 
 	return nil
+}
+
+// TriggerDataWrite performs a data modification to trigger logging (CN04.AR02)
+func (s *AzureBlobService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not yet implemented")
+}
+
+// GetResourceRegion returns the resource region (CN06.AR01)
+func (s *AzureBlobService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}
+
+// IsDataReplicatedToSeparateLocation checks replication (CN08.AR01)
+func (s *AzureBlobService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not yet implemented")
+}
+
+// GetReplicationStatus returns replication status including locations (CN08.AR01, CN08.AR02).
+// Populates ReplicationStatus with Locations (primary + secondary for GRS/RA-GRS), Status, SyncStatus.
+func (s *AzureBlobService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	storageAccountName := s.storageAccountName()
+	account, err := s.storageClient.GetProperties(s.ctx, s.instance.Properties.AzureResourceGroup, storageAccountName, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get storage account properties: %w", err)
+	}
+
+	props := account.Properties
+	if props == nil {
+		return nil, fmt.Errorf("storage account has no properties")
+	}
+
+	// Build locations: primary + secondary (for GRS/RA-GRS)
+	locations := []string{}
+	if props.PrimaryLocation != nil && *props.PrimaryLocation != "" {
+		locations = append(locations, *props.PrimaryLocation)
+	}
+	if props.SecondaryLocation != nil && *props.SecondaryLocation != "" {
+		locations = append(locations, *props.SecondaryLocation)
+	}
+	if len(locations) == 0 {
+		return nil, fmt.Errorf("could not determine storage account locations")
+	}
+
+	// Status: overall replication health from primary/secondary availability
+	status := "Enabled"
+	if props.StatusOfPrimary != nil {
+		switch *props.StatusOfPrimary {
+		case armstorage.AccountStatusUnavailable:
+			status = "Degraded"
+		}
+	}
+	if props.StatusOfSecondary != nil && status != "Degraded" {
+		switch *props.StatusOfSecondary {
+		case armstorage.AccountStatusUnavailable:
+			status = "Degraded"
+		}
+	}
+	// LRS has no secondary - replication is effectively disabled
+	if len(locations) == 1 {
+		status = "Disabled"
+	}
+
+	// SyncStatus: from GeoReplicationStats (Live=Bootstrap=InSync/Syncing, Unavailable=Lagging)
+	syncStatus := "Unknown"
+	if props.GeoReplicationStats != nil && props.GeoReplicationStats.Status != nil {
+		switch *props.GeoReplicationStats.Status {
+		case armstorage.GeoReplicationStatusLive:
+			syncStatus = "InSync"
+		case armstorage.GeoReplicationStatusBootstrap:
+			syncStatus = "Syncing"
+		case armstorage.GeoReplicationStatusUnavailable:
+			syncStatus = "Lagging"
+		}
+	}
+
+	return &generic.ReplicationStatus{
+		Locations:  locations,
+		Status:     status,
+		SyncStatus: syncStatus,
+	}, nil
 }

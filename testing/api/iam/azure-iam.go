@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"github.com/google/uuid"
 )
@@ -492,6 +493,26 @@ func (s *AzureIAMService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for IAM service
 func (s *AzureIAMService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for IAM service
+func (s *AzureIAMService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for IAM service")
+}
+
+// GetResourceRegion is not applicable for IAM service
+func (s *AzureIAMService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for IAM service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for IAM service
+func (s *AzureIAMService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for IAM service")
+}
+
+// GetReplicationStatus is not applicable for IAM service
+func (s *AzureIAMService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for IAM service")
 }
 
 // Microsoft Graph API helper methods

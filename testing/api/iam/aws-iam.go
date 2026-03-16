@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -500,4 +501,24 @@ func (s *AWSIAMService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for IAM service
 func (s *AWSIAMService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for IAM service
+func (s *AWSIAMService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for IAM service")
+}
+
+// GetResourceRegion is not applicable for IAM service
+func (s *AWSIAMService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for IAM service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for IAM service
+func (s *AWSIAMService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for IAM service")
+}
+
+// GetReplicationStatus is not applicable for IAM service
+func (s *AWSIAMService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for IAM service")
 }

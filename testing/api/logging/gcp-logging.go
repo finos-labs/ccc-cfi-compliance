@@ -2,8 +2,10 @@ package logging
 
 import (
 	"context"
+	"fmt"
 
 	"cloud.google.com/go/logging/logadmin"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -64,6 +66,26 @@ func (s *GCPLoggingService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for logging service
 func (s *GCPLoggingService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for logging service
+func (s *GCPLoggingService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for logging service")
+}
+
+// GetResourceRegion is not applicable for logging service
+func (s *GCPLoggingService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for logging service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for logging service
+func (s *GCPLoggingService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for logging service")
+}
+
+// GetReplicationStatus is not applicable for logging service
+func (s *GCPLoggingService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for logging service")
 }
 
 // QueryAdminLogs queries Cloud Audit Logs for admin activity events

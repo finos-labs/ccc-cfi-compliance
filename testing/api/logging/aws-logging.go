@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -123,6 +124,26 @@ func (s *AWSLoggingService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for logging service
 func (s *AWSLoggingService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for logging service
+func (s *AWSLoggingService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for logging service")
+}
+
+// GetResourceRegion is not applicable for logging service
+func (s *AWSLoggingService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for logging service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for logging service
+func (s *AWSLoggingService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for logging service")
+}
+
+// GetReplicationStatus is not applicable for logging service
+func (s *AWSLoggingService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for logging service")
 }
 
 // QueryAdminLogs queries CloudTrail for admin/management events

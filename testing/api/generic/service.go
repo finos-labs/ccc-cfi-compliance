@@ -4,6 +4,15 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
+// ReplicationStatus represents replication configuration and sync status for object storage.
+// Used for CN08.AR01 (physically separate locations) and CN08.AR02 (status visibility).
+// Populated consistently across AWS, Azure, and GCP.
+type ReplicationStatus struct {
+	Locations  []string // Regions/locations where data is replicated (primary + replicas)
+	Status     string   // Replication health: "Enabled", "Syncing", "Healthy", "Degraded", "Disabled"
+	SyncStatus string   // Data sync state: "InSync", "Lagging", "Unknown"
+}
+
 // Service is the generic interface for cloud services
 // This interface can be extended in the future with common methods
 // that all cloud services should implement
@@ -33,4 +42,18 @@ type Service interface {
 	// Azure: Changes the description
 	// GCP: Changes the description
 	UpdateResourcePolicy() error
+
+	// TriggerDataWrite performs a logged data modification (create/update/delete).
+	// Service-specific: object-storage creates/deletes an object; RDMS inserts a row; etc.
+	// Used for CN04.AR02 behavioural tests (data write logging verification).
+	TriggerDataWrite(resourceID string) error
+
+	// GetResourceRegion returns the region/availability zone of the resource.
+	// Used for CN06.AR01 (resource location compliance).
+	GetResourceRegion(resourceID string) (string, error)
+
+	// GetReplicationStatus returns replication/sync status for the resource.
+	// Used for CN08.AR01 (locations) and CN08.AR02 (status visibility).
+	// Object storage returns *types.ReplicationStatus; other services return nil with error.
+	GetReplicationStatus(resourceID string) (*ReplicationStatus, error)
 }

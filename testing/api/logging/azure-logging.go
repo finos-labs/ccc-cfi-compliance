@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/monitor/azquery"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -103,6 +104,26 @@ func (s *AzureLoggingService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for logging service
 func (s *AzureLoggingService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for logging service
+func (s *AzureLoggingService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for logging service")
+}
+
+// GetResourceRegion is not applicable for logging service
+func (s *AzureLoggingService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for logging service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for logging service
+func (s *AzureLoggingService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for logging service")
+}
+
+// GetReplicationStatus is not applicable for logging service
+func (s *AzureLoggingService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for logging service")
 }
 
 // QueryAdminLogs queries Azure Activity Log for admin events

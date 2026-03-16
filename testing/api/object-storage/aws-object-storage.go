@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
@@ -567,4 +568,25 @@ func (s *AWSS3Service) UpdateResourcePolicy() error {
 	}
 
 	return nil
+}
+
+// TriggerDataWrite performs a data modification to trigger logging (CN04.AR02)
+func (s *AWSS3Service) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not yet implemented")
+}
+
+// GetResourceRegion returns the bucket region (CN06.AR01)
+func (s *AWSS3Service) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}
+
+// IsDataReplicatedToSeparateLocation checks replication (CN08.AR01)
+func (s *AWSS3Service) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not yet implemented")
+}
+
+// GetReplicationStatus returns replication status including locations (CN08.AR01, CN08.AR02).
+// Populates ReplicationStatus with Locations (source + CRR destination regions), Status, SyncStatus.
+func (s *AWSS3Service) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }

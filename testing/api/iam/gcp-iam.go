@@ -8,6 +8,7 @@ import (
 
 	admin "cloud.google.com/go/iam/admin/apiv1"
 	"cloud.google.com/go/iam/admin/apiv1/adminpb"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"google.golang.org/api/option"
 	iampb "google.golang.org/genproto/googleapis/iam/v1"
@@ -476,4 +477,24 @@ func (s *GCPIAMService) ResetAccess() error {
 // UpdateResourcePolicy is not applicable for IAM service
 func (s *GCPIAMService) UpdateResourcePolicy() error {
 	return nil
+}
+
+// TriggerDataWrite is not applicable for IAM service
+func (s *GCPIAMService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for IAM service")
+}
+
+// GetResourceRegion is not applicable for IAM service
+func (s *GCPIAMService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for IAM service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for IAM service
+func (s *GCPIAMService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for IAM service")
+}
+
+// GetReplicationStatus is not applicable for IAM service
+func (s *GCPIAMService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for IAM service")
 }

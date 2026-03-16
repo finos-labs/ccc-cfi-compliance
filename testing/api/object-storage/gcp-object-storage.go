@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"google.golang.org/api/iterator"
@@ -516,4 +517,25 @@ func (s *GCPStorageService) UpdateResourcePolicy() error {
 	}
 
 	return nil
+}
+
+// TriggerDataWrite performs a data modification to trigger logging (CN04.AR02)
+func (s *GCPStorageService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not yet implemented")
+}
+
+// GetResourceRegion returns the resource region (CN06.AR01)
+func (s *GCPStorageService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}
+
+// IsDataReplicatedToSeparateLocation checks replication (CN08.AR01)
+func (s *GCPStorageService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not yet implemented")
+}
+
+// GetReplicationStatus returns replication status including locations (CN08.AR01, CN08.AR02).
+// Populates ReplicationStatus with Locations (constituent regions for multi/dual-region buckets), Status, SyncStatus.
+func (s *GCPStorageService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }

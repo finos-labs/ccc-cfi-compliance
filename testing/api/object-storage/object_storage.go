@@ -24,6 +24,12 @@ type Bucket struct {
 	Region string // Geographic region
 }
 
+// ObjectVersion represents a version of an object when versioning is enabled
+type ObjectVersion struct {
+	VersionID string // Unique version identifier
+	ObjectID  string // Object key/name
+}
+
 // Object represents a stored object/blob
 type Object struct {
 	ID                  string   // Unique identifier (key/path)
@@ -62,4 +68,7 @@ type Service interface {
 	// AWS: Should fail if uniform bucket-level access is enforced (ACLs disabled)
 	// Azure: Always fails (doesn't support object-level permissions)
 	SetObjectPermission(bucketID string, objectID string, permissionLevel string) error
+
+	// ListObjectVersions lists all versions of an object (when versioning is enabled)
+	ListObjectVersions(bucketID string, objectID string) ([]ObjectVersion, error)
 }
