@@ -86,8 +86,7 @@ resource "terraform_data" "blob_logging" {
         --services b \
         --log rwd \
         --retention 7 \
-        --account-name ${module.storage_account.name} \
-        --auth-mode login
+        --account-name ${module.storage_account.name}
     EOT
   }
 }
