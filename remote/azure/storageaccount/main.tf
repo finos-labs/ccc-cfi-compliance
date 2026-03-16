@@ -36,7 +36,7 @@ module "storage_account" {
   name                = var.storage_account_name
 
   account_tier             = "Standard"
-  account_replication_type = "LRS"  # Locally redundant - cheapest option
+  account_replication_type = "GRS"  # Geo-redundant for CN08.AR01/CN08.AR02
   access_tier              = "Hot"  # Hot is default, but explicit
 
   # CCC compliance: TLS, HTTPS, public access
@@ -49,14 +49,14 @@ module "storage_account" {
   blob_properties = {
     versioning_enabled = true
     
-    # Container delete retention for soft delete (CN03 tests)
+    # Container delete retention for soft delete (CN03.AR01 - min 7 days)
     container_delete_retention_policy = {
-      days = 3
+      days = 7
     }
     
-    # Blob delete retention for soft delete (CN03 tests)
+    # Blob delete retention for soft delete (CN03.AR01 - min 7 days)
     delete_retention_policy = {
-      days = 3
+      days = 7
     }
   }
 
@@ -66,10 +66,10 @@ module "storage_account" {
       name                  = "ccc-test-container"
       container_access_type = "private"
       
-      # Time-based retention policy for WORM compliance
+      # Time-based retention policy for WORM compliance (CCC.ObjStor.CN03.AR02)
       immutability_policy = {
         immutability_period_in_days = 3
-        policy_mode                  = "Unlocked"  # Unlocked allows testing, Locked is for production
+        policy_mode                  = "Locked"   # Required for policy; irreversible until period expires
       }
     }
   }
@@ -89,5 +89,33 @@ resource "terraform_data" "blob_logging" {
         --account-name ${module.storage_account.name} \
         --auth-mode login
     EOT
+  }
+}
+
+# Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
+resource "azurerm_log_analytics_workspace" "storage_diag" {
+  name                = "cfi-storage-diag"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+# Azure Monitor diagnostic setting for blob service (CN09.AR01 - StorageRead, StorageWrite, StorageDelete)
+resource "azurerm_monitor_diagnostic_setting" "blob" {
+  name                       = "blob-diagnostic-setting"
+  target_resource_id         = "${module.storage_account.resource_id}/blobServices/default/"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.storage_diag.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+
+  enabled_log {
+    category = "StorageWrite"
+  }
+
+  enabled_log {
+    category = "StorageDelete"
   }
 }

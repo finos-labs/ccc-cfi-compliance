@@ -17,7 +17,7 @@ validity_commentary: >
 
 query: |
   az monitor diagnostic-settings list \
-    --resource /subscriptions/${SubscriptionId}/resourceGroups/${ResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AccountName}/blobServices/default \
+    --resource /subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default \
     --output json
 
 rules:

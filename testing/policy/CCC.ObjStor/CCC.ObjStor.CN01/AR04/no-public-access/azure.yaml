@@ -16,8 +16,8 @@ validity_commentary: >
 
 query: |
   az storage account show \
-    --name ${AccountName} \
-    --resource-group ${ResourceGroup} \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
     --query "{allowBlobPublicAccess:allowBlobPublicAccess}" \
     --output json
 
