@@ -6,8 +6,23 @@ Feature: CCC.ObjStor.CN05.AR03 - Recovery of Previous Versions
 
   Background:
     Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
+    And I refer to "{result}" as "storage"
+
+  @Behavioural
+  Scenario: Modified objects receive new version identifiers
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "original content"
+    And I refer to "{result.VersionID}" as "version1"
+    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "modified content"
+    And I refer to "{result.VersionID}" as "version2"
+    And I call "{storage}" with "ReadObjectAtVersion" using arguments "{ResourceName}", "version-test-object.txt", and "{version1}"
+    And I attach "{result}" to the test output as "original-content.json"
+    Then "{result.Data}" contains "original content"
+    When I call "{storage}" with "ReadObjectAtVersion" using arguments "{ResourceName}", "version-test-object.txt", and "{version2}"
+    Then "{result.Data}" contains "modified content"
+    And I attach "{result}" to the test output as "modified-content.json"
 
   @Policy
   Scenario: Previous object versions can be recovered
-    # This is inherent to versioning being enabled - covered by CN05.AR01
+    # Policy check performed by CN05.AR01 (object-storage-versioning)
     Then no-op required

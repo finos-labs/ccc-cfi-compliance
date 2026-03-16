@@ -6,8 +6,18 @@ Feature: CCC.ObjStor.CN05.AR02 - New Version ID on Modification
 
   Background:
     Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
+    And I refer to "{result}" as "storage"
+
+  @Behavioural
+  Scenario: Modified objects receive new version identifiers
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "original content"
+    And I refer to "{result.VersionID}" as "version1"
+    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "modified content"
+    And I refer to "{result.VersionID}" as "version2"
+    Then "{version1}" is not equal to "{version2}"
 
   @Policy
   Scenario: Modified objects receive new version identifiers
-    # This is inherent to versioning being enabled - covered by CN05.AR01
+    # Policy check performed by CN05.AR01 (object-storage-versioning)
     Then no-op required

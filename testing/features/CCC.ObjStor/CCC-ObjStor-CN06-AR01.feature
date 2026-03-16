@@ -6,6 +6,13 @@ Feature: CCC.ObjStor.CN06.AR01 - Access Logs in Separate Data Store
 
   Background:
     Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
+    And I refer to "{result}" as "storage"
+
+  @Behavioural
+  Scenario: Access logs are stored in a separate data store from the monitored container
+    ## This can only be tested at the policy level.
+    When no-op required
 
   @Policy
   Scenario: Access logs are stored in a separate data store
