@@ -43,7 +43,7 @@ Feature: CCC.Core.CN01.AR02
       | cert_expirationStatus | ok      |
       | cert_chain_of_trust   | passed. |
 
-  @Policy @PerService @object-storage
+  @Policy @PerService @security-group
   Scenario: Security group restricts SSH port access
     When I attempt policy check "security-group-ssh-port" for control "CCC.Core.CN01" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

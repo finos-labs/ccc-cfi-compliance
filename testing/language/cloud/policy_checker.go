@@ -144,7 +144,13 @@ func (c *PolicyChecker) EvaluateRule(rule types.Rule, queryOutput string, props 
 			result.Error = fmt.Sprintf("invalid validation regex %s: %v", rule.ValidationRule, err)
 			return result
 		}
-		result.Passed = regex.MatchString(result.ActualValue)
+		// Match against actual values, not the slice representation (e.g. "[value]")
+		for _, av := range actualValues {
+			if regex.MatchString(av) {
+				result.Passed = true
+				break
+			}
+		}
 	} else {
 		// Allowlist: every actual value must be in expected set. Empty actual = pass.
 		result.Passed = true

@@ -4,7 +4,7 @@ Feature: CCC.Core.CN01.AR03
   I want unencrypted traffic to be blocked or redirected to secure equivalents
   So that no data is transmitted in plaintext
 
-  @PerPort @Behavioural @http @tls
+  @PerPort @Behavioural @http @tls @object-storage
   Scenario: HTTP redirects to HTTPS
     If HTTP is accessible, it should immediately redirect to HTTPS (301/302 status codes).
     This ensures that all web traffic is encrypted.
@@ -18,7 +18,7 @@ Feature: CCC.Core.CN01.AR03
     And I call "{connection}" with "Close"
     Then "{connection.State}" is "closed"
 
-  @PerPort @Behavioural @ftp @tls
+  @PerPort @Behavioural @ftp @tls @object-storage
   Scenario: FTP traffic is blocked or not exposed
     Unencrypted FTP should not be accessible. The service should either refuse connections
     or not expose FTP on standard ports (21).
@@ -28,7 +28,7 @@ Feature: CCC.Core.CN01.AR03
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 
-  @PerPort @Behavioural @telnet @tls
+  @PerPort @Behavioural @telnet @tls @object-storage
   Scenario: Telnet traffic is blocked or not exposed
     Telnet transmits credentials in plaintext and should be completely disabled.
     SSH should be used instead for remote shell access.
@@ -38,7 +38,7 @@ Feature: CCC.Core.CN01.AR03
     And I refer to "{result}" as "connection"
     Then "{connection}" is an error
 
-  @PerPort @Behavioural @tls
+  @PerPort @Behavioural @tls @object-storage
   Scenario: Only secure protocols are exposed
     Verify that the service only exposes encrypted protocols by checking that
     all exposed ports use TLS/SSL or other encryption.

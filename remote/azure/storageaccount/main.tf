@@ -39,6 +39,11 @@ module "storage_account" {
   account_replication_type = "LRS"  # Locally redundant - cheapest option
   access_tier              = "Hot"  # Hot is default, but explicit
 
+  # CCC compliance: TLS, HTTPS, public access
+  min_tls_version               = "TLS1_2"  # Azure max; policy may expect TLS1_3 (Azure limitation)
+  https_traffic_only_enabled    = true       # Require secure transfer (CN01.AR01)
+  allow_nested_items_to_be_public = false    # Block public blob access (CN05.AR01)
+
   # Enable versioning required for immutability policies
   is_hns_enabled = false
   blob_properties = {
