@@ -47,3 +47,10 @@ func (ff *FormatterFactory) GetOCSFFormatterFunc() func(string, io.Writer) forma
 		return NewOCSFFormatterWithParams(suite, out, ff.params)
 	}
 }
+
+// GetSummaryFormatterFunc returns a summary formatter function (collects to global, report generated at end)
+func (ff *FormatterFactory) GetSummaryFormatterFunc() func(string, io.Writer) formatters.Formatter {
+	return func(suite string, out io.Writer) formatters.Formatter {
+		return NewSummaryFormatter(suite, out)
+	}
+}

@@ -418,7 +418,7 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, er
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
 			CatalogTypes:        []string{"CCC.ObjStor"},
-			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
+			TagFilter:           []string{"@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			Instance:            s.instance,
 		})
 	}

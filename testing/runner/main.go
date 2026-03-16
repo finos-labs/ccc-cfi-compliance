@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -140,6 +141,14 @@ func main() {
 		log.Printf("⚠️  Warning: Failed to combine OCSF files: %v", err)
 	} else {
 		log.Printf("   ✅ Combined OCSF file created: %s", filepath.Join(*outputDir, "combined.ocsf.json"))
+	}
+
+	// Generate summary report (summary.html + console)
+	log.Println("\n📋 Generating summary report...")
+	if err := reporters.GenerateSummaryReport(*outputDir); err != nil {
+		log.Printf("⚠️  Warning: Failed to generate summary report: %v", err)
+	} else {
+		log.Printf("   ✅ Summary report created: %s", filepath.Join(*outputDir, "summary.html"))
 	}
 
 	// Print summary
