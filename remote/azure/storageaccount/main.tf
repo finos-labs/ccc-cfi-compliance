@@ -29,7 +29,7 @@ resource "azurerm_resource_group" "this" {
 }
 
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
-# Created before storage account so it can be passed to the AVM module
+# Azure Policy/Defender may auto-create blob-diagnostic-setting targeting this workspace
 resource "azurerm_log_analytics_workspace" "storage_diag" {
   name                = "cfi-storage-diag"
   location            = azurerm_resource_group.this.location
@@ -71,13 +71,9 @@ module "storage_account" {
     }
   }
 
-  # CN09.AR01: Blob diagnostic settings (StorageRead, StorageWrite, StorageDelete)
-  diagnostic_settings_blob = {
-    cfi = {
-      workspace_resource_id = azurerm_log_analytics_workspace.storage_diag.id
-      log_categories        = ["StorageRead", "StorageWrite", "StorageDelete"]
-    }
-  }
+  # CN09.AR01: Blob diagnostics - Azure Policy/Defender often auto-create "blob-diagnostic-setting"
+  # on new storage accounts. We skip diagnostic_settings_blob to avoid 409 Conflict (same sink).
+  # If not auto-created, add diagnostic_settings_blob with a dedicated workspace.
 
   # Create default container with immutability policy (CN04 tests - 3 day retention)
   containers = {
