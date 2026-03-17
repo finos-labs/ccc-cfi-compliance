@@ -11,6 +11,10 @@ resource-types:
     - ApplicationFederatedCredential
     - ServicePrincipal
     - SubscriptionRoleAssignment
+    # Subscription/management-group level - require elevated permissions or cause API errors
+    - PolicyAssignment
+    - SecurityPricing
+    - StorageAccount  # Already deleted at resource group level
 
 accounts:
   "fa193ac0-9c06-4111-bf55-341e4db193d3":

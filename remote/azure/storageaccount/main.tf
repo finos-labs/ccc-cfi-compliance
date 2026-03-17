@@ -40,9 +40,10 @@ module "storage_account" {
   access_tier              = "Hot"  # Hot is default, but explicit
 
   # CCC compliance: TLS, HTTPS, public access
-  min_tls_version               = "TLS1_2"  # Azure max; policy may expect TLS1_3 (Azure limitation)
-  https_traffic_only_enabled    = true       # Require secure transfer (CN01.AR01)
+  min_tls_version                = "TLS1_2"  # Azure max; policy may expect TLS1_3 (Azure limitation)
+  https_traffic_only_enabled     = true      # Require secure transfer (CN01.AR01)
   allow_nested_items_to_be_public = false    # Block public blob access (CN05.AR01)
+  shared_access_key_enabled      = true     # Required for az storage logging (Storage Analytics)
 
   # Enable versioning required for immutability policies
   is_hns_enabled = false
@@ -76,7 +77,7 @@ module "storage_account" {
 }
 
 # Enable read, write, delete logging for blob service (Storage Analytics)
-# The AVM module doesn't support blob_properties.logging, so we enable it via Azure CLI
+# Requires shared_access_key_enabled = true on the storage account
 resource "terraform_data" "blob_logging" {
   triggers_replace = [module.storage_account.resource_id]
 
@@ -102,7 +103,7 @@ resource "azurerm_log_analytics_workspace" "storage_diag" {
 
 # Azure Monitor diagnostic setting for blob service (CN09.AR01 - StorageRead, StorageWrite, StorageDelete)
 resource "azurerm_monitor_diagnostic_setting" "blob" {
-  name                       = "blob-diagnostic-setting"
+  name                       = "cfi-blob-diag"
   target_resource_id         = "${module.storage_account.resource_id}/blobServices/default/"
   log_analytics_workspace_id = azurerm_log_analytics_workspace.storage_diag.id
 
