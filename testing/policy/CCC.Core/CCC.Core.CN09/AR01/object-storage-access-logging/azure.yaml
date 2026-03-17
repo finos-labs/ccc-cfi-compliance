@@ -21,7 +21,7 @@ validity_commentary: >
 query: |
   az monitor diagnostic-settings list \
     --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
-    --query "value[0]" \
+    --query "[0]" \
     --output json
 
 rules:
@@ -32,9 +32,20 @@ rules:
       Validates that at least one diagnostic setting exists for the blob service.
       The presence of any diagnostic setting indicates logging is configured.
 
-  - jsonpath: "$.logs[?(@.enabled==true)].category"
+  - jsonpath: '$.logs[?(@.category=="StorageRead")].enabled'
     expected_values: []
-    validation_rule: "^.+$"
+    validation_rule: "^true$"
     description: >
-      Validates that at least one log category is enabled. Categories include
-      StorageRead, StorageWrite, and StorageDelete for blob operations.
+      Validates that StorageRead log category is enabled for blob read operations.
+
+  - jsonpath: '$.logs[?(@.category=="StorageWrite")].enabled'
+    expected_values: []
+    validation_rule: "^true$"
+    description: >
+      Validates that StorageWrite log category is enabled for blob write operations.
+
+  - jsonpath: '$.logs[?(@.category=="StorageDelete")].enabled'
+    expected_values: []
+    validation_rule: "^true$"
+    description: >
+      Validates that StorageDelete log category is enabled for blob delete operations.
