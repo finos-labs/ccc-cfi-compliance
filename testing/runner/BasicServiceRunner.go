@@ -103,6 +103,16 @@ func enrichParamsProps(params types.TestParams) types.TestParams {
 			params.Props[cpType.Field(i).Name] = s
 		}
 	}
+	// Alias Azure names to policy-standard names (CCC.ObjStor uses AccountName, ResourceGroup, SubscriptionId)
+	if v, ok := params.Props["AzureStorageAccount"]; ok {
+		params.Props["AccountName"] = v
+	}
+	if v, ok := params.Props["AzureResourceGroup"]; ok {
+		params.Props["ResourceGroup"] = v
+	}
+	if v, ok := params.Props["AzureSubscriptionID"]; ok {
+		params.Props["SubscriptionId"] = v
+	}
 	// Service and rule keys come from YAML (kebab-case) — convert to TitleCase
 	for _, svc := range params.Instance.Services {
 		for k, v := range svc.Properties {

@@ -28,6 +28,16 @@ resource "azurerm_resource_group" "this" {
   location = var.location
 }
 
+# Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
+# Created before storage account so it can be passed to the AVM module
+resource "azurerm_log_analytics_workspace" "storage_diag" {
+  name                = "cfi-storage-diag"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
 # Storage account for compliance testing
 module "storage_account" {
   source = "git::https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount.git?ref=main"
@@ -58,6 +68,14 @@ module "storage_account" {
     # Blob delete retention for soft delete (CN03.AR01 - min 7 days)
     delete_retention_policy = {
       days = 7
+    }
+  }
+
+  # CN09.AR01: Blob diagnostic settings (StorageRead, StorageWrite, StorageDelete)
+  diagnostic_settings_blob = {
+    cfi = {
+      workspace_resource_id = azurerm_log_analytics_workspace.storage_diag.id
+      log_categories        = ["StorageRead", "StorageWrite", "StorageDelete"]
     }
   }
 
@@ -92,30 +110,3 @@ resource "terraform_data" "blob_logging" {
   }
 }
 
-# Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
-resource "azurerm_log_analytics_workspace" "storage_diag" {
-  name                = "cfi-storage-diag"
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  sku                 = "PerGB2018"
-  retention_in_days   = 30
-}
-
-# Azure Monitor diagnostic setting for blob service (CN09.AR01 - StorageRead, StorageWrite, StorageDelete)
-resource "azurerm_monitor_diagnostic_setting" "blob" {
-  name                       = "cfi-blob-diag"
-  target_resource_id         = "${module.storage_account.resource_id}/blobServices/default/"
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.storage_diag.id
-
-  enabled_log {
-    category = "StorageRead"
-  }
-
-  enabled_log {
-    category = "StorageWrite"
-  }
-
-  enabled_log {
-    category = "StorageDelete"
-  }
-}
