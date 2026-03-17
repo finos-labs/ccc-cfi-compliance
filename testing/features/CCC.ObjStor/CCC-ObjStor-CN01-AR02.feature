@@ -1,4 +1,4 @@
-@PerService @object-storage @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN01.AR02
+@PerService @object-storage @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN01
 Feature: CCC.ObjStor.CN01.AR02
   As a security administrator
   I want to prevent any requests to read protected objects using untrusted KMS keys
