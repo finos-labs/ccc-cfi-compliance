@@ -5,16 +5,18 @@ requirement_text: >
 
 validity_score: 9
 validity_commentary: >
-  This query validates that diagnostic settings are configured for the storage account.
+  This query validates that diagnostic settings are configured for the blob service.
 
 query: |
   az monitor diagnostic-settings list \
-    --resource /subscriptions/${AzureSubscriptionId}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount} \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "[0]" \
     --output json
 
 rules:
-  - jsonpath: "$.value[0].logs[?(@.enabled==true)].category"
+  # Accept either .category (StorageRead etc.) or .categoryGroup (audit) - mutually exclusive in Azure
+  - jsonpath: "$"
     expected_values: []
-    validation_rule: "^.+$"
+    validation_rule: "(category|categoryGroup).*enabled.*true|enabled.*true.*(category|categoryGroup)"
     description: >
-      Verifies that at least one log category is enabled.
+      Verifies that at least one log category or category group is enabled.

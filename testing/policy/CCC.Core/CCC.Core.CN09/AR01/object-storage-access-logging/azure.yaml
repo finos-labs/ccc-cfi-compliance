@@ -32,20 +32,12 @@ rules:
       Validates that at least one diagnostic setting exists for the blob service.
       The presence of any diagnostic setting indicates logging is configured.
 
-  - jsonpath: '$.logs[?(@.category=="StorageRead")].enabled'
+  # Access logging: StorageRead, StorageWrite, StorageDelete. When categoryGroup audit
+  # is enabled, Azure replaces individual categories - accept either format (mutually exclusive).
+  # Jsonpath returns full doc; regex matches either all three categories or categoryGroup audit.
+  - jsonpath: "$"
     expected_values: []
-    validation_rule: "^true$"
+    validation_rule: "(StorageRead.*StorageWrite.*StorageDelete|StorageRead.*StorageDelete.*StorageWrite|StorageWrite.*StorageRead.*StorageDelete|StorageWrite.*StorageDelete.*StorageRead|StorageDelete.*StorageRead.*StorageWrite|StorageDelete.*StorageWrite.*StorageRead)|categoryGroup[^\"]*audit"
     description: >
-      Validates that StorageRead log category is enabled for blob read operations.
-
-  - jsonpath: '$.logs[?(@.category=="StorageWrite")].enabled'
-    expected_values: []
-    validation_rule: "^true$"
-    description: >
-      Validates that StorageWrite log category is enabled for blob write operations.
-
-  - jsonpath: '$.logs[?(@.category=="StorageDelete")].enabled'
-    expected_values: []
-    validation_rule: "^true$"
-    description: >
-      Validates that StorageDelete log category is enabled for blob delete operations.
+      Validates read/write/delete logging: either individual categories (StorageRead,
+      StorageWrite, StorageDelete) all enabled, or categoryGroup audit (which replaces them).

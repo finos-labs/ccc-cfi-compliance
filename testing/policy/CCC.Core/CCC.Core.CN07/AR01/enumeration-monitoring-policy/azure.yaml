@@ -6,16 +6,16 @@ requirement_text: >
 
 validity_score: 9
 validity_commentary: >
-  This query validates monitoring configuration at the Azure Storage Account level.
+  This query validates monitoring configuration at the Azure Storage blob service level.
 
 query: |
   az monitor diagnostic-settings list \
-    --resource /subscriptions/${AzureSubscriptionId}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount} \
-    --query "value[?logs[?categoryGroup=='audit' && enabled==\`true\`]]" \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "[0]" \
     --output json
 
 rules:
-  - jsonpath: "$.[0].logs[?(@.categoryGroup=='audit')].enabled"
+  - jsonpath: '$.logs[?(@.categoryGroup=="audit")].enabled'
     expected_values:
       - true
     validation_rule: "^true$"
