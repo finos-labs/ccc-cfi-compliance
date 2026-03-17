@@ -23,7 +23,6 @@ query: |
   az storage account show \
     --name ${AzureStorageAccount} \
     --resource-group ${AzureResourceGroup} \
-    --query "{allowBlobPublicAccess: properties.allowBlobPublicAccess}" \
     --output json
 
 rules:
