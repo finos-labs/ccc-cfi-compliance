@@ -25,6 +25,7 @@ type OCSFFormatter struct {
 // OCSFFinding represents a single OCSF finding/result
 type OCSFFinding struct {
 	Message      string          `json:"message"`
+	ExclusionTag string          `json:"-"` // NotTested, NotTestable, Duplicate - used for status override
 	Metadata     OCSFMetadata    `json:"metadata"`
 	SeverityID   int             `json:"severity_id"`
 	Severity     string          `json:"severity"`
@@ -123,10 +124,25 @@ func (f *OCSFFormatter) Feature(gd *messages.GherkinDocument, uri string, c []by
 	}
 }
 
+// applyExclusionStatusOverride sets status from exclusion tags: NotTested=FAIL, NotTestable/Duplicate=PASS
+func applyExclusionStatusOverride(finding *OCSFFinding) {
+	switch finding.ExclusionTag {
+	case "NotTested":
+		finding.StatusCode = "FAIL"
+		finding.Status = "Update"
+		finding.StatusID = 2
+	case "NotTestable", "Duplicate":
+		finding.StatusCode = "PASS"
+		finding.Status = "New"
+		finding.StatusID = 1
+	}
+}
+
 // Pickle captures pickle (scenario) information
 func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 	// Save the previous scenario if one was in progress
 	if f.scenarioStarted && f.currentScenario != nil {
+		applyExclusionStatusOverride(f.currentScenario)
 		f.findings = append(f.findings, *f.currentScenario)
 	}
 
@@ -136,19 +152,34 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 	// Extract tags from pickle
 	var tagNames []string
 	productName := "CCC-Complete"
+	exclusionTag := ""
 	for _, tag := range pickle.Tags {
 		tagNames = append(tagNames, tag.Name)
 		if tag.Name == "@Policy" {
 			productName = "CCC-Complete (Policy)"
 		} else if tag.Name == "@Behavioural" {
 			productName = "CCC-Complete (Behavioural)"
+		} else if tag.Name == "@NotTested" {
+			exclusionTag = "NotTested"
+		} else if tag.Name == "@NotTestable" {
+			exclusionTag = "NotTestable"
+		} else if tag.Name == "@Duplicate" {
+			exclusionTag = "Duplicate"
 		}
 	}
 
+	message := pickle.Name
+	eventCode := pickle.Name
+	if exclusionTag != "" {
+		message = message + " - " + exclusionTag
+		eventCode = eventCode + " - " + exclusionTag
+	}
+
 	finding := &OCSFFinding{
-		Message: pickle.Name,
+		Message:      message,
+		ExclusionTag: exclusionTag,
 		Metadata: OCSFMetadata{
-			EventCode: pickle.Name,
+			EventCode: eventCode,
 			Product: OCSFProduct{
 				Name:       productName,
 				UID:        productName,
@@ -173,8 +204,8 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 		FindingInfo: OCSFFindingInfo{
 			CreatedTime:   now.Unix(),
 			CreatedTimeDT: now.Format(time.RFC3339),
-			Desc:          fmt.Sprintf("Compliance test scenario: %s", pickle.Name),
-			Title:         pickle.Name,
+			Desc:          fmt.Sprintf("Compliance test scenario: %s", message),
+			Title:         message,
 			Types:         []string{},
 			UID:           fmt.Sprintf("ccc-test-%s-%d", pickle.Id, now.Unix()),
 		},
@@ -238,6 +269,7 @@ func (f *OCSFFormatter) TestRunStarted() {
 func (f *OCSFFormatter) TestRunFinished(msg *messages.TestRunFinished) {
 	// Finalize any pending scenario
 	if f.scenarioStarted && f.currentScenario != nil {
+		applyExclusionStatusOverride(f.currentScenario)
 		f.findings = append(f.findings, *f.currentScenario)
 		f.scenarioStarted = false
 	}
@@ -247,6 +279,7 @@ func (f *OCSFFormatter) TestRunFinished(msg *messages.TestRunFinished) {
 func (f *OCSFFormatter) Summary() {
 	// Finalize any pending scenario
 	if f.scenarioStarted && f.currentScenario != nil {
+		applyExclusionStatusOverride(f.currentScenario)
 		f.findings = append(f.findings, *f.currentScenario)
 		f.scenarioStarted = false
 	}
