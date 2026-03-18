@@ -1,0 +1,49 @@
+name: ALB Unencrypted Traffic Block Check
+service_type: load-balancer
+requirement_text: >
+  Unencrypted traffic MUST be blocked or redirected to secure equivalents so that
+  no data is transmitted in plaintext.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that the ALB has HTTPS listeners configured. When only
+  HTTPS listeners exist (or HTTP listeners redirect to HTTPS), plaintext
+  traffic is blocked. Strengths:
+  - ALB is the primary TLS termination point for EC2 workloads
+  - HTTPS listeners with TLS 1.3 ensure encrypted traffic
+  Limitations:
+  - Does not explicitly validate HTTP redirect configuration
+  - HTTP listeners that forward to targets would fail the HTTPS-only check
+  - NLB with TLS listeners would require a separate query
+
+query: |
+  aws elbv2 describe-listeners \
+    --load-balancer-arn ${UID}
+
+rules:
+  - jsonpath: "$.Listeners[?(@.Protocol == 'HTTPS')].SslPolicy"
+    expected_values:
+      - "ELBSecurityPolicy-TLS13-1-2-2021-06"
+      - "ELBSecurityPolicy-TLS13-1-3-2021-06"
+      - "ELBSecurityPolicy-TLS13-1-2-Res-2021-06"
+      - "ELBSecurityPolicy-TLS13-1-2-Ext1-2021-06"
+      - "ELBSecurityPolicy-TLS13-1-2-Ext2-2021-06"
+    validation_rule: "^ELBSecurityPolicy-TLS13.*$"
+    description: >
+      Verifies that HTTPS listeners use a TLS 1.3 compatible security policy.
+      Ensures encrypted traffic on exposed ports.
+
+  - jsonpath: "$.Listeners[?(@.Protocol == 'HTTPS')].Port"
+    expected_values:
+      - 443
+    validation_rule: "^(443|8443|[0-9]+)$"
+    description: >
+      Confirms that HTTPS listeners are configured on expected ports.
+      Encrypted traffic must be available.
+
+  - jsonpath: "$.Listeners[?(@.Protocol == 'HTTPS')].Certificates[*].CertificateArn"
+    expected_values: []
+    validation_rule: "^arn:aws:acm:[a-z0-9-]+:[0-9]+:certificate/[a-f0-9-]+$"
+    description: >
+      Validates that HTTPS listeners have an ACM certificate attached.
+      Required for TLS termination.

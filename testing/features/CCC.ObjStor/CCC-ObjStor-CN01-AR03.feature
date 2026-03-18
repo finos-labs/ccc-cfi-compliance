@@ -39,6 +39,6 @@ Feature: CCC.ObjStor.CN01.AR03
 
   @Policy
   Scenario: All unauthorized requests are blocked
-    # This control requires behavioral testing - comprehensive access testing
-    # IAM policies enforce this at runtime
-    Then no-op required
+    # Validates RBAC/IAM is used; no-public-access already checked by AR01/AR02
+    When I attempt policy check "object-storage-no-public-principals" for control "CCC.ObjStor.CN01" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

@@ -25,7 +25,7 @@ Feature: CCC.Core.CN01.AR08
     When I attempt policy check "load-balancer-trust-store" for control "CCC.Core.CN01" assessment requirement "AR08" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Policy @PerService @object-storage
+  @Policy @NotTested @PerService @object-storage
   Scenario: Storage account enforces mutual TLS
     # Mutual TLS (client certificate authentication) is typically not supported on 
     # public object storage service endpoints.

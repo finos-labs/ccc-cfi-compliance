@@ -1,0 +1,29 @@
+name: S3 Unencrypted Traffic Block Check
+service_type: object-storage
+requirement_text: >
+  Unencrypted traffic MUST be blocked or redirected to secure equivalents so that
+  no data is transmitted in plaintext.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 buckets enforce HTTPS via bucket policy.
+  Strengths:
+  - Directly checks for a bucket policy that denies non-secure transport
+  - AWS enforces this at the bucket gateway for all incoming requests
+  Limitations:
+  - Does not explicitly check redirect behavior (S3 typically returns 403 for HTTP)
+  - Requires bucket policy to be present; default buckets without policy may allow HTTP
+
+query: |
+  aws s3api get-bucket-policy \
+    --bucket ${ResourceName} \
+    --output json
+
+rules:
+  - jsonpath: "$.Policy"
+    expected_values: []
+    validation_rule: "aws:SecureTransport.*(true|\"true\")"
+    description: >
+      Verifies that the bucket policy contains a condition requiring secure
+      transport (HTTPS). A Deny statement with condition 'aws:SecureTransport: false'
+      blocks unencrypted requests at the S3 gateway.

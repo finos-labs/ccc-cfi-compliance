@@ -17,7 +17,7 @@ Feature: CCC.ObjStor.CN05.AR02 - New Version ID on Modification
     And I refer to "{result.VersionID}" as "version2"
     Then "{version1}" is not equal to "{version2}"
 
-  @Policy
+  @Policy @Duplicate
   Scenario: Modified objects receive new version identifiers
     # Policy check performed by CN05.AR01 (object-storage-versioning)
     Then no-op required

@@ -29,7 +29,7 @@ Feature: CCC.ObjStor.CN05.AR04 - Retain Versions on Delete
       | {listedVersionId} | list-deleted-versions-object.txt |
     And I attach "{result}" to the test output as "versions-after-delete.json"
 
-  @Policy
+  @Policy @Duplicate
   Scenario: Object versions are retained after deletion
     # Policy check performed by CN05.AR01 (object-storage-versioning)
     Then no-op required

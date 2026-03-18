@@ -1,0 +1,40 @@
+name: Azure Application Gateway Unencrypted Traffic Block Check
+service_type: load-balancer
+requirement_text: >
+  Unencrypted traffic MUST be blocked or redirected to secure equivalents so that
+  no data is transmitted in plaintext.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that the Application Gateway requires HTTPS for traffic.
+  When HTTPS listeners are configured with TLS 1.3+, unencrypted traffic is
+  effectively blocked. HTTP listeners may redirect to HTTPS.
+  Strengths:
+  - Application Gateway is the primary L7 load balancer for Azure workloads
+  - HTTPS-only configuration prevents plaintext transmission
+  Limitations:
+  - Does not explicitly validate HTTP-to-HTTPS redirect configuration
+  - Direct VM connections bypassing the gateway are not covered
+
+query: |
+  az network application-gateway show \
+    --name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{sslPolicy: sslPolicy, httpListeners: httpListeners[*].{name: name, protocol: protocol}}" \
+    --output json
+
+rules:
+  - jsonpath: "$.sslPolicy.minProtocolVersion"
+    expected_values:
+      - "TLSv1_3"
+    validation_rule: "^TLSv1_3$"
+    description: >
+      Verifies that the minimum TLS protocol version is set to TLS 1.3.
+      Ensures encrypted traffic when HTTPS is used.
+
+  - jsonpath: "$.httpListeners[?(@.protocol=='Https')].name"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Confirms that HTTPS listeners are configured. At least one HTTPS
+      listener must exist; traffic must use encrypted ports.

@@ -1,0 +1,33 @@
+name: Azure Storage Unencrypted Traffic Block Check
+service_type: object-storage
+requirement_text: >
+  Unencrypted traffic MUST be blocked or redirected to secure equivalents so that
+  no data is transmitted in plaintext.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that Azure Storage rejects HTTP traffic at the account level.
+  When supportsHttpsTrafficOnly is true, all HTTP requests are rejected (not redirected).
+  Strengths:
+  - Account-level enforcement for all blob, file, queue, and table endpoints
+  - Prevents plaintext transmission
+  Limitations:
+  - Does not validate TLS version (see AR01 object-storage-tls-policy)
+  - Redirect behavior (301/302) is not validated here; Azure rejects HTTP outright
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{supportsHttpsTrafficOnly: supportsHttpsTrafficOnly}" \
+    --output json
+
+rules:
+  - jsonpath: "$.supportsHttpsTrafficOnly"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Confirms that HTTPS-only traffic is enforced. When enabled, all HTTP
+      requests are rejected at the storage account level, preventing plaintext
+      transmission to containers and blobs.

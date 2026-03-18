@@ -1,0 +1,56 @@
+name: S3 Block External Unauthorized Data Requests
+service_type: object-storage
+requirement_text: >
+  Data requests from outside the trust perimeter MUST be blocked so that
+  data exfiltration is prevented. Only authorised identities may read data.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that S3 Block Public Access is configured.
+  When enabled, it prevents ACLs and bucket policies that would grant
+  public read access, blocking external unauthorized data requests.
+  Strengths:
+  - Directly queries the bucket's Block Public Access settings
+  - RestrictPublicBuckets restricts access to authorized users only
+  - All four settings block different vectors for public access
+  Limitations:
+  - Does not validate IAM policies for principle of least privilege
+  - Behavioral testing verifies unauthorized read is blocked at runtime
+
+query: |
+  aws s3api get-public-access-block \
+    --bucket ${ResourceName} \
+    --output json
+
+rules:
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicAcls"
+    expected_values:
+      - "true"
+    validation_rule: "^true$"
+    description: >
+      BlockPublicAcls prevents new public ACLs. When true, no public ACLs
+      can grant anonymous read access.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.IgnorePublicAcls"
+    expected_values:
+      - "true"
+    validation_rule: "^true$"
+    description: >
+      IgnorePublicAcls causes existing public ACLs to be ignored, blocking
+      anonymous read access via ACLs.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicPolicy"
+    expected_values:
+      - "true"
+    validation_rule: "^true$"
+    description: >
+      BlockPublicPolicy blocks new public bucket policies that would
+      grant external read access.
+
+  - jsonpath: "$.PublicAccessBlockConfiguration.RestrictPublicBuckets"
+    expected_values:
+      - "true"
+    validation_rule: "^true$"
+    description: >
+      RestrictPublicBuckets restricts access to buckets with public
+      policies to only authorized users, blocking external data requests.

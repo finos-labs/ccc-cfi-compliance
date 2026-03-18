@@ -1,0 +1,34 @@
+name: GCP Cloud Storage Block External Unauthorized Data Requests
+service_type: object-storage
+requirement_text: >
+  Data requests from outside the trust perimeter MUST be blocked so that
+  data exfiltration is prevented. Only authorised identities may read data.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that GCP Cloud Storage has public access prevention
+  enabled. When set to 'enforced' or 'inherited', the bucket cannot grant
+  public read access via IAM or ACLs, blocking external unauthorized data requests.
+  Strengths:
+  - Prevents allUsers and allAuthenticatedUsers read access when enforced
+  - Cannot be overridden by IAM policy or ACL changes
+  - Aligns with Google security best practices
+  Limitations:
+  - Does not validate network-level restrictions
+  - 'inherited' uses org-level policy; org should restrict public access
+  - Behavioral testing verifies unauthorized read is blocked at runtime
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(iamConfiguration.publicAccessPrevention)"
+
+rules:
+  - jsonpath: "$.iamConfiguration.publicAccessPrevention"
+    expected_values:
+      - "enforced"
+      - "inherited"
+    validation_rule: "^(enforced|inherited)$"
+    description: >
+      Validates that public access prevention is configured. When enforced
+      or inherited, external unauthorized data requests (public read) are
+      blocked at the bucket level.

@@ -1,0 +1,36 @@
+name: Azure Storage Block External Unauthorized Data Requests
+service_type: object-storage
+requirement_text: >
+  Data requests from outside the trust perimeter MUST be blocked so that
+  data exfiltration is prevented. Only authorised identities may read data.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that Azure Storage has blob public access disabled.
+  When allowBlobPublicAccess is false, anonymous read access to blobs is not
+  permitted, blocking external unauthorized data requests.
+  Strengths:
+  - Storage account-level setting applies to all containers and blobs
+  - Overrides any public access settings on individual containers
+  - Aligns with CIS and Prowler benchmarks
+  Limitations:
+  - Does not validate network rules (e.g. allow from VNet only)
+  - Does not validate shared key or SAS token restrictions
+  - Behavioral testing verifies unauthorized read is blocked at runtime
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{allowBlobPublicAccess:allowBlobPublicAccess}" \
+    --output json
+
+rules:
+  - jsonpath: "$.allowBlobPublicAccess"
+    expected_values:
+      - false
+    validation_rule: "^false$"
+    description: >
+      Validates that blob public access is disabled at the storage account level.
+      When false, anonymous read access is not permitted, blocking external
+      unauthorized data requests to containers and blobs.

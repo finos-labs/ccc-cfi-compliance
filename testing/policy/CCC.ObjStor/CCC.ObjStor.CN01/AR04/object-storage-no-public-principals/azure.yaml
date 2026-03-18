@@ -1,0 +1,30 @@
+name: Azure Storage RBAC in Use
+service_type: object-storage
+requirement_text: >
+  All unauthorized requests MUST be blocked. Access MUST be controlled by RBAC.
+
+validity_score: 7
+validity_commentary: >
+  ObjStor.CN01.AR01/AR02 already validate no-public-access at the account level.
+  This check validates that RBAC role assignments exist on the storage account,
+  proving access control is role-based rather than anonymous or key-based.
+  Strengths:
+  - Confirms RBAC is configured for the storage account
+  - Role assignments scope access to specific identities
+  Limitations:
+  - Does not validate least-privilege role assignments
+  - Behavioral testing verifies unauthorized access is blocked at runtime
+
+query: |
+  SCOPE="/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}"
+  COUNT=$(az role assignment list --scope "$SCOPE" --query "length(@)" --output tsv 2>/dev/null || echo "0")
+  echo "{\"rbacInUse\": $COUNT}"
+
+rules:
+  - jsonpath: "$.rbacInUse"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Validates that at least one RBAC role assignment exists on the storage
+      account. RBAC is the required access control mechanism; no assignments
+      indicates access may not be properly scoped.
