@@ -1,0 +1,30 @@
+name: GCP Cloud Storage Retention Policy Lock Check
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify the retention policy for an object storage
+  bucket, the service MUST prevent the policy from being modified.
+
+validity_score: 10
+validity_commentary: >
+  This query validates that a retention policy is set and locked on the GCP
+  bucket. A locked retention policy cannot be removed or shortened, even by
+  project owners.
+  Strengths:
+  - Locking is an irreversible, immutable configuration
+  - Directly checks both the presence and locked state of the policy
+  - Consistent with GCP compliance best practices
+  Limitations:
+  - Does not validate the specific minimum retention period
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(retentionPolicy)"
+
+rules:
+  - jsonpath: "$.retentionPolicy.isLocked"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that the retention policy is locked, preventing any modification.
+      A locked retention policy cannot be shortened or removed.

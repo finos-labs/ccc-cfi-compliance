@@ -1,0 +1,35 @@
+name: Azure Storage Block Blob Public Access
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify data on the service or a child
+  resource, the service MUST block requests from unauthorized entities.
+  Disabling blob public access ensures the storage account is not world-writable.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that Azure Storage has blob public access disabled.
+  When allowBlobPublicAccess is false, anonymous access to blobs is not
+  permitted, reducing the risk of unauthorized data modification.
+  Strengths:
+  - Storage account-level setting applies to all containers
+  - Overrides any public access settings on individual containers
+  - Aligns with CIS and Prowler benchmarks
+  Limitations:
+  - Does not validate shared key or SAS token restrictions
+  - Behavioral testing (CN05-AR01) verifies unauthorized modification is blocked at runtime
+  - Network rules (e.g. allow from VNet only) are checked separately
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --output json
+
+rules:
+  - jsonpath: "$.allowBlobPublicAccess"
+    expected_values: ["false"]
+    validation_rule: "^false$"
+    description: >
+      Validates that blob public access is disabled at the storage account level.
+      When false, anonymous access is not permitted regardless of container ACLs.
+      This is a necessary precondition for blocking unauthorized data modification.

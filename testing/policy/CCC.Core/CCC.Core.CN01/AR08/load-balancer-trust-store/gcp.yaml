@@ -16,7 +16,7 @@ validity_commentary: >
 query: |
   gcloud certificate-manager trust-configs describe ${ResourceName} \
     --location=global \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --format=json
 
 rules:

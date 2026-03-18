@@ -5,9 +5,22 @@ Feature: CCC.Core.CN10.AR01 - Replication Destination Trust
   So that data sovereignty and trust perimeter requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage replication destination compliance
     When I attempt policy check "object-storage-replication-destination" for control "CCC.Core.CN10" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
+
+  @Behavioural @object-storage
+  Scenario: Replication destination trust cannot be verified automatically
+    # Verifying data replicates only to trusted destinations requires inspecting
+    # replication configuration and validating destination regions/accounts against
+    # trust criteria - GetReplicationStatus provides locations but trust validation
+    # is policy/organizational.
+    #
+    # Manual verification steps:
+    # 1. Retrieve replication configuration (e.g., GetReplicationStatus)
+    # 2. Verify destination locations are in approved/trusted regions
+    # 3. Confirm no replication to disallowed jurisdictions or untrusted accounts
+    Then no-op required

@@ -15,7 +15,7 @@ validity_commentary: >
 
 query: |
   gcloud compute firewall-rules list \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --filter="allowed.ports:22 AND direction:INGRESS" \
     --format=json
 

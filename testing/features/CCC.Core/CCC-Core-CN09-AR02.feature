@@ -5,9 +5,9 @@ Feature: CCC.Core.CN09.AR02 - Logs Cannot Be Disabled
   So that audit trail tampering is prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Disabling logs requires disabling the resource
     # This control requires behavioral testing - attempting to disable logs
     # Cloud provider logging configurations enforce this at runtime

@@ -5,10 +5,9 @@ Feature: CCC.Core.CN05.AR03 - Block Cross-Tenant Access
   So that multi-tenant isolation is maintained
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Cross-tenant access is blocked without explicit allowlist
-    # This control requires behavioral testing - attempting cross-tenant access
-    # Cloud provider isolation and IAM policies enforce this at runtime
-    Then no-op required
+    When I attempt policy check "object-storage-cross-tenant-block" for control "CCC.Core.CN05" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

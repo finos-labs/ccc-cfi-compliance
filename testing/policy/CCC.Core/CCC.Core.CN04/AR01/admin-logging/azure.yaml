@@ -1,0 +1,35 @@
+name: Azure Activity Log Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all access and changes by administrators 
+  (identity, timestamp, action, result).
+
+validity_score: 9
+validity_commentary: >
+  Azure Activity Log automatically captures all administrative operations
+  for all Azure resources. Activity Log is enabled by default at the
+  subscription level and cannot be disabled.
+  Strengths:
+  - Activity Log is enabled by default and cannot be disabled
+  - Logs include caller identity, timestamp, operation, and status
+  - Covers all resources in the subscription
+  Limitations:
+  - Default retention is 90 days; longer retention requires export
+  - Does not validate export to Log Analytics or Storage Account
+
+query: |
+  az monitor activity-log list \
+    --subscription ${AzureSubscriptionID} \
+    --max-events 1 \
+    --query "[0]" \
+    --output json
+
+rules:
+  - jsonpath: "$.eventTimestamp"
+    expected_values: []
+    validation_rule: "^\\d{4}-\\d{2}-\\d{2}T.*$"
+    description: >
+      Azure Activity Log is enabled by default for all subscriptions.
+      This check verifies Activity Log is accessible and contains events.
+      Activity logs include identity (caller), timestamp, operation name,
+      and result status for all administrative actions.

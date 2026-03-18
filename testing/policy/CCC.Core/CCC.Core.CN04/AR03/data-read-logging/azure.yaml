@@ -1,0 +1,34 @@
+name: Azure Diagnostic Logging Read Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all data read attempts 
+  (identity, timestamp, action, result).
+
+validity_score: 7
+validity_commentary: >
+  This query validates that Azure diagnostic settings are configured
+  to log read operations.
+  Strengths:
+  - StorageRead captures blob download and list operations
+  - Logs include caller identity, timestamp, operation, and status
+  - Separate from the storage account being logged
+  Limitations:
+  - Diagnostic settings must be explicitly configured (not default)
+  - Requires destination (Log Analytics, Storage, or Event Hub)
+  - High-volume accounts may generate very significant log data
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "[].logs[?category=='StorageRead'] | [0][0]" \
+    --output json
+
+rules:
+  - jsonpath: "$.enabled"
+    expected_values: ["true"]
+    validation_rule: ""
+    description: >
+      Validates that StorageRead logging is enabled for the blob service.
+      StorageRead captures blob download, metadata read, and list
+      operations with full caller identity and timestamp. If no diagnostic
+      settings exist, this check will fail.

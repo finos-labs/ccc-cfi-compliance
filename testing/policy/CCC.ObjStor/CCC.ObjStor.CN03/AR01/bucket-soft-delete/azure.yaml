@@ -1,0 +1,32 @@
+name: Azure Blob Soft Delete Check
+service_type: object-storage
+requirement_text: >
+  When an object storage bucket deletion is attempted, the bucket MUST be
+  fully recoverable for a set time-frame after deletion is requested.
+
+validity_score: 9
+validity_commentary: >
+  Azure Blob Storage supports container soft delete and blob soft delete.
+  This check validates that container soft delete is enabled with a retention
+  period greater than zero days.
+  Strengths:
+  - Directly checks container (bucket-equivalent) soft delete configuration
+  - Azure container soft delete is a native feature for recovery
+  Limitations:
+  - Does not verify the exact minimum retention duration required
+
+query: |
+  az storage account blob-service-properties show \
+    --account-name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{containerDeleteRetentionPolicy: containerDeleteRetentionPolicy}" \
+    --output json
+
+rules:
+  - jsonpath: "$.containerDeleteRetentionPolicy.enabled"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that container soft delete is enabled on the storage account,
+      allowing deleted containers to be recovered within the retention period.

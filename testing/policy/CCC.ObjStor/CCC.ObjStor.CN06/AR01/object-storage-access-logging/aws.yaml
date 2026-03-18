@@ -1,0 +1,28 @@
+name: AWS S3 Access Logging Check
+service_type: object-storage
+requirement_text: >
+  Access logs MUST be stored in a separate data store from the bucket they
+  monitor, ensuring log integrity and availability.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 server access logging is enabled and that the
+  target log bucket is different from the source bucket.
+  Strengths:
+  - Directly reads the bucket logging configuration
+  - Confirms logs are directed to a separate bucket
+  - Industry standard approach for S3 audit logging
+  Limitations:
+  - Does not verify the log target bucket's retention or access policies
+
+query: |
+  aws s3api get-bucket-logging \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.LoggingEnabled.TargetBucket"
+    expected_values: []
+    validation_rule: "^(?!${ResourceName}$).+"
+    description: >
+      Verifies that server access logging is enabled and that log files are
+      delivered to a bucket different from the monitored bucket.

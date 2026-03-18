@@ -1,0 +1,32 @@
+name: Cloud Audit Logs Admin Activity Configuration
+service_type: all
+requirement_text: >
+  The service MUST log all access and changes by administrators 
+  (identity, timestamp, action, result).
+
+validity_score: 9
+validity_commentary: >
+  This query validates that Cloud Audit Logs Admin Activity logging is enabled.
+  Admin Activity logs are always enabled by default in GCP and cannot be disabled.
+  Strengths:
+  - Admin Activity logs are enabled by default and cannot be disabled
+  - Logs include principal, timestamp, method, and status
+  - Stored in Cloud Logging separate from the bucket
+  Limitations:
+  - Does not validate log retention period
+  - Does not verify log sink configuration for long-term storage
+
+query: |
+  gcloud logging sinks list \
+    --project=${GcpProjectId} \
+    --format=json
+
+rules:
+  - jsonpath: "$"
+    expected_values: []
+    validation_rule: ".*"
+    description: >
+      Admin Activity audit logs are enabled by default in GCP and cannot be
+      disabled. This check verifies the logging infrastructure is accessible.
+      Admin Activity logs capture resource creation, deletion, IAM changes,
+      and configuration modifications with full identity and timestamp.

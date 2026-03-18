@@ -213,12 +213,54 @@ func (f *AWSFactory) GetServiceAPI(serviceName string) (generic.Service, error) 
 4. **Add feature files** in `features/CCC.NewCatalog/`:
 
 ```gherkin
-@CCC.NewCatalog
-Feature: CCC.NewCatalog.CN01 - Control Name
+@PerService @new-service @CCC.NewCatalog @tlp-green @tlp-amber @tlp-red @CCC.NewCatalog.CN01.AR01
+Feature: CCC.NewCatalog.CN01.AR01 - Control Name
   Scenario: AR01 - Validation scenario
     Given the resource is configured
     Then the control requirement should be met
 ```
+
+### Feature File Tagging Convention
+
+Feature files use multiple tags for flexible test filtering:
+
+| Tag Type | Example | Purpose |
+|----------|---------|---------|
+| **Execution mode** | `@PerService`, `@PerPort` | How the test runner executes the test |
+| **Service type** | `@object-storage`, `@vpc` | Matches service API tags for AND-filtering |
+| **Catalog** | `@CCC.ObjStor`, `@CCC.Core` | Identifies the control catalog |
+| **TLP level** | `@tlp-clear`, `@tlp-green`, `@tlp-amber`, `@tlp-red` | Traffic Light Protocol sensitivity level |
+| **Control ID** | `@CCC.ObjStor.CN01` | Specific control and assessment requirement |
+
+**Service-specific tests** (e.g., `CCC.ObjStor`) include both the service tag and catalog tag:
+
+```gherkin
+@PerService @object-storage @CCC.ObjStor @tlp-amber @tlp-red @CCC.ObjStor.CN01
+Feature: CCC.ObjStor.CN01.AR01
+  Given blah ... 
+```
+
+**Core control tests** (`CCC.Core`) use scenario-level service tags to indicate which services each scenario applies to:
+
+```gherkin
+@PerService @CCC.Core @CCC.Core.CN02 @tlp-green @tlp-amber @tlp-red
+Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
+
+  @Policy @object-storage
+  Scenario: Object storage encryption compliance
+    ...
+
+  @Policy @vpc
+  Scenario: VPC encryption compliance
+    ...
+```
+
+This allows:
+- `@object-storage` - Run all object storage tests (CCC.ObjStor + CCC.Core scenarios)
+- `@CCC.ObjStor` - Run only CCC.ObjStor-specific tests
+- `@CCC.Core` - Run all core control tests
+- `@tlp-green` - Run tests appropriate for green TLP level
+- `@CCC.Core.CN01` - Run a single control test
 
 ## Development
 
@@ -233,16 +275,18 @@ go build -o ccc-compliance ./runner/
 
 ```bash
 ./ccc-compliance \
-  -provider aws \
-  -region us-east-1 \
-  -timeout 30m
+  --provider aws \
+  --service objects-storage  # Run a particular service, elide for all services \
+  --tags "@CCC.Core" # some tags, see above" \
 ```
 
 ### Adding New Test Steps
 
-Ordinarily, you shouldn't need to add new steps to the framework as you can use the ones in generic to call all the API functions you need. Test step definitions are in:
+Ordinarily, you shouldn't need to add new steps to the framework. The existing steps allow you to call any API function and validate results.
 
-- `language/cloud/cloud_steps.go` - Cloud-specific steps
-- `language/generic/generic_steps.go` - Reusable generic steps
+**Step definitions are provided by:**
 
-See the documentation in `language/generic/README.md` and `language/cloud/README.md`.
+- **[standard-cucumber-steps](https://github.com/robmoffat/standard-cucumber-steps)** - Generic reusable steps for calling methods, assertions, variable handling, etc.
+- **`language/cloud/cloud_steps.go`** - Cloud-specific steps (provider initialization, policy checks, attachments)
+
+See the [standard-cucumber-steps README](https://github.com/robmoffat/standard-cucumber-steps/blob/main/README.md) for the full list of available generic steps, and `language/cloud/README.md` for cloud-specific extensions.

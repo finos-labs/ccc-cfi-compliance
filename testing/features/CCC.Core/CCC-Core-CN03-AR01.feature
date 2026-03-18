@@ -5,14 +5,14 @@ Feature: CCC.Core.CN03.AR01 - Multi-Factor Authentication for Destructive Operat
   So that accidental or malicious deletions are prevented
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
+  @Policy @object-storage
   Scenario: Object storage delete protection compliance
     When I attempt policy check "object-storage-delete-protection" for control "CCC.Core.CN03" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Behavioural @CCC.ObjStor
+  @Behavioural @object-storage
   Scenario: MFA requirement for destructive operations cannot be tested automatically
     # Multi-factor authentication (MFA) for destructive operations requires human interaction
     # to complete the second factor challenge (e.g., TOTP code, push notification, hardware key).

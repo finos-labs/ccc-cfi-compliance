@@ -1,0 +1,27 @@
+name: AWS S3 Uniform Bucket-Level Access Check
+service_type: object-storage
+requirement_text: >
+  The service MUST enforce uniform bucket-level access, preventing ad-hoc 
+  object-level permissions via ACLs.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that S3 Object Ownership is set to BucketOwnerEnforced,
+  which disables ACLs and ensures all access is controlled by bucket policies.
+  Strengths:
+  - Directly confirms ACLs are disabled
+  - Ensures uniform access across all objects in the bucket
+  - Industry best practice for access management
+
+query: |
+  aws s3api get-bucket-ownership-controls \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.OwnershipControls.Rules[0].ObjectOwnership"
+    expected_values:
+      - "BucketOwnerEnforced"
+    validation_rule: "^BucketOwnerEnforced$"
+    description: >
+      Verifies that Object Ownership is set to BucketOwnerEnforced.
+      This setting disables ACLs for the bucket and all objects within it.

@@ -1,0 +1,32 @@
+name: Azure Blob Default Immutability Policy Check
+service_type: object-storage
+requirement_text: >
+  Objects MUST automatically receive a default retention policy upon upload,
+  protecting critical data from premature deletion or modification.
+
+validity_score: 8
+validity_commentary: >
+  This query validates that an immutability policy is configured on the Azure
+  storage container with a non-zero retention interval, ensuring uploaded blobs
+  are automatically protected.
+  Strengths:
+  - Container-level immutability policy applies to all blobs within it
+  - Directly checks the immutability interval in days
+  Limitations:
+  - Policy may need to be set per-container in Azure
+  - Does not verify that the policy is locked (see CN03.AR02)
+
+query: |
+  az storage container immutability-policy show \
+    --account-name ${AzureStorageAccount} \
+    --container-name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --output json
+
+rules:
+  - jsonpath: "$.properties.immutabilityPeriodSinceCreationInDays"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Verifies that the immutability period is set to a positive number of days,
+      ensuring all blobs uploaded to the container receive retention protection.

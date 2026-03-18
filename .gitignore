@@ -79,7 +79,7 @@ dist/
 # Development temp folder
 tmp
 
-
+**/output-*
 **/output/*.html
 **/output/*.ocsf.json
 cucumber-report.html

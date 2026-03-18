@@ -15,7 +15,7 @@ validity_commentary: >
 
 query: |
   gcloud compute firewall-rules describe ${ResourceName} \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --format=json
 
 rules:

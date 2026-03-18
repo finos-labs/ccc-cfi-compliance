@@ -11,7 +11,7 @@ Feature: CCC.Core.CN01.AR07
 
     Then "{portNumber}" is "80"
 
-  @Behavioural @PerPort @http @tls
+  @Behavioural @PerPort @http @tls @object-storage
   Scenario: Verify HTTPS uses IANA-assigned port 443
     HTTPS must use port 443 as assigned by IANA.
     This is the standard port for encrypted web traffic.
@@ -66,7 +66,7 @@ Feature: CCC.Core.CN01.AR07
 
     Then "{portNumber}" is "636"
 
-  @Policy @PerService
+  @Policy @PerService @security-group
   Scenario: Security group enforces IANA port-protocol mapping
     When I attempt policy check "security-group-port-protocol" for control "CCC.Core.CN01" assessment requirement "AR07" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

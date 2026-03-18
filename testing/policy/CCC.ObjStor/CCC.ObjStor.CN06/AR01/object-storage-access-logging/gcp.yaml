@@ -1,0 +1,28 @@
+name: GCP Cloud Storage Access Logging Check
+service_type: object-storage
+requirement_text: >
+  Access logs MUST be stored in a separate data store from the bucket they
+  monitor, ensuring log integrity and availability.
+
+validity_score: 10
+validity_commentary: >
+  This query validates that GCP Cloud Storage access and usage logging is
+  enabled and directed to a separate log bucket.
+  Strengths:
+  - Directly reads the bucket logging configuration via gcloud
+  - Confirms a log bucket is configured (implicitly separate from source)
+  - Consistent with GCP security best practices for audit logging
+  Limitations:
+  - Does not verify the log bucket's own retention or IAM policies
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format="json(logging)"
+
+rules:
+  - jsonpath: "$.logging.logBucket"
+    expected_values: []
+    validation_rule: "^(?!${ResourceName}$).+"
+    description: >
+      Verifies that access logging is enabled and log files are written to a
+      bucket different from the source bucket being monitored.

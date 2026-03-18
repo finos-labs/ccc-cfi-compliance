@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog/formatters"
@@ -114,7 +115,11 @@ type OCSFResourceGroup struct {
 // Feature captures feature information
 func (f *OCSFFormatter) Feature(gd *messages.GherkinDocument, uri string, c []byte) {
 	if gd.Feature != nil {
-		f.currentFeature = gd.Feature.Name
+		name := gd.Feature.Name
+		if parts := strings.Split(name, " - "); len(parts) > 0 {
+			name = strings.TrimSpace(parts[0])
+		}
+		f.currentFeature = name
 	}
 }
 
@@ -130,17 +135,23 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 
 	// Extract tags from pickle
 	var tagNames []string
+	productName := "CCC-Complete"
 	for _, tag := range pickle.Tags {
 		tagNames = append(tagNames, tag.Name)
+		if tag.Name == "@Policy" {
+			productName = "CCC-Complete (Policy)"
+		} else if tag.Name == "@Behavioural" {
+			productName = "CCC-Complete (Behavioural)"
+		}
 	}
 
 	finding := &OCSFFinding{
 		Message: pickle.Name,
 		Metadata: OCSFMetadata{
-			EventCode: "ccc_compliance_test",
+			EventCode: pickle.Name,
 			Product: OCSFProduct{
-				Name:       "CCC-Complete",
-				UID:        "CCC-Complete",
+				Name:       productName,
+				UID:        productName,
 				VendorName: "FINOS",
 				Version:    "0.1",
 			},
@@ -189,8 +200,8 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 		}
 
 		resource := OCSFResource{
-			CloudPartition: f.params.CloudParams.Provider,
-			Region:         f.params.CloudParams.Region,
+			CloudPartition: f.params.Instance.Properties.Provider,
+			Region:         f.params.Instance.Properties.Region,
 			Data: OCSFResourceData{
 				Details: fmt.Sprintf("%s service on %s:%s", f.params.Protocol, f.params.HostName, f.params.PortNumber),
 				Metadata: OCSFResourceMetadata{
@@ -199,7 +210,7 @@ func (f *OCSFFormatter) Pickle(pickle *messages.Pickle) {
 					Findings: []string{},
 					Tags:     []string{},
 					Type:     f.params.ServiceType,
-					Region:   f.params.CloudParams.Region,
+					Region:   f.params.Instance.Properties.Region,
 				},
 			},
 			Group: OCSFResourceGroup{

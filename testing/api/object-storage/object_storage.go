@@ -4,11 +4,30 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 )
 
+// serviceParamString retrieves a string value from service params by camelCase key
+func serviceParamString(serviceParams map[string]interface{}, key string) string {
+	if serviceParams == nil {
+		return ""
+	}
+	if v, ok := serviceParams[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // Bucket represents a storage bucket/container
 type Bucket struct {
 	ID     string // Unique identifier (name for AWS S3, Azure Storage Account + Container)
 	Name   string // Human-readable name
 	Region string // Geographic region
+}
+
+// ObjectVersion represents a version of an object when versioning is enabled
+type ObjectVersion struct {
+	VersionID string // Unique version identifier
+	ObjectID  string // Object key/name
 }
 
 // Object represents a stored object/blob
@@ -36,6 +55,7 @@ type Service interface {
 	SetBucketRetentionDurationDays(bucketID string, days int) error
 	ListDeletedBuckets() ([]Bucket, error)
 	RestoreBucket(bucketID string) error
+	UpdateBucketPolicy(bucketID string, policyTag string) (*Bucket, error)
 
 	// Object operations
 	ListObjects(bucketID string) ([]Object, error)
@@ -48,4 +68,7 @@ type Service interface {
 	// AWS: Should fail if uniform bucket-level access is enforced (ACLs disabled)
 	// Azure: Always fails (doesn't support object-level permissions)
 	SetObjectPermission(bucketID string, objectID string, permissionLevel string) error
+
+	// ListObjectVersions lists all versions of an object (when versioning is enabled)
+	ListObjectVersions(bucketID string, objectID string) ([]ObjectVersion, error)
 }

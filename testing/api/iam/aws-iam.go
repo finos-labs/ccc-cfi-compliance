@@ -10,20 +10,22 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/aws/aws-sdk-go-v2/service/iam/types"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSIAMService implements IAMService for AWS
 type AWSIAMService struct {
 	client           *iam.Client
 	ctx              context.Context
+	instance         types.InstanceConfig
 	provisionedUsers map[string]*Identity // Cache of provisioned users by userName
 	accessLevels     map[string]string    // Cache of access levels by "userName:serviceID"
 }
 
 // NewAWSIAMService creates a new AWS IAM service using default credentials
-func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
+func NewAWSIAMService(ctx context.Context, instance types.InstanceConfig) (*AWSIAMService, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
@@ -32,6 +34,7 @@ func NewAWSIAMService(ctx context.Context) (*AWSIAMService, error) {
 	return &AWSIAMService{
 		client:           iam.NewFromConfig(cfg),
 		ctx:              ctx,
+		instance:         instance,
 		provisionedUsers: make(map[string]*Identity),
 		accessLevels:     make(map[string]string),
 	}, nil
@@ -92,7 +95,7 @@ func (s *AWSIAMService) provisionUserInternal(userName string) (*Identity, error
 		fmt.Printf("👤 Creating user %s...\n", userName)
 		createUserOutput, err = s.client.CreateUser(s.ctx, &iam.CreateUserInput{
 			UserName: aws.String(userName),
-			Tags: []types.Tag{
+			Tags: []iamtypes.Tag{
 				{
 					Key:   aws.String("Purpose"),
 					Value: aws.String("CCC-Testing"),
@@ -473,8 +476,8 @@ func sanitizeForPolicyName(s string) string {
 }
 
 // Fill this later when we are writing tests for IAM
-func (s *AWSIAMService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
-	return []environment.TestParams{}, nil
+func (s *AWSIAMService) GetOrProvisionTestableResources() ([]types.TestParams, error) {
+	return []types.TestParams{}, nil
 }
 
 // CheckUserProvisioned is a no-op for IAM services (no service-specific validation needed)
@@ -493,4 +496,29 @@ func (s *AWSIAMService) ElevateAccessForInspection() error {
 func (s *AWSIAMService) ResetAccess() error {
 	// No-op: IAM services don't have network-level access controls to reset
 	return nil
+}
+
+// UpdateResourcePolicy is not applicable for IAM service
+func (s *AWSIAMService) UpdateResourcePolicy() error {
+	return nil
+}
+
+// TriggerDataWrite is not applicable for IAM service
+func (s *AWSIAMService) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not supported for IAM service")
+}
+
+// GetResourceRegion is not applicable for IAM service
+func (s *AWSIAMService) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not supported for IAM service")
+}
+
+// IsDataReplicatedToSeparateLocation is not applicable for IAM service
+func (s *AWSIAMService) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not supported for IAM service")
+}
+
+// GetReplicationStatus is not applicable for IAM service
+func (s *AWSIAMService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not supported for IAM service")
 }

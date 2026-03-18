@@ -1,0 +1,32 @@
+name: Azure Blob Immutability Policy Lock Check
+service_type: object-storage
+requirement_text: >
+  When an attempt is made to modify the retention policy for an object storage
+  bucket, the service MUST prevent the policy from being modified.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that an immutability policy is set on the Azure storage
+  container (bucket-equivalent) and that it is in a locked state.
+  Strengths:
+  - A locked immutability policy cannot be shortened or deleted
+  - Directly checks the container-level immutability configuration
+  Limitations:
+  - Requires the container name to be known; uses ResourceName as container
+  - Immutability must be applied at container level in Azure
+
+query: |
+  az storage container immutability-policy show \
+    --account-name ${AzureStorageAccount} \
+    --container-name ${ResourceName} \
+    --resource-group ${AzureResourceGroup} \
+    --output json
+
+rules:
+  - jsonpath: "$.properties.state"
+    expected_values:
+      - "Locked"
+    validation_rule: "^Locked$"
+    description: >
+      Verifies that the container immutability policy is in the Locked state,
+      preventing any modification or deletion of the retention configuration.

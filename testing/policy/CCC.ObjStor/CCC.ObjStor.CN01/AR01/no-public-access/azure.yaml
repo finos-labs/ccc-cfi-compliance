@@ -1,0 +1,31 @@
+name: Azure Blob Block Public Access Check
+service_type: object-storage
+requirement_text: >
+  The service MUST enforce access control so that only authorised identities
+  can read, list, write, or create objects and buckets.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that public blob access is disabled at the Azure storage
+  account level, preventing anonymous read access to containers and blobs.
+  Strengths:
+  - Checks account-level public access configuration
+  - Ensures all access requires Azure AD authentication or SAS tokens
+  Limitations:
+  - Does not audit individual RBAC role assignments
+
+query: |
+  az storage account show \
+    --name ${AzureStorageAccount} \
+    --resource-group ${AzureResourceGroup} \
+    --query "{allowBlobPublicAccess:allowBlobPublicAccess}" \
+    --output json
+
+rules:
+  - jsonpath: "$.allowBlobPublicAccess"
+    expected_values:
+      - false
+    validation_rule: "^false$"
+    description: >
+      Verifies that public blob access is disabled at the account level,
+      requiring authenticated access to all containers and blobs.

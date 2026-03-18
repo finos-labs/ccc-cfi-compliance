@@ -1,0 +1,38 @@
+name: AWS S3 Cross-Tenant Access Block
+service_type: object-storage
+requirement_text: >
+  When administrative access or configuration change is attempted on the service
+  or a child resource in a multi-tenant environment, the service MUST refuse
+  requests across tenant boundaries unless the origin is explicitly included
+  in a pre-approved allowlist.
+
+validity_score: 6
+validity_commentary: >
+  Cross-tenant (cross-account) access in S3 is granted via bucket policies
+  with Principal referencing another AWS account. This query extracts AWS
+  principals from the bucket policy and verifies each is in permitted-account-ids.
+  Strengths:
+  - Detects cross-account Principal elements in bucket policy
+  - Uses permitted-account-ids for explicit allowlist
+  Limitations:
+  - Cross-account access via IAM roles (assume-role) not checked here
+  - Principal.Service and Federated principals not analyzed
+  - Requires jq; consider IAM Access Analyzer for comprehensive review
+
+query: |
+  ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "unknown")
+  POLICY=$(aws s3api get-bucket-policy --bucket ${ResourceName} 2>/dev/null)
+  if [ -z "$POLICY" ]; then
+    echo '{"crossAccountPrincipals": []}'
+  else
+    ACCOUNTS=$(echo "$POLICY" | jq -r '.Policy | fromjson | .Statement[]? | .Principal.AWS? | if type == "string" then . else .[]? end | select(. != null)' 2>/dev/null | grep -oE 'arn:aws:iam::[0-9]+' | sed 's/arn:aws:iam:://' | sed 's/:.*//' | sort -u)
+    OTHER=$(echo "$ACCOUNTS" | while read acc; do [ -n "$acc" ] && [ "$acc" != "$ACCOUNT" ] && echo "$acc"; done)
+    echo "$OTHER" | jq -R -s 'split("\n") | map(select(length>0)) | {crossAccountPrincipals: .}' 2>/dev/null || echo '{"crossAccountPrincipals": []}'
+  fi
+
+rules:
+  - jsonpath: "$.crossAccountPrincipals"
+    expected_values: ["${PermittedAccountIds}"]
+    description: >
+      Validates that bucket policy principals from other accounts are in
+      permitted-account-ids. Empty permitted = no cross-account allowed.

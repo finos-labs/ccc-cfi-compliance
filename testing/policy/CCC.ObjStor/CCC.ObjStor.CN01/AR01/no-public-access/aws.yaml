@@ -1,0 +1,42 @@
+name: AWS S3 Block Public Access Check
+service_type: object-storage
+requirement_text: >
+  The service MUST enforce access control so that only authorised identities
+  can read, list, write, or create objects and buckets.
+
+validity_score: 9
+validity_commentary: >
+  This query validates that all four S3 Block Public Access settings are
+  enabled, preventing unauthenticated access to any objects in the bucket.
+  Strengths:
+  - Directly verifies the bucket-level public access block configuration
+  - Covers both ACL-based and policy-based public access routes
+  - Industry best practice for enforcing authenticated-only access
+  Limitations:
+  - Does not audit individual IAM policies granting specific user access
+
+query: |
+  aws s3api get-public-access-block \
+    --bucket ${ResourceName}
+
+rules:
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicAcls"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: Verifies that BlockPublicAcls is enabled.
+  - jsonpath: "$.PublicAccessBlockConfiguration.IgnorePublicAcls"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: Verifies that IgnorePublicAcls is enabled.
+  - jsonpath: "$.PublicAccessBlockConfiguration.BlockPublicPolicy"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: Verifies that BlockPublicPolicy is enabled.
+  - jsonpath: "$.PublicAccessBlockConfiguration.RestrictPublicBuckets"
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: Verifies that RestrictPublicBuckets is enabled.

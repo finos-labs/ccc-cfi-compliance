@@ -5,9 +5,18 @@ Feature: CCC.Core.CN05.AR06 - Block All Unauthorized Requests
   So that the principle of least privilege is enforced
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
+    And I call "{api}" with "GetServiceAPI" using argument "object-storage"
+    And I refer to "{result}" as "storage"
+    And I call "{api}" with "GetServiceAPI" using argument "iam"
+    And I refer to "{result}" as "iamService"
 
-  @Policy @CCC.ObjStor
+  @Destructive @Behavioural @object-storage
+  Scenario: Service prevents data read by user with no access
+    # This test already covered by CCC.ObjStor.CN01.AR01
+    Then no-op required
+  
+  @Policy @object-storage
   Scenario: All unauthorized requests are blocked
     # This control requires behavioral testing - comprehensive access testing
     # IAM policies enforce this at runtime

@@ -1,8 +1,17 @@
 package generic
 
 import (
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
+
+// ReplicationStatus represents replication configuration and sync status for object storage.
+// Used for CN08.AR01 (physically separate locations) and CN08.AR02 (status visibility).
+// Populated consistently across AWS, Azure, and GCP.
+type ReplicationStatus struct {
+	Locations  []string // Regions/locations where data is replicated (primary + replicas)
+	Status     string   // Replication health: "Enabled", "Syncing", "Healthy", "Degraded", "Disabled"
+	SyncStatus string   // Data sync state: "InSync", "Lagging", "Unknown"
+}
 
 // Service is the generic interface for cloud services
 // This interface can be extended in the future with common methods
@@ -11,7 +20,7 @@ type Service interface {
 
 	// For a given service type, return all the resources that can be tested within it,
 	// as a set of TestParams. If no resources exist, create default ones.
-	GetOrProvisionTestableResources() ([]environment.TestParams, error)
+	GetOrProvisionTestableResources() ([]types.TestParams, error)
 
 	// CheckUserProvisioned validates that the service's identity is properly provisioned
 	// and usable. Returns nil if the user is ready, error otherwise.
@@ -26,4 +35,25 @@ type Service interface {
 	// ResetAccess restores the original access permissions that were in place
 	// before ElevateAccessForInspection was called
 	ResetAccess() error
+
+	// UpdateResourcePolicy updates the resource's policy in a way that triggers logging
+	// without changing the policy's functional behavior.
+	// AWS: Modifies the SID field
+	// Azure: Changes the description
+	// GCP: Changes the description
+	UpdateResourcePolicy() error
+
+	// TriggerDataWrite performs a logged data modification (create/update/delete).
+	// Service-specific: object-storage creates/deletes an object; RDMS inserts a row; etc.
+	// Used for CN04.AR02 behavioural tests (data write logging verification).
+	TriggerDataWrite(resourceID string) error
+
+	// GetResourceRegion returns the region/availability zone of the resource.
+	// Used for CN06.AR01 (resource location compliance).
+	GetResourceRegion(resourceID string) (string, error)
+
+	// GetReplicationStatus returns replication/sync status for the resource.
+	// Used for CN08.AR01 (locations) and CN08.AR02 (status visibility).
+	// Object storage returns *types.ReplicationStatus; other services return nil with error.
+	GetReplicationStatus(resourceID string) (*ReplicationStatus, error)
 }

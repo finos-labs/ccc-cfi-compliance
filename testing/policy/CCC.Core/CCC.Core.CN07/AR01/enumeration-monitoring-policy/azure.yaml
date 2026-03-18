@@ -1,0 +1,23 @@
+name: Azure Storage Enumeration Monitoring Policy Check
+service_type: object-storage
+requirement_text: >
+  Enumeration activities must be monitored and generate events
+  that can be sent to monitored channels.
+
+validity_score: 9
+validity_commentary: >
+  This query validates monitoring configuration at the Azure Storage blob service level.
+
+query: |
+  az monitor diagnostic-settings list \
+    --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
+    --query "[0]" \
+    --output json
+
+rules:
+  - jsonpath: '$.logs[?(@.categoryGroup=="audit")].enabled'
+    expected_values:
+      - true
+    validation_rule: "^true$"
+    description: >
+      Verifies that diagnostic settings are configured to audit enumeration activities.

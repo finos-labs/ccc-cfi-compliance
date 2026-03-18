@@ -3,6 +3,7 @@ package objstorage
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -13,35 +14,36 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSS3Service implements Service for AWS S3
 type AWSS3Service struct {
-	client      *s3.Client
-	config      aws.Config
-	ctx         context.Context
-	cloudParams environment.CloudParams
+	client   *s3.Client
+	config   aws.Config
+	ctx      context.Context
+	instance types.InstanceConfig
 }
 
 // NewAWSS3Service creates a new AWS S3 service using default credentials
-func NewAWSS3Service(ctx context.Context, cloudParams environment.CloudParams) (*AWSS3Service, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
+func NewAWSS3Service(ctx context.Context, instance types.InstanceConfig) (*AWSS3Service, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(instance.Properties.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	return &AWSS3Service{
-		client:      s3.NewFromConfig(cfg),
-		config:      cfg,
-		ctx:         ctx,
-		cloudParams: cloudParams,
+		client:   s3.NewFromConfig(cfg),
+		config:   cfg,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
 // NewAWSS3ServiceWithCredentials creates a new AWS S3 service with specific credentials from an Identity
-func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment.CloudParams, identity *iam.Identity) (*AWSS3Service, error) {
+func NewAWSS3ServiceWithCredentials(ctx context.Context, instance types.InstanceConfig, identity *iam.Identity) (*AWSS3Service, error) {
 	// Extract credentials from the map
 	accessKeyID := identity.Credentials["access_key_id"]
 	secretAccessKey := identity.Credentials["secret_access_key"]
@@ -54,7 +56,7 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment
 	fmt.Printf("   Has Session Token: %v\n", sessionToken != "")
 
 	cfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(cloudParams.Region),
+		config.WithRegion(instance.Properties.Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKeyID,
 			secretAccessKey,
@@ -66,10 +68,10 @@ func NewAWSS3ServiceWithCredentials(ctx context.Context, cloudParams environment
 	}
 
 	return &AWSS3Service{
-		client:      s3.NewFromConfig(cfg),
-		config:      cfg,
-		ctx:         ctx,
-		cloudParams: cloudParams,
+		client:   s3.NewFromConfig(cfg),
+		config:   cfg,
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
@@ -106,7 +108,7 @@ func (s *AWSS3Service) ListBuckets() ([]Bucket, error) {
 func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	input := &s3.CreateBucketInput{
@@ -121,7 +123,7 @@ func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 	return &Bucket{
 		ID:     bucketID,
 		Name:   bucketID,
-		Region: s.cloudParams.Region,
+		Region: s.instance.Properties.Region,
 	}, nil
 }
 
@@ -129,7 +131,7 @@ func (s *AWSS3Service) CreateBucket(bucketID string) (*Bucket, error) {
 func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	_, err := regionalClient.DeleteBucket(s.ctx, &s3.DeleteBucketInput{
@@ -146,7 +148,7 @@ func (s *AWSS3Service) DeleteBucket(bucketID string) error {
 func (s *AWSS3Service) ListObjects(bucketID string) ([]Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.ListObjectsV2(s.ctx, &s3.ListObjectsV2Input{
@@ -217,7 +219,7 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 func (s *AWSS3Service) ReadObject(bucketID string, objectID string) (*Object, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
@@ -300,7 +302,7 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 	}
 
 	// Create a default test bucket
-	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(s.cloudParams.Region))
+	defaultBucketName := fmt.Sprintf("ccc-test-bucket-%s", strings.ToLower(s.instance.Properties.Region))
 	fmt.Printf("📦 No buckets found. Creating default test bucket: %s\n", defaultBucketName)
 
 	bucket, err := s.CreateBucket(defaultBucketName)
@@ -316,7 +318,7 @@ func (s *AWSS3Service) EnsureDefaultResourceExists(buckets []Bucket, err error) 
 func (s *AWSS3Service) GetBucketRetentionDurationDays(bucketID string) (int, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Get Object Lock configuration
@@ -350,7 +352,7 @@ func (s *AWSS3Service) GetBucketRetentionDurationDays(bucketID string) (int, err
 func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
 	// Create a regional client
 	regionalConfig := s.config.Copy()
-	regionalConfig.Region = s.cloudParams.Region
+	regionalConfig.Region = s.instance.Properties.Region
 	regionalClient := s3.NewFromConfig(regionalConfig)
 
 	// Get object retention
@@ -380,7 +382,7 @@ func (s *AWSS3Service) GetObjectRetentionDurationDays(bucketID string, objectID 
 // Returns two TestParams per bucket:
 // 1. PerService - for policy/configuration checks
 // 2. PerPort - for TLS/endpoint connectivity tests
-func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *AWSS3Service) GetOrProvisionTestableResources() ([]types.TestParams, error) {
 	// List all buckets and ensure at least one exists
 	buckets, err := s.EnsureDefaultResourceExists(s.ListBuckets())
 	if err != nil {
@@ -388,24 +390,24 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 	}
 
 	// Convert buckets to TestParams (2 per bucket: service + port)
-	resources := make([]environment.TestParams, 0, len(buckets)*2)
+	resources := make([]types.TestParams, 0, len(buckets)*2)
 	for _, bucket := range buckets {
 		// PerService: Resource-level tests (policy checks, configuration validation)
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ReportFile:          fmt.Sprintf("%s-service", bucket.Name),
 			ReportTitle:         bucket.Name,
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.ObjStor", "@PerService"},
-			CloudParams:         s.cloudParams,
+			CatalogTypes:        []string{"CCC.ObjStor"},
+			TagFilter:           []string{"@object-storage", "@PerService"},
+			Instance:            s.instance,
 		})
 
 		// PerPort: Endpoint-level tests (TLS/SSL, port connectivity)
-		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.cloudParams.Region)
-		resources = append(resources, environment.TestParams{
+		endpoint := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucket.Name, s.instance.Properties.Region)
+		resources = append(resources, types.TestParams{
 			ResourceName:        bucket.Name,
 			UID:                 bucket.ID,
 			ReportFile:          fmt.Sprintf("%s-port", bucket.Name),
@@ -415,9 +417,9 @@ func (s *AWSS3Service) GetOrProvisionTestableResources() ([]environment.TestPara
 			Protocol:            "https",
 			ProviderServiceType: "s3",
 			ServiceType:         "object-storage",
-			CatalogTypes:        []string{"CCC.ObjStor", "CCC.Core"},
-			TagFilter:           []string{"@CCC.Core", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
-			CloudParams:         s.cloudParams,
+			CatalogTypes:        []string{"CCC.ObjStor"},
+			TagFilter:           []string{"@object-storage", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
+			Instance:            s.instance,
 		})
 	}
 
@@ -498,4 +500,93 @@ func (s *AWSS3Service) SetBucketRetentionDurationDays(bucketID string, days int)
 func (s *AWSS3Service) ResetAccess() error {
 	// No-op: AWS S3 access is managed through IAM policies, not network access
 	return nil
+}
+
+// UpdateResourcePolicy updates the bucket policy to trigger logging without functional changes.
+// It fetches the existing policy and modifies the SID field with a timestamp to ensure the
+// policy is "changed" from CloudTrail's perspective while keeping the actual permissions intact.
+func (s *AWSS3Service) UpdateResourcePolicy() error {
+	// Get the first bucket to update
+	buckets, err := s.ListBuckets()
+	if err != nil {
+		return fmt.Errorf("failed to list buckets: %w", err)
+	}
+	if len(buckets) == 0 {
+		return fmt.Errorf("no buckets found to update policy")
+	}
+
+	bucketID := buckets[0].ID
+
+	// Get the existing bucket policy
+	getPolicyOutput, err := s.client.GetBucketPolicy(s.ctx, &s3.GetBucketPolicyInput{
+		Bucket: aws.String(bucketID),
+	})
+	if err != nil {
+		// If there's no policy, we can't do a no-op update
+		return fmt.Errorf("failed to get bucket policy (bucket may not have a policy): %w", err)
+	}
+
+	// Parse the existing policy
+	var policy map[string]interface{}
+	if err := json.Unmarshal([]byte(*getPolicyOutput.Policy), &policy); err != nil {
+		return fmt.Errorf("failed to parse bucket policy: %w", err)
+	}
+
+	// Update the SID in each statement with a timestamp suffix
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	if statements, ok := policy["Statement"].([]interface{}); ok {
+		for _, stmt := range statements {
+			if statement, ok := stmt.(map[string]interface{}); ok {
+				// Modify the SID - append or update timestamp
+				if sid, exists := statement["Sid"]; exists {
+					sidStr := fmt.Sprintf("%v", sid)
+					// Remove any existing timestamp suffix and add new one
+					if idx := strings.LastIndex(sidStr, "-ccc-"); idx != -1 {
+						sidStr = sidStr[:idx]
+					}
+					statement["Sid"] = sidStr + "-ccc-" + timestamp
+				} else {
+					statement["Sid"] = "CCCComplianceTest-" + timestamp
+				}
+			}
+		}
+	}
+
+	// Marshal the modified policy back to JSON
+	modifiedPolicy, err := json.Marshal(policy)
+	if err != nil {
+		return fmt.Errorf("failed to marshal modified policy: %w", err)
+	}
+
+	// Put the modified policy back
+	_, err = s.client.PutBucketPolicy(s.ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(bucketID),
+		Policy: aws.String(string(modifiedPolicy)),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update bucket policy: %w", err)
+	}
+
+	return nil
+}
+
+// TriggerDataWrite performs a data modification to trigger logging (CN04.AR02)
+func (s *AWSS3Service) TriggerDataWrite(resourceID string) error {
+	return fmt.Errorf("not yet implemented")
+}
+
+// GetResourceRegion returns the bucket region (CN06.AR01)
+func (s *AWSS3Service) GetResourceRegion(resourceID string) (string, error) {
+	return "", fmt.Errorf("not yet implemented")
+}
+
+// IsDataReplicatedToSeparateLocation checks replication (CN08.AR01)
+func (s *AWSS3Service) IsDataReplicatedToSeparateLocation(resourceID string) (bool, error) {
+	return false, fmt.Errorf("not yet implemented")
+}
+
+// GetReplicationStatus returns replication status including locations (CN08.AR01, CN08.AR02).
+// Populates ReplicationStatus with Locations (source + CRR destination regions), Status, SyncStatus.
+func (s *AWSS3Service) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("not yet implemented")
 }

@@ -5,10 +5,25 @@ Feature: CCC.Core.CN04.AR02 - Log Data Modification Attempts
   So that data changes are auditable
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
 
-  @Policy @CCC.ObjStor
-  Scenario: Data modification attempts are logged
-    # This control requires verifying that logging captures data modification events
-    # Covered by CN09.AR01 access logging configuration
-    Then no-op required
+  @Policy @object-storage
+  Scenario: Object storage data modification logging compliance
+    When I attempt policy check "data-write-logging" for control "CCC.Core.CN04" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
+  @Behavioural
+  Scenario: Verify data modifications are logged with identity and timestamp
+    Given I call "{api}" with "GetServiceAPI" using argument "{ServiceType}"
+    And I refer to "{result}" as "theService"
+    And I call "{api}" with "GetServiceAPI" using argument "logging"
+    And I refer to "{result}" as "loggingService"
+    When I call "{theService}" with "TriggerDataWrite" using argument "{ResourceName}"
+    And I attach "{result}" to the test output as "Data Write Trigger Result"
+    And we wait for a period of "10000" ms
+    Then I call "{loggingService}" with "QueryDataWriteLogs" using arguments "{ResourceName}" and "{20}"
+    And I refer to "{result}" as "dataLogs"
+    And I attach "{dataLogs}" to the test output as "Data Write Logs"
+    Then "{dataLogs}" is an array of objects with at least the following contents
+      | result    |
+      | Succeeded |

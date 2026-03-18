@@ -1,0 +1,52 @@
+instances:
+
+  - id: main-aws
+    properties:
+      provider: aws
+      region: us-east-1
+
+    rules:
+      permitted-regions: [us-east-1]
+      # CN05.AR03: AWS account IDs allowed for cross-account bucket access. Empty = none.
+      # Comma-separated, e.g. "123456789012,234567890123"
+      permitted-account-ids: ""
+
+    services:
+      - type: object-storage
+      - type: logging
+        aws-cloud-trail-log-group-name: cfi-test-log-group
+
+  - id: main-azure
+    properties:
+      provider: azure
+      region: eastus
+      azure-subscription-id: c1cedd8e-bf91-4d7d-a4cc-45700402a2a1
+      azure-resource-group: cfi_test
+
+    rules:
+      permitted-regions: [eastus]
+      # CN05.AR03: Storage accounts allowed as object replication destinations. Empty = none.
+      # Account names or full resource IDs, e.g. ["partner-dest", "/subscriptions/.../storageAccounts/partner-dest"]
+      permitted-destination-storage-accounts: []
+
+    services:
+      - type: object-storage
+        azure-storage-account: storagecfitesting2026
+      - type: logging 
+
+  - id: main-gcp
+    properties:
+      provider: gcp
+      region: us-central1
+      gcp-project-id: nodal-time-474015-p5
+
+    rules:
+      permitted-regions: [us-central1]
+      # CN05.AR03: GCP project IDs allowed for cross-project bucket access. Empty = none.
+      # Comma-separated, e.g. "partner-proj-1,partner-proj-2"
+      permitted-project-ids: ""
+
+    services:
+      - type: object-storage
+      - type: logging
+        gcp-log-bucket-name: cfi-test-log-bucket

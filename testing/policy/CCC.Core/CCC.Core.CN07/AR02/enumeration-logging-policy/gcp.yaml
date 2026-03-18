@@ -1,0 +1,19 @@
+name: GCP Cloud Storage Enumeration Logging Policy Check
+service_type: object-storage
+requirement_text: >
+  Enumeration activities must be logged.
+
+validity_score: 7
+validity_commentary: >
+  This query validates that bucket-level logging is enabled.
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.logging.logBucket"
+    expected_values: []
+    validation_rule: "^.+$"
+    description: >
+      Verifies that a log bucket is configured.

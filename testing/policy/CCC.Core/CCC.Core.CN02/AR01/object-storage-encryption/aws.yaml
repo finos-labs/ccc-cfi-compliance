@@ -18,7 +18,7 @@ validity_commentary: >
 
 query: |
   aws s3api get-bucket-encryption \
-    --bucket ${BUCKET_NAME}
+    --bucket ${ResourceName}
 
 rules:
   - jsonpath: "$.ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm"

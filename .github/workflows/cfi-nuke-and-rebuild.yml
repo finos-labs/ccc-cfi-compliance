@@ -15,164 +15,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ===========================================================================
-  # PHASE 1: Nuke all cloud resources
-  # ===========================================================================
-  nuke-resources:
-    runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 3
-      matrix:
-        platform:
-          - name: gcp
-            config: gcp-nuke-config.yaml
-            binary_url: https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz
-            binary_name: gcp-nuke
-          - name: aws
-            config: aws-nuke-config.yaml
-            binary_url: https://github.com/ekristen/aws-nuke/releases/download/v3.60.1/aws-nuke-v3.60.1-linux-amd64.tar.gz
-            binary_name: aws-nuke
-          - name: azure
-            config: azure-nuke-config.yaml
-            binary_url: https://github.com/ekristen/azure-nuke/releases/download/v1.2.3/azure-nuke-v1.2.3-linux-amd64.tar.gz
-            binary_name: azure-nuke
-      fail-fast: false
-
-    env:
-      PLATFORM: ${{ matrix.platform.name }}
-      DRY_RUN_FLAG: "--no-dry-run"
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials (OIDC)
-        if: matrix.platform.name == 'aws'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Configure Azure Credentials (OIDC)
-        if: matrix.platform.name == 'azure'
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Authenticate to Google Cloud (OIDC)
-        if: matrix.platform.name == 'gcp'
-        uses: google-github-actions/auth@v1
-        with:
-          token_format: "id_token"
-          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
-          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
-          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
-
-      - name: Install ${{ matrix.platform.name }}-nuke
-        run: |
-          echo "📦 Installing ${{ matrix.platform.binary_name }}..."
-          wget -q ${{ matrix.platform.binary_url }}
-          tar -xzf ${{ matrix.platform.binary_name }}-*.tar.gz || tar -xzf *.tar.gz
-          sudo mv ${{ matrix.platform.binary_name }} /usr/local/bin/${{ matrix.platform.binary_name }}
-          sudo chmod +x /usr/local/bin/${{ matrix.platform.binary_name }}
-          ${{ matrix.platform.binary_name }} --version
-          echo "✅ ${{ matrix.platform.binary_name }} installed successfully"
-
-      - name: Verify credentials - AWS
-        if: matrix.platform.name == 'aws'
-        run: |
-          echo "🔐 Verifying AWS credentials..."
-          aws sts get-caller-identity
-          echo "✅ AWS credentials verified"
-
-      - name: Verify credentials - Azure
-        if: matrix.platform.name == 'azure'
-        run: |
-          echo "🔐 Verifying Azure credentials..."
-          az account show
-          echo "✅ Azure credentials verified"
-
-      - name: Verify credentials - GCP
-        if: matrix.platform.name == 'gcp'
-        run: |
-          echo "🔐 Verifying GCP credentials..."
-          gcloud auth list
-          gcloud config get-value project
-          echo "✅ GCP credentials verified"
-
-      - name: Display nuke configuration
-        run: |
-          echo "📄 Using configuration from .github/workflows/nuke/${{ matrix.platform.config }}"
-          cat .github/workflows/nuke/${{ matrix.platform.config }}
-
-      - name: Run ${{ matrix.platform.name }}-nuke
-        continue-on-error: true
-        run: |
-          echo "💥 Running ${{ matrix.platform.binary_name }} to clean up resources..."
-          echo "⚠️  Resources will be DELETED (except those protected by filters)!"
-
-          if [ "${{ matrix.platform.name }}" = "gcp" ]; then
-            ${{ matrix.platform.binary_name }} run \
-              --config .github/workflows/nuke/${{ matrix.platform.config }} \
-              --project-id ${{ secrets.GCP_PROJECT_ID }} \
-              ${{ env.DRY_RUN_FLAG }} \
-              --no-prompt || true
-          elif [ "${{ matrix.platform.name }}" = "azure" ]; then
-            # Get OIDC token from GitHub Actions and write to file
-            FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
-            
-            if [ -z "$FEDERATED_TOKEN" ] || [ "$FEDERATED_TOKEN" = "null" ]; then
-              echo "❌ Error: Failed to retrieve OIDC token"
-              exit 1
-            fi
-            echo "✅ OIDC token retrieved"
-            echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
-            
-            ${{ matrix.platform.binary_name }} run \
-              --config .github/workflows/nuke/${{ matrix.platform.config }} \
-              --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
-              --client-id ${{ secrets.AZURE_CLIENT_ID }} \
-              --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
-              --client-federated-token-file /tmp/azure-federated-token.txt \
-              ${{ env.DRY_RUN_FLAG }} \
-              --force || true
-            
-            rm -f /tmp/azure-federated-token.txt
-          else
-            ${{ matrix.platform.binary_name }} run \
-              --config .github/workflows/nuke/${{ matrix.platform.config }} \
-              ${{ env.DRY_RUN_FLAG }} \
-              --force || true
-          fi
-
-          echo "✅ Nuke completed for ${{ matrix.platform.name }}"
-
-      - name: Save nuke output
-        if: always()
-        run: |
-          mkdir -p nuke-output
-          echo "Nuke run completed at $(date)" > nuke-output/${{ matrix.platform.name }}-nuke-log.txt
-          echo "Platform: ${{ matrix.platform.name }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
-          echo "Config: ${{ matrix.platform.config }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
-          echo "Workflow: ${{ github.workflow }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
-          echo "Run ID: ${{ github.run_id }}" >> nuke-output/${{ matrix.platform.name }}-nuke-log.txt
-
-      - name: Upload nuke results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuke-results-${{ matrix.platform.name }}
-          path: nuke-output/
-          retention-days: 30
-
-  # ===========================================================================
-  # PHASE 2: Prepare matrix for terraform rebuild
-  # ===========================================================================
   prepare-matrix:
-    needs: nuke-resources
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -196,10 +39,7 @@ jobs:
           echo "matrix={\"target\": $(echo "$matrix" | jq -c '.target')}" >> $GITHUB_OUTPUT
           echo "Generated matrix with $(echo "$matrix" | jq '.target | length') targets"
 
-  # ===========================================================================
-  # PHASE 3: Rebuild infrastructure with Terraform
-  # ===========================================================================
-  rebuild-infrastructure:
+  nuke-and-rebuild:
     needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
@@ -234,6 +74,9 @@ jobs:
           grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
           echo "✅ Environment variables loaded"
 
+      # =======================================================================
+      # Authentication
+      # =======================================================================
       - name: Configure AWS Credentials (OIDC)
         if: matrix.target.provider == 'aws'
         uses: aws-actions/configure-aws-credentials@v4
@@ -258,6 +101,70 @@ jobs:
           workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
           service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
 
+      # =======================================================================
+      # Nuke - Clean up existing resources for this provider
+      # =======================================================================
+      - name: Install nuke tool
+        run: |
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            BINARY_URL="https://github.com/ekristen/aws-nuke/releases/download/v3.60.1/aws-nuke-v3.60.1-linux-amd64.tar.gz"
+            BINARY_NAME="aws-nuke"
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            BINARY_URL="https://github.com/ekristen/azure-nuke/releases/download/v1.2.3/azure-nuke-v1.2.3-linux-amd64.tar.gz"
+            BINARY_NAME="azure-nuke"
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            BINARY_URL="https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz"
+            BINARY_NAME="gcp-nuke"
+          fi
+
+          echo "📦 Installing $BINARY_NAME..."
+          wget -q "$BINARY_URL"
+          tar -xzf *.tar.gz
+          sudo mv "$BINARY_NAME" /usr/local/bin/
+          sudo chmod +x /usr/local/bin/"$BINARY_NAME"
+          $BINARY_NAME --version
+          echo "✅ $BINARY_NAME installed"
+
+      - name: Run nuke
+        continue-on-error: true
+        run: |
+          echo "💥 Running nuke for $TARGET_PROVIDER..."
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            aws-nuke run \
+              --config .github/workflows/nuke/aws-nuke-config.yaml \
+              --no-dry-run \
+              --force || true
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            # Get OIDC token
+            FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+            
+            if [ -n "$FEDERATED_TOKEN" ] && [ "$FEDERATED_TOKEN" != "null" ]; then
+              echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
+              azure-nuke run \
+                --config .github/workflows/nuke/azure-nuke-config.yaml \
+                --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
+                --client-id ${{ secrets.AZURE_CLIENT_ID }} \
+                --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+                --client-federated-token-file /tmp/azure-federated-token.txt \
+                --no-dry-run \
+                --force || true
+              rm -f /tmp/azure-federated-token.txt
+            fi
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            gcp-nuke run \
+              --config .github/workflows/nuke/gcp-nuke-config.yaml \
+              --project-id ${{ secrets.GCP_PROJECT_ID }} \
+              --no-dry-run \
+              --no-prompt || true
+          fi
+
+          echo "✅ Nuke completed for $TARGET_PROVIDER"
+
+      # =======================================================================
+      # Rebuild - Terraform apply
+      # =======================================================================
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -266,10 +173,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "🚀 Deploying module: $TARGET_NAME (id: $TARGET_ID)"
+          echo "🚀 Deploying: $TARGET_NAME (id: $TARGET_ID)"
           echo "📁 Path: $TARGET_PATH"
           echo "☁️  Provider: $TARGET_PROVIDER"
-          echo "🔧 Service: $TARGET_SERVICE"
 
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
 
@@ -286,21 +192,28 @@ jobs:
             terraform apply -auto-approve -input=false
           fi
 
-          echo "✅ Terraform apply completed successfully for $TARGET_ID"
+          echo "✅ Terraform apply completed for $TARGET_ID"
 
-      - name: Save rebuild output
+      # =======================================================================
+      # Save results
+      # =======================================================================
+      - name: Save output
         if: always()
         run: |
-          mkdir -p rebuild-output
-          echo "Rebuild completed at $(date)" > rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
-          echo "Target: ${{ matrix.target.id }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
-          echo "Provider: ${{ matrix.target.provider }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
-          echo "Terraform outcome: ${{ steps.terraform-apply.outcome }}" >> rebuild-output/${{ matrix.target.id }}-rebuild-log.txt
+          mkdir -p output
+          cat > output/${{ matrix.target.id }}-log.txt << EOF
+          Nuke and Rebuild completed at $(date)
+          Target: ${{ matrix.target.id }}
+          Provider: ${{ matrix.target.provider }}
+          Terraform outcome: ${{ steps.terraform-apply.outcome }}
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          EOF
 
-      - name: Upload rebuild results
+      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rebuild-results-${{ matrix.target.id }}
-          path: rebuild-output/
+          name: nuke-rebuild-${{ matrix.target.id }}
+          path: output/
           retention-days: 30

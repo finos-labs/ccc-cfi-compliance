@@ -16,7 +16,7 @@ validity_commentary: >
 query: |
   gcloud network-security server-tls-policies describe ${ResourceName} \
     --location=global \
-    --project=${GCPProjectID} \
+    --project=${GcpProjectId} \
     --format=json
 
 rules:

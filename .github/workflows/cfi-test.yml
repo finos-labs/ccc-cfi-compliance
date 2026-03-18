@@ -58,6 +58,8 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       OUTPUT_DIR: results
       PROWLER_BRANCH: master
+      RUN_PROWLER: ${{ contains(matrix.target.test-frameworks || fromJson('[]'), 'prowler') }}
+      RUN_CFI: ${{ contains(matrix.target.test-frameworks || fromJson('[]'), 'cfi') }}
       TARGET_ID: ${{ matrix.target.id }}
       TARGET_NAME: ${{ matrix.target.name }}
       TARGET_PATH: ${{ matrix.target.path }}
@@ -120,6 +122,7 @@ jobs:
           echo "✅ testssl.sh installed"
 
       - name: Cache Python Poetry virtualenv
+        if: env.RUN_PROWLER == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -130,6 +133,7 @@ jobs:
           restore-keys: prowler-
 
       - name: Install Prowler and Python deps
+        if: env.RUN_PROWLER == 'true'
         run: |
           git clone -b ${{ env.PROWLER_BRANCH }} --single-branch https://github.com/prowler-cloud/prowler
           cd prowler
@@ -137,6 +141,7 @@ jobs:
           poetry install
 
       - name: Run Prowler Scan
+        if: env.RUN_PROWLER == 'true'
         id: prowler-scan
         continue-on-error: true
         run: |
@@ -157,8 +162,8 @@ jobs:
           echo "✅ Prowler scan completed for $TARGET_ID"
 
       - name: Modify Prowler metadata
+        if: always() && env.RUN_PROWLER == 'true'
         id: modify-prowler-metadata
-        if: always()
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -179,6 +184,7 @@ jobs:
           echo "✅ Prowler metadata modifications completed"
 
       - name: Run Compliance Tests
+        if: env.RUN_CFI == 'true'
         id: compliance-tests
         continue-on-error: true
         run: |
@@ -189,20 +195,21 @@ jobs:
 
           chmod +x run-compliance-tests.sh
 
-          # Build command with provider-specific parameters
-          if [ "$TARGET_PROVIDER" = "aws" ]; then
-            ./run-compliance-tests.sh --provider aws --output "output" --region "$AWS_REGION"
-          elif [ "$TARGET_PROVIDER" = "azure" ]; then
-            ./run-compliance-tests.sh --provider azure --output "output" \
-              --region "$TF_VAR_location" \
-              --azure-subscription-id "${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              --azure-resource-group "$TF_VAR_resource_group_name" \
-              --azure-storage-account "$TF_VAR_storage_account_name"
-          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
-            ./run-compliance-tests.sh --provider gcp --output "output" \
-              --region "$TF_VAR_gcp_region" \
-              --gcp-project-id "${{ secrets.GCP_PROJECT_ID }}"
-          fi
+          # Map provider to instance ID (from environment.yaml)
+          case "$TARGET_PROVIDER" in
+            aws)   INSTANCE_ID="main-aws" ;;
+            azure) INSTANCE_ID="main-azure" ;;
+            gcp)   INSTANCE_ID="main-gcp" ;;
+            *)     echo "❌ Unknown provider: $TARGET_PROVIDER"; exit 1 ;;
+          esac
+
+          # Map config service to compliance service type (storage → object-storage)
+          case "$TARGET_SERVICE" in
+            storage) SERVICE_TYPE="object-storage" ;;
+            *)       SERVICE_TYPE="$TARGET_SERVICE" ;;
+          esac
+
+          ./run-compliance-tests.sh --instance "$INSTANCE_ID" --service "$SERVICE_TYPE" --output "output"
 
           echo "✅ Compliance tests completed for $TARGET_ID"
 
@@ -212,25 +219,28 @@ jobs:
           # Create output directory
           mkdir -p ${{ env.OUTPUT_DIR }}
 
-          # Copy Prowler OCSF results
-          cd "$GITHUB_WORKSPACE/prowler/output"
-
-          if [ -f "scan-modified.ocsf.json" ]; then
-            cp "scan-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-prowler.ocsf.json"
-            echo "✅ Successfully captured Prowler output for $TARGET_ID"
-          else
-            echo "⚠️  No Prowler OCSF file found for $TARGET_ID"
+          # Copy Prowler OCSF results (if Prowler was run)
+          if [ "${{ env.RUN_PROWLER }}" = "true" ]; then
+            cd "$GITHUB_WORKSPACE/prowler/output"
+            if [ -f "scan-modified.ocsf.json" ]; then
+              cp "scan-modified.ocsf.json" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-prowler.ocsf.json"
+              echo "✅ Successfully captured Prowler output for $TARGET_ID"
+            else
+              echo "⚠️  No Prowler OCSF file found for $TARGET_ID"
+            fi
           fi
 
-          # Copy all compliance test results (HTML reports and OCSF JSON)
-          cd "$GITHUB_WORKSPACE/testing/output"
-          if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
-            for f in *.ocsf.json *.html; do
-              [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
-            done
-            echo "✅ Successfully captured compliance test output for $TARGET_ID"
-          else
-            echo "⚠️  No compliance test output files found for $TARGET_ID"
+          # Copy compliance test results (if CFI tests were run)
+          if [ "${{ env.RUN_CFI }}" = "true" ]; then
+            cd "$GITHUB_WORKSPACE/testing/output"
+            if ls *.ocsf.json *.html 2>/dev/null | head -1 > /dev/null; then
+              for f in *.ocsf.json *.html; do
+                [ -f "$f" ] && cp "$f" "../../${{ env.OUTPUT_DIR }}/${TARGET_ID}-${f}"
+              done
+              echo "✅ Successfully captured compliance test output for $TARGET_ID"
+            else
+              echo "⚠️  No compliance test output files found for $TARGET_ID"
+            fi
           fi
 
       - name: Upload test results
