@@ -28,3 +28,14 @@ func IsAzureCredentialPropagationError(err error) bool {
 		strings.Contains(msg, "invalid_client") ||
 		strings.Contains(msg, "unauthorized_client")
 }
+
+// IsAzureGraphAuthorizationDeniedError returns true for Microsoft Graph API
+// 403 Authorization_RequestDenied, which can occur when Graph API permissions
+// have not yet propagated after being granted (similar to RBAC propagation).
+func IsAzureGraphAuthorizationDeniedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "403") && strings.Contains(msg, "Authorization_RequestDenied")
+}

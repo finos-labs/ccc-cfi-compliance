@@ -520,6 +520,12 @@ func (s *AzureIAMService) GetReplicationStatus(resourceID string) (*generic.Repl
 // Microsoft Graph API helper methods
 
 func (s *AzureIAMService) callGraphAPI(method, endpoint string, body interface{}) (map[string]interface{}, error) {
+	return retry.Do(3, 30*time.Second, func() (map[string]interface{}, error) {
+		return s.callGraphAPIOnce(method, endpoint, body)
+	}, retry.IsAzureGraphAuthorizationDeniedError)
+}
+
+func (s *AzureIAMService) callGraphAPIOnce(method, endpoint string, body interface{}) (map[string]interface{}, error) {
 	graphURL := "https://graph.microsoft.com/v1.0" + endpoint
 
 	var reqBody io.Reader
