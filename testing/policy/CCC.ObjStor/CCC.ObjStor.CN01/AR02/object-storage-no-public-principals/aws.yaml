@@ -1,0 +1,47 @@
+name: S3 Bucket Policy No Public Principal
+service_type: object-storage
+requirement_text: >
+  All unauthorized requests MUST be blocked. Bucket policy MUST NOT allow
+  Principal "*" or equivalent public principal in Allow statements.
+
+validity_score: 7
+validity_commentary: >
+  ObjStor.CN01.AR01 already validates no-public-access. This check validates
+  that the bucket policy does not contain Allow statements with Principal "*"
+  or Principal.AWS "*", which would grant public access. No bucket policy
+  (empty) passes.
+  Strengths:
+  - Detects policy statements that would grant public access
+  - Complements Block Public Access as defense in depth
+  Limitations:
+  - Does not validate IAM policies for principle of least privilege
+  - Requires jq for policy parsing
+  - Behavioral testing verifies unauthorized access is blocked at runtime
+
+query: |
+  POLICY=$(aws s3api get-bucket-policy --bucket ${ResourceName} 2>/dev/null || echo "")
+  if [ -z "$POLICY" ]; then
+    echo '{"hasPublicPrincipal": false}'
+  else
+    FOUND=$(echo "$POLICY" | jq -r '
+      .Policy | fromjson | .Statement[]? | select(.Effect == "Allow") | .Principal |
+      if type == "string" then (if . == "*" then "yes" else "no" end)
+      elif .AWS != null then (
+        if (.AWS | type) == "string" then (if .AWS == "*" then "yes" else "no" end)
+        elif (.AWS | type) == "array" then (if ([.AWS[] | select(. == "*")] | length) > 0 then "yes" else "no" end)
+        else "no" end
+      )
+      else "no" end
+    ' 2>/dev/null | grep -q "yes" && echo "true" || echo "false")
+    echo "{\"hasPublicPrincipal\": $FOUND}"
+  fi
+
+rules:
+  - jsonpath: "$.hasPublicPrincipal"
+    expected_values:
+      - false
+    validation_rule: "^false$"
+    description: >
+      Validates that no Allow statement in the bucket policy grants access
+      to Principal "*" or Principal.AWS "*". Access must be explicitly
+      granted to specific IAM principals only.

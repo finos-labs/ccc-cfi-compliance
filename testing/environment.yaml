@@ -13,6 +13,8 @@ instances:
 
     services:
       - type: object-storage
+        # CN04.AR02: Minimum retention period in days for policy checks
+        object-storage-retention-period-days: 2
       - type: logging
         aws-cloud-trail-log-group-name: cfi-test-log-group
 
@@ -32,6 +34,8 @@ instances:
     services:
       - type: object-storage
         azure-storage-account: storagecfitesting2026
+        # CN04.AR02: Minimum immutability period in days for policy checks (matches TF)
+        object-storage-retention-period-days: 2
       - type: logging 
 
   - id: main-gcp
@@ -48,5 +52,7 @@ instances:
 
     services:
       - type: object-storage
+        # CN04.AR02: Minimum retention period in seconds for policy checks (2 days)
+        object-storage-retention-period-seconds: 172800
       - type: logging
         gcp-log-bucket-name: cfi-test-log-bucket

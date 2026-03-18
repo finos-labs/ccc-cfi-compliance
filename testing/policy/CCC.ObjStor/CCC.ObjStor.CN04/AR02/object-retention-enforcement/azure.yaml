@@ -7,8 +7,8 @@ requirement_text: >
 validity_score: 9
 validity_commentary: >
   This query validates that a locked immutability policy is in place on the
-  Azure storage container, preventing deletion or modification of blobs during
-  the retention period.
+  Azure storage container, preventing deletion or modification of blobs
+  during the retention period.
   Strengths:
   - A Locked immutability policy cannot be shortened or removed
   - Directly verifies the policy state and period
@@ -16,10 +16,8 @@ validity_commentary: >
   - Must be configured at the container level in Azure
 
 query: |
-  az storage container immutability-policy show \
-    --account-name ${AzureStorageAccount} \
-    --container-name ${ResourceName} \
-    --resource-group ${AzureResourceGroup} \
+  az resource show \
+    --ids "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default/containers/${ResourceName}/immutabilityPolicies/default" \
     --output json
 
 rules:
@@ -31,8 +29,8 @@ rules:
       Verifies that the immutability policy is locked, enforcing retention
       and preventing blob deletion or modification before the period expires.
   - jsonpath: "$.properties.immutabilityPeriodSinceCreationInDays"
-    expected_values: []
-    validation_rule: "^[1-9][0-9]*$"
+    expected_values:
+      - "${ObjectStorageRetentionPeriodDays}"
     description: >
-      Verifies that the immutability period is a positive number of days,
+      Verifies that the immutability period meets the configured minimum (days),
       confirming objects are actively protected from modification or deletion.

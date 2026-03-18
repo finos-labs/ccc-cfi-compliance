@@ -75,19 +75,24 @@ module "storage_account" {
   # on new storage accounts. We skip diagnostic_settings_blob to avoid 409 Conflict (same sink).
   # If not auto-created, add diagnostic_settings_blob with a dedicated workspace.
 
-  # Create default container with immutability policy (CN04 tests - 3 day retention)
+  # Create default container with immutable storage (CN04 tests - retention policy added below)
   containers = {
     ccc-test-container = {
-      name                  = "ccc-test-container"
-      container_access_type = "private"
-      
-      # Time-based retention policy for WORM compliance (CCC.ObjStor.CN03.AR02)
-      immutability_policy = {
-        immutability_period_in_days = 3
-        policy_mode                  = "Locked"   # Required for policy; irreversible until period expires
+      name     = "ccc-test-container"
+      public_access = "None"
+      immutable_storage_with_versioning = {
+        enabled = true  # Required before immutability policy can be set
       }
     }
   }
+}
+
+# Container-level immutability policy (CN04.AR02 - object retention enforcement)
+# Must be separate from module; AVM module does not support immutability_policy on containers.
+resource "azurerm_storage_container_immutability_policy" "ccc_test_container" {
+  storage_container_resource_manager_id = module.storage_account.containers["ccc-test-container"].id
+  immutability_period_in_days            = 2
+  locked                                 = true
 }
 
 # Enable read, write, delete logging for blob service (Storage Analytics)
