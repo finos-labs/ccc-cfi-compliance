@@ -30,7 +30,7 @@ Feature: CCC.ObjStor.CN02.AR02 - Uniform Bucket-Level Access (Consistent Deny)
     When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object.txt"
     Then "{result}" is an error
 
-  @Policy @object-storage
+  @Policy @Duplicate @object-storage
   Scenario: Uniform bucket-level access prevents object-level deny overrides
     # Policy check already performed by CCC.ObjStor.CN02.AR01 (uniform-bucket-level-access)
     Then no-op required

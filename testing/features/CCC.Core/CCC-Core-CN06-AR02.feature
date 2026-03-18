@@ -7,15 +7,14 @@ Feature: CCC.Core.CN06.AR02 - Child Resource Location Compliance
   Background:
     Given a cloud api for "{Instance}" in "api"
 
-  @Behavioural @object-storage
-  Scenario: Child resource region compliance cannot be tested separately
-    # Child resources (e.g., objects in a bucket) inherit region from parent in most
-    # cloud services. The parent resource region check in CN06.AR01 covers this.
-    # Separate automated verification would require enumerating all child resource types
-    # and their region inheritance - which varies by provider and resource type.
-    #
-    # Manual verification steps:
-    # 1. Identify child resources (objects, etc.) under parent (bucket, etc.)
-    # 2. Verify child resources inherit parent region
-    # 3. Confirm no child resources exist in non-approved regions
+  @Behavioural @NotTestable @object-storage
+  Scenario: Child resource region compliance
+    # Child resources (e.g., objects in a bucket) inherit region from parent.
     Then no-op required
+
+  @Policy @NotTestable @object-storage
+  Scenario: Child resource region compliance
+    # Child resources (e.g., objects in a bucket) inherit region from parent.
+    Then no-op required
+
+  

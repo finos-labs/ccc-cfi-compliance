@@ -1,0 +1,31 @@
+name: GCP Cloud Storage IAM in Use
+service_type: object-storage
+requirement_text: >
+  All unauthorized requests MUST be blocked. Access MUST be controlled by IAM.
+
+validity_score: 7
+validity_commentary: >
+  ObjStor.CN01.AR01 already validates no-public-access. This check validates
+  that IAM bindings exist on the bucket, proving access control is identity-based
+  rather than public. At least one binding indicates IAM is in use.
+  Strengths:
+  - Confirms IAM is configured for the bucket
+  - Bindings scope access to specific identities (user, group, service account)
+  Limitations:
+  - Does not validate least-privilege bindings
+  - Inherited project-level bindings may not appear in bucket policy
+  - Behavioral testing verifies unauthorized access is blocked at runtime
+
+query: |
+  POLICY=$(gcloud storage buckets get-iam-policy gs://${ResourceName} --format=json 2>/dev/null || echo "{}")
+  COUNT=$(echo "$POLICY" | jq -r '.bindings | length' 2>/dev/null || echo "0")
+  echo "{\"iamInUse\": $COUNT}"
+
+rules:
+  - jsonpath: "$.iamInUse"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      Validates that at least one IAM binding exists on the bucket. IAM is
+      the required access control mechanism; no bindings indicates access
+      may not be properly scoped.

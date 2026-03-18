@@ -53,10 +53,12 @@ Feature: CCC.Core.CN01.AR03
   Scenario: Object storage policy prevents the use of unencrypted ports
     # Policy check already performed by CCC.Core.CN01.AR01 (object-storage-tls-policy)
     # This check specifically validates that unencrypted HTTP is blocked or redirected.
-    Then no-op required
+    When I attempt policy check "object-storage-unencrypted-policy" for control "CCC.Core.CN01" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
 
   @Policy @PerService @load-balancer
   Scenario: Load balancer policy prevents the use of unencrypted ports
     # Policy check already performed by CCC.Core.CN01.AR01 (load-balancer-tls-policy)
     # This check specifically validates that unencrypted HTTP is blocked or redirected.
-    Then no-op required
+    When I attempt policy check "load-balancer-unencrypted-policy" for control "CCC.Core.CN01" assessment requirement "AR03" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

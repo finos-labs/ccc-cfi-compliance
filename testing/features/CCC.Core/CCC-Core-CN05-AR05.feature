@@ -7,8 +7,9 @@ Feature: CCC.Core.CN05.AR05 - Hide Service Existence from External Requests
   Background:
     Given a cloud api for "{Instance}" in "api"
 
-  @Policy @object-storage
+  @Policy @NotTested @object-storage
   Scenario: External requests do not reveal service existence
-    # This control requires behavioral testing - verifying error responses
-    # Network configuration and WAF rules enforce this at runtime
+    # This is unsupported by the policy engine - all cloud accounts will
+    # return a 403 Forbidden error if an attacker correctly guesses the 
+    # account / bucket / blob names.
     Then no-op required

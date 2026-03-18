@@ -16,12 +16,14 @@ import (
 
 // SummaryResult represents a single scenario result for the summary report
 type SummaryResult struct {
-	Control     string
-	Scenario    string
-	IsPolicy    bool
-	Outcome     string // "PASSING", "FAILING", "NO-OP"
-	hasNoOpStep bool
-	failed      bool
+	Control      string
+	Scenario     string
+	ScenarioName string // Scenario with exclusion tag suffix (e.g. "Name - NotTestable")
+	Badge        string // .e.g., "Not Testable"
+	IsPolicy     bool
+	Outcome      string // "PASSING", "FAILING" - same logic as OCSF
+	exclusionTag string // NotTested, NotTestable, Duplicate
+	failed       bool
 }
 
 // summaryCollector holds all results for the summary report
@@ -36,9 +38,9 @@ var controlPattern = "CCC."
 
 // SummaryFormatter is a godog formatter that collects results for a summary report
 type SummaryFormatter struct {
-	out           io.Writer
+	out            io.Writer
 	currentFeature string
-	currentResult *SummaryResult
+	currentResult  *SummaryResult
 }
 
 // Feature captures feature information (control ID)
@@ -61,22 +63,20 @@ func (f *SummaryFormatter) Pickle(pickle *messages.Pickle) {
 
 	// Determine Policy vs Behavioural from tags
 	isPolicy := false
+	exclusionTag := ""
 	for _, tag := range pickle.Tags {
 		if tag.Name == "@Policy" {
 			isPolicy = true
-			break
+		} else if tag.Name == "@NotTested" {
+			exclusionTag = "NotTested"
+		} else if tag.Name == "@NotTestable" {
+			exclusionTag = "NotTestable"
+		} else if tag.Name == "@Duplicate" {
+			exclusionTag = "Duplicate"
 		}
-		// Default to Behavioural if @Behavioural or neither
 	}
 
-	// Check if scenario has "no-op required" step
-	hasNoOpStep := false
-	for _, step := range pickle.Steps {
-		if strings.Contains(strings.ToLower(step.Text), "no-op required") {
-			hasNoOpStep = true
-			break
-		}
-	}
+	scenarioName := pickle.Name
 
 	control := f.currentFeature
 	if control == "" {
@@ -91,10 +91,13 @@ func (f *SummaryFormatter) Pickle(pickle *messages.Pickle) {
 	}
 
 	f.currentResult = &SummaryResult{
-		Control:     control,
-		Scenario:    pickle.Name,
-		IsPolicy:    isPolicy,
-		hasNoOpStep: hasNoOpStep,
+		Control:      control,
+		Scenario:     pickle.Name,
+		ScenarioName: scenarioName,
+		Badge:        exclusionTag,
+		IsPolicy:     isPolicy,
+
+		exclusionTag: exclusionTag,
 	}
 }
 
@@ -104,18 +107,25 @@ func (f *SummaryFormatter) finalizeResult() {
 	}
 	r := f.currentResult
 	outcome := "PASSING"
-	if r.failed {
+	switch r.exclusionTag {
+	case "NotTested":
 		outcome = "FAILING"
-	} else if r.hasNoOpStep {
-		outcome = "NO-OP"
+	case "NotTestable", "Duplicate":
+		outcome = "PASSING"
+	default:
+		if r.failed {
+			outcome = "FAILING"
+		}
 	}
 
 	summaryCollector.mu.Lock()
 	summaryCollector.results = append(summaryCollector.results, SummaryResult{
-		Control:  r.Control,
-		Scenario: r.Scenario,
-		IsPolicy: r.IsPolicy,
-		Outcome:  outcome,
+		Control:      r.Control,
+		Scenario:     r.Scenario,
+		ScenarioName: r.ScenarioName,
+		IsPolicy:     r.IsPolicy,
+		Badge:        r.Badge,
+		Outcome:      outcome,
 	})
 	summaryCollector.mu.Unlock()
 
@@ -136,7 +146,8 @@ func (f *SummaryFormatter) Summary() {
 }
 
 // Defined is required by the formatters.Formatter interface
-func (f *SummaryFormatter) Defined(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {}
+func (f *SummaryFormatter) Defined(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {
+}
 
 // Passed is required by the formatters.Formatter interface
 func (f *SummaryFormatter) Passed(pickle *messages.Pickle, step *messages.PickleStep, def *formatters.StepDefinition) {
@@ -179,13 +190,15 @@ func NewSummaryFormatter(suite string, out io.Writer) formatters.Formatter {
 
 // SummaryData holds the aggregated summary for report generation
 type SummaryData struct {
-	Control               string
-	PassingPolicy         []string
-	FailingPolicy         []string
-	NoOpPolicy            []string
-	PassingBehavioural    []string
-	FailingBehavioural    []string
-	NoOpBehavioural      []string
+	Control                  string
+	PassingPolicy            []string
+	PassingPolicyBadges      []string
+	FailingPolicy            []string
+	FailingPolicyBadges      []string
+	PassingBehavioural       []string
+	PassingBehaviouralBadges []string
+	FailingBehavioural       []string
+	FailingBehaviouralBadges []string
 }
 
 // GenerateSummaryReport produces summary.html and prints to the console.
@@ -207,19 +220,23 @@ func GenerateSummaryReport(outputDir string) error {
 			byControl[r.Control] = &SummaryData{Control: r.Control}
 		}
 		d := byControl[r.Control]
+		scenarioName := r.ScenarioName
+		if scenarioName == "" {
+			scenarioName = r.Scenario
+		}
 		switch {
 		case r.IsPolicy && r.Outcome == "PASSING":
-			d.PassingPolicy = append(d.PassingPolicy, r.Scenario)
+			d.PassingPolicy = append(d.PassingPolicy, scenarioName)
+			d.PassingPolicyBadges = append(d.PassingPolicyBadges, r.Badge)
 		case r.IsPolicy && r.Outcome == "FAILING":
-			d.FailingPolicy = append(d.FailingPolicy, r.Scenario)
-		case r.IsPolicy && r.Outcome == "NO-OP":
-			d.NoOpPolicy = append(d.NoOpPolicy, r.Scenario)
+			d.FailingPolicy = append(d.FailingPolicy, scenarioName)
+			d.FailingPolicyBadges = append(d.FailingPolicyBadges, r.Badge)
 		case !r.IsPolicy && r.Outcome == "PASSING":
-			d.PassingBehavioural = append(d.PassingBehavioural, r.Scenario)
+			d.PassingBehavioural = append(d.PassingBehavioural, scenarioName)
+			d.PassingBehaviouralBadges = append(d.PassingBehaviouralBadges, r.Badge)
 		case !r.IsPolicy && r.Outcome == "FAILING":
-			d.FailingBehavioural = append(d.FailingBehavioural, r.Scenario)
-		case !r.IsPolicy && r.Outcome == "NO-OP":
-			d.NoOpBehavioural = append(d.NoOpBehavioural, r.Scenario)
+			d.FailingBehavioural = append(d.FailingBehavioural, scenarioName)
+			d.FailingBehaviouralBadges = append(d.FailingBehaviouralBadges, r.Badge)
 		}
 	}
 
@@ -262,7 +279,11 @@ func generateSummaryHTML(controls []string, byControl map[string]*SummaryData) s
         .failing { background: #ffebee; }
         .noop { background: #fff8e1; }
         .cell-list { margin: 0; padding-left: 16px; }
-        .cell-list li { margin: 2px 0; }
+        .cell-list li { margin: 4px 0; }
+        .badge { display: inline-block; padding: 4px 10px; margin: 2px 0; border-radius: 12px;
+            font-size: 0.9em; font-weight: 500; }
+        .badge-passing { background: #c8e6c9; color: #2e7d32; border: 1px solid #81c784; }
+        .badge-failing { background: #ffcdd2; color: #c62828; border: 1px solid #e57373; }
     </style>
 </head>
 <body>
@@ -274,10 +295,8 @@ func generateSummaryHTML(controls []string, byControl map[string]*SummaryData) s
                     <th>Control</th>
                     <th class="passing">PASSING @Policy</th>
                     <th class="failing">FAILING @Policy</th>
-                    <th class="noop">NO-OP @Policy</th>
                     <th class="passing">PASSING @Behavioural</th>
                     <th class="failing">FAILING @Behavioural</th>
-                    <th class="noop">NO-OP @Behavioural</th>
                 </tr>
             </thead>
             <tbody>
@@ -286,12 +305,10 @@ func generateSummaryHTML(controls []string, byControl map[string]*SummaryData) s
 		d := byControl[ctrl]
 		buf.WriteString("                <tr>\n")
 		buf.WriteString(fmt.Sprintf("                    <td><strong>%s</strong></td>\n", escapeHTML(ctrl)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"passing\">%s</td>\n", scenarioListHTML(d.PassingPolicy)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"failing\">%s</td>\n", scenarioListHTML(d.FailingPolicy)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"noop\">%s</td>\n", scenarioListHTML(d.NoOpPolicy)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"passing\">%s</td>\n", scenarioListHTML(d.PassingBehavioural)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"failing\">%s</td>\n", scenarioListHTML(d.FailingBehavioural)))
-		buf.WriteString(fmt.Sprintf("                    <td class=\"noop\">%s</td>\n", scenarioListHTML(d.NoOpBehavioural)))
+		buf.WriteString(fmt.Sprintf("                    <td class=\"passing\">%s</td>\n", scenarioListHTML(d.PassingPolicy, d.PassingPolicyBadges, "passing")))
+		buf.WriteString(fmt.Sprintf("                    <td class=\"failing\">%s</td>\n", scenarioListHTML(d.FailingPolicy, d.FailingPolicyBadges, "failing")))
+		buf.WriteString(fmt.Sprintf("                    <td class=\"passing\">%s</td>\n", scenarioListHTML(d.PassingBehavioural, d.PassingBehaviouralBadges, "passing")))
+		buf.WriteString(fmt.Sprintf("                    <td class=\"failing\">%s</td>\n", scenarioListHTML(d.FailingBehavioural, d.FailingBehaviouralBadges, "failing")))
 		buf.WriteString("                </tr>\n")
 	}
 	buf.WriteString(`            </tbody>
@@ -302,15 +319,20 @@ func generateSummaryHTML(controls []string, byControl map[string]*SummaryData) s
 	return buf.String()
 }
 
-func scenarioListHTML(scenarios []string) string {
+func scenarioListHTML(scenarios []string, badges []string, badgeType string) string {
 	if len(scenarios) == 0 {
 		return "—"
 	}
 	var b strings.Builder
 	b.WriteString("<ul class=\"cell-list\">")
-	for _, s := range scenarios {
+	for i, s := range scenarios {
 		b.WriteString("<li>")
 		b.WriteString(escapeHTML(s))
+		if badges[i] != "" {
+			b.WriteString("<span class=\"badge badge-" + badgeType + "\">")
+			b.WriteString(escapeHTML(badges[i]))
+			b.WriteString("</span>")
+		}
 		b.WriteString("</li>")
 	}
 	b.WriteString("</ul>")
@@ -331,7 +353,7 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 	buf.WriteString("CCC Compliance Test Summary\n")
 	buf.WriteString(strings.Repeat("=", 100) + "\n\n")
 
-	headers := []string{"Control", "PASSING @Policy", "FAILING @Policy", "NO-OP @Policy", "PASSING @Behavioural", "FAILING @Behavioural", "NO-OP @Behavioural"}
+	headers := []string{"Control", "PASSING @Policy", "FAILING @Policy", "PASSING @Behavioural", "FAILING @Behavioural"}
 	colWidth := 20
 	pad := func(s string, w int) string {
 		if len(s) >= w {
@@ -355,10 +377,8 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 			ctrl,
 			strings.Join(d.PassingPolicy, ", "),
 			strings.Join(d.FailingPolicy, ", "),
-			strings.Join(d.NoOpPolicy, ", "),
 			strings.Join(d.PassingBehavioural, ", "),
 			strings.Join(d.FailingBehavioural, ", "),
-			strings.Join(d.NoOpBehavioural, ", "),
 		}
 		buf.WriteString(pad(row[0], 36))
 		for _, cell := range row[1:] {
@@ -367,7 +387,7 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 		}
 		buf.WriteString("\n")
 		// If any cell has multiple scenarios, print them on following lines
-		allCells := [][]string{d.PassingPolicy, d.FailingPolicy, d.NoOpPolicy, d.PassingBehavioural, d.FailingBehavioural, d.NoOpBehavioural}
+		allCells := [][]string{d.PassingPolicy, d.FailingPolicy, d.PassingBehavioural, d.FailingBehavioural}
 		maxLen := 0
 		for _, c := range allCells {
 			if len(c) > maxLen {

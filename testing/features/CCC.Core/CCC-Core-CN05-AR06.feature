@@ -11,13 +11,12 @@ Feature: CCC.Core.CN05.AR06 - Block All Unauthorized Requests
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
 
-  @Destructive @Behavioural @object-storage
+  @Destructive @Behavioural @Duplicate @object-storage
   Scenario: Service prevents data read by user with no access
     # This test already covered by CCC.ObjStor.CN01.AR01
     Then no-op required
-  
-  @Policy @object-storage
+
+  @Policy @Duplicate @object-storage
   Scenario: All unauthorized requests are blocked
-    # This control requires behavioral testing - comprehensive access testing
-    # IAM policies enforce this at runtime
+    # Test moved to CCC.ObjStor.CN01.AR03 (object-storage-no-public-principals)
     Then no-op required

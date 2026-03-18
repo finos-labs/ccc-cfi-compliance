@@ -12,7 +12,7 @@ Feature: CCC.Core.CN07.AR01 - Publish Enumeration Activity Events
     When I attempt policy check "enumeration-monitoring-policy" for control "CCC.Core.CN07" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Behavioural @object-storage
+  @Behavioural @NotTestable @object-storage
   Scenario: Enumeration event publishing cannot be tested automatically
     # Verifying enumeration activities trigger events to monitored channels requires
     # performing enumeration operations and verifying events reach the correct channels

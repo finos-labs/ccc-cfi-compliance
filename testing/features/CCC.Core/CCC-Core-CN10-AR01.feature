@@ -12,7 +12,7 @@ Feature: CCC.Core.CN10.AR01 - Replication Destination Trust
     When I attempt policy check "object-storage-replication-destination" for control "CCC.Core.CN10" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Behavioural @object-storage
+  @Behavioural @NotTestable @object-storage
   Scenario: Replication destination trust cannot be verified automatically
     # Verifying data replicates only to trusted destinations requires inspecting
     # replication configuration and validating destination regions/accounts against

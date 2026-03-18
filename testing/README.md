@@ -227,10 +227,12 @@ Feature files use multiple tags for flexible test filtering:
 | Tag Type | Example | Purpose |
 |----------|---------|---------|
 | **Execution mode** | `@PerService`, `@PerPort` | How the test runner executes the test |
+| **Test type** | `@Policy`, `@Behavioural` | Policy scenarios validate config via CLI/query and rules; Behavioural scenarios call service APIs and verify runtime behaviour |
 | **Service type** | `@object-storage`, `@vpc` | Matches service API tags for AND-filtering |
 | **Catalog** | `@CCC.ObjStor`, `@CCC.Core` | Identifies the control catalog |
 | **TLP level** | `@tlp-clear`, `@tlp-green`, `@tlp-amber`, `@tlp-red` | Traffic Light Protocol sensitivity level |
 | **Control ID** | `@CCC.ObjStor.CN01` | Specific control and assessment requirement |
+| **Exclusion** | `@NotTested`, `@NotTestable`, `@Duplicate` | `@NotTested`: scenarios not yet implemented or intentionally skipped; `@NotTestable`: requirements that cannot be tested (e.g. provider limitations, no testable API or observable behaviour); `@Duplicate`: functionality would duplicate another test |
 
 **Service-specific tests** (e.g., `CCC.ObjStor`) include both the service tag and catalog tag:
 
@@ -256,11 +258,16 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
 ```
 
 This allows:
+- `@Policy` - Run only policy-check scenarios (config validation via CLI/query)
+- `@Behavioural` - Run only behavioural scenarios (API calls, runtime verification)
 - `@object-storage` - Run all object storage tests (CCC.ObjStor + CCC.Core scenarios)
 - `@CCC.ObjStor` - Run only CCC.ObjStor-specific tests
 - `@CCC.Core` - Run all core control tests
 - `@tlp-green` - Run tests appropriate for green TLP level
 - `@CCC.Core.CN01` - Run a single control test
+- `~@NotTested` - Exclude scenarios not yet implemented
+- `~@NotTestable` - Exclude scenarios that cannot be tested (provider or architectural constraints)
+- `~@Duplicate` - Exclude scenarios that duplicate another test
 
 ## Development
 

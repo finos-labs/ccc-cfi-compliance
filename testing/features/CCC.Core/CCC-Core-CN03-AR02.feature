@@ -7,7 +7,7 @@ Feature: CCC.Core.CN03.AR02 - API Authentication with Credentials
   Background:
     Given a cloud api for "{Instance}" in "api"
 
-  @Policy @object-storage
+  @Policy @NotTestable @object-storage @load-balancer
   Scenario: API modification requires credential and trust perimeter origin
     # This control requires behavioral testing - verifying API auth mechanisms
     # Cannot be verified with a simple policy check

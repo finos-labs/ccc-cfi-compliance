@@ -16,10 +16,8 @@ validity_commentary: >
   - Immutability must be applied at container level in Azure
 
 query: |
-  az storage container immutability-policy show \
-    --account-name ${AzureStorageAccount} \
-    --container-name ${ResourceName} \
-    --resource-group ${AzureResourceGroup} \
+  az resource show \
+    --ids "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default/containers/${ResourceName}/immutabilityPolicies/default" \
     --output json
 
 rules:

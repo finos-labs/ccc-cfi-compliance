@@ -12,7 +12,7 @@ Feature: CCC.Core.CN07.AR02 - Log Enumeration Activities
     When I attempt policy check "enumeration-logging-policy" for control "CCC.Core.CN07" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Behavioural @object-storage
+  @Behavioural @NotTestable @object-storage
   Scenario: Enumeration logging cannot be verified automatically
     # Verifying enumeration activities are logged requires performing operations
     # and querying cloud audit logs - cross-service integration (object-storage +

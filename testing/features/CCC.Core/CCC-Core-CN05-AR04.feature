@@ -9,6 +9,5 @@ Feature: CCC.Core.CN05.AR04 - Block Unauthorized External Data Requests
 
   @Policy @object-storage
   Scenario: External unauthorized data requests are blocked
-    # This control requires behavioral testing - attempting external access
-    # Network policies and IAM policies enforce this at runtime
-    Then no-op required
+    When I attempt policy check "object-storage-block-public-read" for control "CCC.Core.CN05" assessment requirement "AR04" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true

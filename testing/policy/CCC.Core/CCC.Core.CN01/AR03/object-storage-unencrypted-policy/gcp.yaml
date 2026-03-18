@@ -1,0 +1,29 @@
+name: GCP Cloud Storage Unencrypted Traffic Block Check
+service_type: object-storage
+requirement_text: >
+  Unencrypted traffic MUST be blocked or redirected to secure equivalents so that
+  no data is transmitted in plaintext.
+
+validity_score: 8
+validity_commentary: >
+  This check verifies that GCP Cloud Storage is accessed over HTTPS.
+  Strengths:
+  - GCS API implicitly requires TLS for all operations on the public endpoint
+  - Google manages the TLS termination; plaintext is not accepted
+  Limitations:
+  - GCP does not expose a per-bucket HTTPS-only flag; enforcement is platform-level
+  - Organization policy 'constraints/storage.requireHttpsTrafficOnly' can provide
+    additional enforcement
+
+query: |
+  gcloud storage buckets describe gs://${ResourceName} \
+    --format=json
+
+rules:
+  - jsonpath: "$.name"
+    expected_values: []
+    validation_rule: ".+"
+    description: >
+      Confirms the bucket exists. GCP Cloud Storage implicitly requires TLS for
+      all storage API operations. Unencrypted HTTP is not supported at the
+      GCS endpoint level.

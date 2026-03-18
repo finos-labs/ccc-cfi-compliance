@@ -7,8 +7,8 @@ requirement_text: >
 validity_score: 9
 validity_commentary: >
   This query validates that S3 Object Lock is enabled in Compliance mode,
-  which prevents deletion or modification of objects during the retention period
-  by any user including administrators.
+  which prevents deletion or modification of objects during the retention
+  period by any user including administrators.
   Strengths:
   - Compliance mode cannot be overridden by any user
   - Directly confirms Object Lock is active with an enforcement rule
@@ -25,7 +25,9 @@ rules:
     expected_values:
       - "Enabled"
     validation_rule: "^Enabled$"
-    description: Verifies that Object Lock is enabled on the bucket.
+    description: >
+      Verifies that Object Lock is enabled, enforcing retention and
+      preventing object deletion or modification before the period expires.
   - jsonpath: "$.ObjectLockConfiguration.Rule.DefaultRetention.Mode"
     expected_values:
       - "COMPLIANCE"
@@ -33,3 +35,9 @@ rules:
     description: >
       Verifies that compliance mode is active, preventing any user from
       deleting or modifying objects before the retention period expires.
+  - jsonpath: "$.ObjectLockConfiguration.Rule.DefaultRetention.Days"
+    expected_values:
+      - "${ObjectStorageRetentionPeriodDays}"
+    description: >
+      Verifies that the retention period meets the configured minimum (days),
+      confirming objects are actively protected from modification or deletion.
