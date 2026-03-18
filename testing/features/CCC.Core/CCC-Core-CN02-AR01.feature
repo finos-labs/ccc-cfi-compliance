@@ -11,6 +11,7 @@ Feature: CCC.Core.CN02.AR01 - Data Encryption at Rest
   Scenario: Verify objects are encrypted at rest
     Given I call "{api}" with "GetServiceAPI" using argument "object-storage"
     And I refer to "{result}" as "storage"
+    And "{result}" is not an error
     When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-encryption-check.txt", and "encryption test data"
     Then "{result}" is not an error
     And I refer to "{result}" as "uploadResult"

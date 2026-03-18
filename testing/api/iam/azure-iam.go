@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic/retry"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"github.com/google/uuid"
 )
@@ -718,105 +720,75 @@ func (s *AzureIAMService) getOrCreateServicePrincipal(appID string) (objectID st
 	return objectID, nil
 }
 
+// errRBACNotPropagatedYet is a sentinel returned when the role assignment exists in ARM
+// but we haven't confirmed it yet (used for retry predicate).
+var errRBACNotPropagatedYet = errors.New("rbac not propagated yet")
+
 // waitForCredentialPropagation validates that the service principal credentials work
 // by attempting to acquire a token for Graph API (identity management scope).
-// It retries for up to 60 seconds.
+// It retries for up to 60 seconds when propagation errors are detected.
 func (s *AzureIAMService) waitForCredentialPropagation(clientID, clientSecret, tenantID string) error {
-	maxAttempts := 12 // 12 attempts * 5 seconds = 60 seconds max
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		// Try to create a credential and get a token
+	_, err := retry.Do(12, 5*time.Second, func() (struct{}, error) {
 		cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
 		if err != nil {
-			return fmt.Errorf("failed to create credential for validation: %w", err)
+			return struct{}{}, fmt.Errorf("failed to create credential for validation: %w", err)
 		}
-
-		// Try to get a token for Microsoft Graph (IAM's own domain)
 		_, err = cred.GetToken(s.ctx, policy.TokenRequestOptions{
 			Scopes: []string{"https://graph.microsoft.com/.default"},
 		})
-
-		if err == nil {
-			// Success! Credentials work for authentication
-			fmt.Printf("   ✅ Credentials validated after %d attempt(s)\n", attempt)
-			return nil
-		}
-
-		// Check if it's a credential error (propagation issue) or something else
-		if strings.Contains(err.Error(), "AADSTS7000215") ||
-			strings.Contains(err.Error(), "invalid_client") ||
-			strings.Contains(err.Error(), "unauthorized_client") {
-			// Credential not yet propagated, wait and retry
-			if attempt < maxAttempts {
-				waitTime := 5 * time.Second
-				fmt.Printf("   ⏳ Credentials not ready yet (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
-				time.Sleep(waitTime)
-				continue
-			}
-		}
-
-		// Other error or max attempts reached
-		return fmt.Errorf("credential validation failed after %d attempts: %w", attempt, err)
+		return struct{}{}, err
+	}, retry.IsAzureCredentialPropagationError)
+	if err != nil {
+		return fmt.Errorf("credential validation failed: %w", err)
 	}
-
-	return fmt.Errorf("credential validation timed out after %d seconds", maxAttempts*5)
+	fmt.Printf("   ✅ Credentials validated\n")
+	return nil
 }
 
 // waitForRBACPropagation validates that the role assignment has propagated and is effective
 // by verifying the assignment exists. It retries for up to 60 seconds.
 func (s *AzureIAMService) waitForRBACPropagation(principalID, scope, roleDefinitionID string) error {
-	maxAttempts := 12 // 12 attempts * 5 seconds = 60 seconds max
-
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		// List role assignments for this principal at this scope
-		filter := fmt.Sprintf("principalId eq '%s'", principalID)
-		pager := s.authClient.NewListForScopePager(scope, &armauthorization.RoleAssignmentsClientListForScopeOptions{
-			Filter: &filter,
-		})
-
-		// Check if the expected role assignment exists
-		found := false
-		for pager.More() {
-			page, err := pager.NextPage(s.ctx)
-			if err != nil {
-				// Network or permission error - wait and retry
-				if attempt < maxAttempts {
-					waitTime := 5 * time.Second
-					fmt.Printf("   ⏳ Error checking role assignment (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
-					time.Sleep(waitTime)
-					break
-				}
-				return fmt.Errorf("failed to list role assignments after %d attempts: %w", attempt, err)
-			}
-
-			for _, assignment := range page.Value {
-				if assignment.Properties != nil &&
-					assignment.Properties.RoleDefinitionID != nil &&
-					*assignment.Properties.RoleDefinitionID == roleDefinitionID {
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
+	err := retry.DoVoid(12, 5*time.Second, func() error {
+		found, listErr := s.checkRoleAssignmentExists(principalID, scope, roleDefinitionID)
+		if listErr != nil {
+			return listErr
 		}
-
 		if found {
-			// Role assignment exists in control plane
-			fmt.Printf("   ✅ RBAC assignment found after %d attempt(s)\n", attempt)
-			// Add buffer for data plane propagation (control plane is fast, data plane lags)
+			fmt.Printf("   ✅ RBAC assignment found\n")
 			fmt.Printf("   ⏳ Waiting 10s for data plane propagation...\n")
 			time.Sleep(10 * time.Second)
 			return nil
 		}
+		return errRBACNotPropagatedYet
+	}, func(e error) bool {
+		return e != nil
+	})
+	if err != nil {
+		return fmt.Errorf("RBAC validation failed: %w", err)
+	}
+	return nil
+}
 
-		// Role assignment not found yet, wait and retry
-		if attempt < maxAttempts {
-			waitTime := 5 * time.Second
-			fmt.Printf("   ⏳ Role assignment not active yet (attempt %d/%d), waiting %v...\n", attempt, maxAttempts, waitTime)
-			time.Sleep(waitTime)
+// checkRoleAssignmentExists lists role assignments and returns true if the expected one exists.
+func (s *AzureIAMService) checkRoleAssignmentExists(principalID, scope, roleDefinitionID string) (bool, error) {
+	filter := fmt.Sprintf("principalId eq '%s'", principalID)
+	pager := s.authClient.NewListForScopePager(scope, &armauthorization.RoleAssignmentsClientListForScopeOptions{
+		Filter: &filter,
+	})
+
+	for pager.More() {
+		page, err := pager.NextPage(s.ctx)
+		if err != nil {
+			return false, err
+		}
+
+		for _, assignment := range page.Value {
+			if assignment.Properties != nil &&
+				assignment.Properties.RoleDefinitionID != nil &&
+				*assignment.Properties.RoleDefinitionID == roleDefinitionID {
+				return true, nil
+			}
 		}
 	}
-
-	return fmt.Errorf("RBAC validation timed out after %d seconds", maxAttempts*5)
+	return false, nil
 }
