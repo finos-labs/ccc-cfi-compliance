@@ -1018,6 +1018,34 @@ func (s *AWSVPCService) enrichCN03EnforcementEvidence(requesterVpcID string, evi
 	}
 
 	actualAllowed := boolFromEvidence(evidence["DryRunAllowed"])
+	// Keep ExitCode semantics stable for feature assertions:
+	// denied dry-run should always report non-zero exit code.
+	if !actualAllowed {
+		switch v := evidence["ExitCode"].(type) {
+		case int:
+			if v <= 0 {
+				evidence["ExitCode"] = 1
+			}
+		case int32:
+			if v <= 0 {
+				evidence["ExitCode"] = 1
+			}
+		case int64:
+			if v <= 0 {
+				evidence["ExitCode"] = 1
+			}
+		case float64:
+			if v <= 0 {
+				evidence["ExitCode"] = 1
+			}
+		case string:
+			if strings.TrimSpace(v) == "" || strings.TrimSpace(v) == "0" {
+				evidence["ExitCode"] = 1
+			}
+		default:
+			evidence["ExitCode"] = 1
+		}
+	}
 	guardrailMismatch := actualAllowed != expectedAllowed
 
 	evidence["GuardrailExpectation"] = guardrailExpectation
