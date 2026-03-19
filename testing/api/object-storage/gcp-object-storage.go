@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -207,6 +208,41 @@ func (s *GCPStorageService) CreateObject(bucketID string, objectID string, data 
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           fmt.Sprintf("%d", attrs.Generation),
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version (generation) of an object from a bucket
+func (s *GCPStorageService) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	gen, err := strconv.ParseInt(versionID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version ID %q: %w", versionID, err)
+	}
+	bucket := s.client.Bucket(bucketID)
+	obj := bucket.Object(objectID).Generation(gen)
+
+	reader, err := obj.NewReader(s.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader for object %s version %s: %w", objectID, versionID, err)
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object content: %w", err)
+	}
+
+	attrs, err := obj.Attrs(s.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     attrs.Size,
+		Data:     []string{string(content)},
 	}, nil
 }
 

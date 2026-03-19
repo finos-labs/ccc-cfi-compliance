@@ -4,13 +4,20 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
+// LocationRegion represents a replication region for assertion compatibility.
+// The Value field matches the "value" column used in "array of objects with at least" steps.
+type LocationRegion struct {
+	Value string `json:"value"`
+}
+
 // ReplicationStatus represents replication configuration and sync status for object storage.
 // Used for CN08.AR01 (physically separate locations) and CN08.AR02 (status visibility).
 // Populated consistently across AWS, Azure, and GCP.
+// Locations uses []LocationRegion so feature steps can assert with "array of objects with at least".
 type ReplicationStatus struct {
-	Locations  []string // Regions/locations where data is replicated (primary + replicas)
-	Status     string   // Replication health: "Enabled", "Syncing", "Healthy", "Degraded", "Disabled"
-	SyncStatus string   // Data sync state: "InSync", "Lagging", "Unknown"
+	Locations  []LocationRegion // Regions/locations where data is replicated (primary + replicas)
+	Status     string           // Replication health: "Enabled", "Syncing", "Healthy", "Degraded", "Disabled"
+	SyncStatus string           // Data sync state: "InSync", "Lagging", "Unknown"
 }
 
 // Service is the generic interface for cloud services

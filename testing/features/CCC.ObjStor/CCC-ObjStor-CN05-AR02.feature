@@ -11,9 +11,9 @@ Feature: CCC.ObjStor.CN05.AR02 - New Version ID on Modification
 
   @Behavioural
   Scenario: Modified objects receive new version identifiers
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "original content"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object={Timestamp}.txt", and "original content"
     And I refer to "{result.VersionID}" as "version1"
-    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object.txt", and "modified content"
+    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "version-test-object={Timestamp}.txt", and "modified content"
     And I refer to "{result.VersionID}" as "version2"
     Then "{version1}" is not equal to "{version2}"
 

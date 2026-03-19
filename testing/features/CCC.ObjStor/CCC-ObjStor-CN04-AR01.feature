@@ -19,28 +19,26 @@ Feature: CCC.ObjStor.CN04.AR01
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserWrite}", and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-retention-object.txt", and "protected data"
+    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-retention-object={Timestamp}.txt", and "protected data"
     And I attach "{result}" to the test output as "uploaded-object.json"
-    And I call "{userStorage}" with "GetObjectRetentionDurationDays" using arguments "{ResourceName}" and "test-retention-object.txt"
+    And I call "{userStorage}" with "GetObjectRetentionDurationDays" using arguments "{ResourceName}" and "test-retention-object={Timestamp}.txt"
     Then "{result}" should be greater than "1"
-    And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-retention-object.txt"
 
   @Behavioural
   Scenario: Service enforces retention policy on newly created objects
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "immediate-delete-test.txt", and "test content"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "immediate-delete-test={Timestamp}.txt", and "test content"
     Then "{result}" is not an error
-    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "immediate-delete-test.txt"
+    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "immediate-delete-test={Timestamp}.txt"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "immediate-delete-error.txt"
     And "{result}" should contain "retention"
 
   @Behavioural
   Scenario: Service validates retention period meets minimum requirements
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "retention-period-test.txt", and "compliance data"
-    And I call "{storage}" with "GetObjectRetentionDurationDays" using arguments "{ResourceName}" and "retention-period-test.txt"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "retention-period-test={Timestamp}.txt", and "compliance data"
+    And I call "{storage}" with "GetObjectRetentionDurationDays" using arguments "{ResourceName}" and "retention-period-test={Timestamp}.txt"
     Then "{result}" should be greater than "1"
     And I attach "{result}" to the test output as "retention-period-days.json"
-    And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "retention-period-test.txt"
 
   @Policy
   Scenario: Test policy for default object retention

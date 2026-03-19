@@ -316,6 +316,10 @@ func (s *AzureBlobService) createObject(bucketID string, objectID string, data s
 		}
 	}
 
+	versionID := ""
+	if uploadResp.VersionID != nil {
+		versionID = *uploadResp.VersionID
+	}
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -324,6 +328,55 @@ func (s *AzureBlobService) createObject(bucketID string, objectID string, data s
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           versionID,
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version of a blob from a container
+func (s *AzureBlobService) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Object, error) {
+		return s.readObjectAtVersion(bucketID, objectID, versionID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) readObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	storageAccountName := s.storageAccountName()
+	containerName := bucketID
+
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
+	versionedBlobClient, err := blockBlobClient.BlobClient().WithVersionID(versionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create versioned blob client: %w", err)
+	}
+
+	downloadResponse, err := versionedBlobClient.DownloadStream(s.ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download blob %s version %s: %w", objectID, versionID, err)
+	}
+	defer downloadResponse.Body.Close()
+
+	content, err := io.ReadAll(downloadResponse.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read blob content: %w", err)
+	}
+
+	size := int64(len(content))
+	if downloadResponse.ContentLength != nil {
+		size = *downloadResponse.ContentLength
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     size,
+		Data:     []string{string(content)},
 	}, nil
 }
 
@@ -930,12 +983,13 @@ func (s *AzureBlobService) GetReplicationStatus(resourceID string) (*generic.Rep
 	}
 
 	// Build locations: primary + secondary (for GRS/RA-GRS)
-	locations := []string{}
+	// Use LocationRegion so feature steps can assert with "array of objects with at least"
+	locations := []generic.LocationRegion{}
 	if props.PrimaryLocation != nil && *props.PrimaryLocation != "" {
-		locations = append(locations, *props.PrimaryLocation)
+		locations = append(locations, generic.LocationRegion{Value: *props.PrimaryLocation})
 	}
 	if props.SecondaryLocation != nil && *props.SecondaryLocation != "" {
-		locations = append(locations, *props.SecondaryLocation)
+		locations = append(locations, generic.LocationRegion{Value: *props.SecondaryLocation})
 	}
 	if len(locations) == 0 {
 		return nil, fmt.Errorf("could not determine storage account locations")

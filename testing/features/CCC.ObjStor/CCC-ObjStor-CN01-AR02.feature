@@ -10,7 +10,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I refer to "{result}" as "storage"
     And I call "{api}" with "GetServiceAPI" using argument "iam"
     And I refer to "{result}" as "iamService"
-    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object.txt", and "test content"
+    And I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object={Timestamp}.txt", and "test content"
     And "{result}" is not an error
 
   @Behavioural
@@ -21,7 +21,7 @@ Feature: CCC.ObjStor.CN01.AR02
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserNoAccess}", and "{false}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object.txt"
+    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object={Timestamp}.txt"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "no-access-read-object-error.txt"
 
@@ -34,10 +34,9 @@ Feature: CCC.ObjStor.CN01.AR02
     And "{result}" is not an error
     And I attach "{result}" to the test output as "read-storage-service.json"
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object.txt"
+    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object={Timestamp}.txt"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "read-read-object-result.json"
-    And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-object.txt"
 
   @Policy
   Scenario: All unauthorized requests are blocked

@@ -204,6 +204,10 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		encryptionAlgorithm = "aws:kms"
 	}
 
+	versionID := ""
+	if putResult.VersionId != nil {
+		versionID = *putResult.VersionId
+	}
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -212,6 +216,41 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           versionID,
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version of an object from a bucket
+func (s *AWSS3Service) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return nil, err
+	}
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = bucketRegion
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
+		Bucket:    aws.String(bucketID),
+		Key:       aws.String(objectID),
+		VersionId: aws.String(versionID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object %s version %s from bucket %s: %w", objectID, versionID, bucketID, err)
+	}
+	defer output.Body.Close()
+
+	content, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object content: %w", err)
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     aws.ToInt64(output.ContentLength),
+		Data:     []string{string(content)},
 	}, nil
 }
 

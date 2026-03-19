@@ -21,7 +21,7 @@ Feature: CCC.ObjStor.CN01.AR04
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserRead}", and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-write-object.txt", and "test content"
+    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-write-object={Timestamp}.txt", and "test content"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "read-create-object-error.txt"
 
@@ -34,10 +34,9 @@ Feature: CCC.ObjStor.CN01.AR04
     And "{result}" is not an error
     And I attach "{result}" to the test output as "write-storage-service.json"
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-write-object.txt", and "test content"
+    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-write-object={Timestamp}.txt", and "test content"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "write-create-object-result.json"
-    And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-write-object.txt"
 
   @Policy
   Scenario: All unauthorized requests are blocked

@@ -30,6 +30,8 @@ instances:
       # CN05.AR03: Storage accounts allowed as object replication destinations. Empty = none.
       # Account names or full resource IDs, e.g. ["partner-dest", "/subscriptions/.../storageAccounts/partner-dest"]
       permitted-destination-storage-accounts: []
+        # CN08.AR02: Expected replication locations (primary + secondary for GRS)
+      replication-locations: [eastus, westus]
 
     services:
       - type: object-storage

@@ -20,6 +20,7 @@ Feature: CCC.Core.CN08.AR02 - Replication Status Visibility
     And I refer to "{result}" as "replicationStatus"
     And I attach "{replicationStatus}" to the test output as "Replication Status"
     And I refer to "{replicationStatus.Locations}" as "locations"
-    Then "{repllocations}" is an array of objects with at least the following contents
-      | value           |
-      | {locations[0]}  |
+    Then "{locations}" is an array of objects with at least the following contents
+      | value   |
+      | {ReplicationLocations[0]}  |
+      | {ReplicationLocations[1]}  |
