@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -14,6 +15,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic/retry"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage/elevation"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
@@ -26,6 +28,8 @@ type AzureBlobService struct {
 	ctx           context.Context
 	instance      *types.InstanceConfig
 	elevator      *elevation.AzureStorageElevator // Handles access elevation (RBAC + network)
+	createdObjs   []struct{ bucket, object string }
+	createdMu     sync.Mutex
 }
 
 // storageAccountName returns the Azure storage account name from service params
@@ -123,6 +127,12 @@ func NewAzureBlobServiceWithCredentials(ctx context.Context, cloudParams types.C
 // ListBuckets lists all containers in the identified storage account
 // In Azure, a "bucket" is represented as "resourceGroup/storageAccount/containerName"
 func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]Bucket, error) {
+		return s.listBuckets()
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) listBuckets() ([]Bucket, error) {
 	storageAccountName := s.storageAccountName()
 	fmt.Printf("📦 Using storage account: %s\n", storageAccountName)
 
@@ -161,6 +171,12 @@ func (s *AzureBlobService) ListBuckets() ([]Bucket, error) {
 // CreateBucket creates a new container in the storage account
 // bucketID is the container name
 func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Bucket, error) {
+		return s.createBucket(bucketID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) createBucket(bucketID string) (*Bucket, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 	fmt.Printf("📦 Creating container %s in storage account %s...\n", containerName, storageAccountName)
@@ -183,6 +199,12 @@ func (s *AzureBlobService) CreateBucket(bucketID string) (*Bucket, error) {
 // DeleteBucket deletes a container from the storage account
 // bucketID is the container name
 func (s *AzureBlobService) DeleteBucket(bucketID string) error {
+	return retry.DoVoid(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() error {
+		return s.deleteBucket(bucketID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) deleteBucket(bucketID string) error {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 	fmt.Printf("🗑️  Deleting container %s from storage account %s...\n", containerName, storageAccountName)
@@ -207,6 +229,12 @@ func (s *AzureBlobService) GetBucketRegion(bucketID string) (string, error) {
 // ListObjects lists all blobs in a container
 // bucketID is the container name
 func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]Object, error) {
+		return s.listObjects(bucketID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) listObjects(bucketID string) ([]Object, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -252,6 +280,12 @@ func (s *AzureBlobService) ListObjects(bucketID string) ([]Object, error) {
 // CreateObject creates a new blob in a container
 // bucketID is the container name
 func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data string) (*Object, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Object, error) {
+		return s.createObject(bucketID, objectID, data)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) createObject(bucketID string, objectID string, data string) (*Object, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -285,6 +319,16 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data s
 		}
 	}
 
+	versionID := ""
+	if uploadResp.VersionID != nil {
+		versionID = *uploadResp.VersionID
+	}
+
+	// Track for TearDown
+	s.createdMu.Lock()
+	s.createdObjs = append(s.createdObjs, struct{ bucket, object string }{bucketID, objectID})
+	s.createdMu.Unlock()
+
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -293,12 +337,67 @@ func (s *AzureBlobService) CreateObject(bucketID string, objectID string, data s
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           versionID,
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version of a blob from a container
+func (s *AzureBlobService) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Object, error) {
+		return s.readObjectAtVersion(bucketID, objectID, versionID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) readObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	storageAccountName := s.storageAccountName()
+	containerName := bucketID
+
+	blobClient, err := s.getBlobServiceClient(storageAccountName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob service client: %w", err)
+	}
+
+	containerClient := blobClient.ServiceClient().NewContainerClient(containerName)
+	blockBlobClient := containerClient.NewBlockBlobClient(objectID)
+	versionedBlobClient, err := blockBlobClient.BlobClient().WithVersionID(versionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create versioned blob client: %w", err)
+	}
+
+	downloadResponse, err := versionedBlobClient.DownloadStream(s.ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download blob %s version %s: %w", objectID, versionID, err)
+	}
+	defer downloadResponse.Body.Close()
+
+	content, err := io.ReadAll(downloadResponse.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read blob content: %w", err)
+	}
+
+	size := int64(len(content))
+	if downloadResponse.ContentLength != nil {
+		size = *downloadResponse.ContentLength
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     size,
+		Data:     []string{string(content)},
 	}, nil
 }
 
 // ReadObject reads a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Object, error) {
+		return s.readObject(bucketID, objectID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) readObject(bucketID string, objectID string) (*Object, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -341,6 +440,12 @@ func (s *AzureBlobService) ReadObject(bucketID string, objectID string) (*Object
 // DeleteObject deletes a blob from a container
 // bucketID is the container name
 func (s *AzureBlobService) DeleteObject(bucketID string, objectID string) error {
+	return retry.DoVoid(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() error {
+		return s.deleteObject(bucketID, objectID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) deleteObject(bucketID string, objectID string) error {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -473,6 +578,12 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 
 // GetBucketRetentionDurationDays retrieves the retention policy duration in days for a container
 func (s *AzureBlobService) GetBucketRetentionDurationDays(bucketID string) (int, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (int, error) {
+		return s.getBucketRetentionDurationDays(bucketID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) getBucketRetentionDurationDays(bucketID string) (int, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -499,6 +610,12 @@ func (s *AzureBlobService) GetBucketRetentionDurationDays(bucketID string) (int,
 
 // GetObjectRetentionDurationDays retrieves the retention policy duration in days for a blob
 func (s *AzureBlobService) GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (int, error) {
+		return s.getObjectRetentionDurationDays(bucketID, objectID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) getObjectRetentionDurationDays(bucketID string, objectID string) (int, error) {
 	storageAccountName := s.storageAccountName()
 	containerName := bucketID
 
@@ -618,6 +735,12 @@ func (s *AzureBlobService) SetObjectPermission(bucketID, objectID string, permis
 // ListDeletedBuckets lists all soft-deleted containers in the storage account
 // Azure supports container-level soft delete for CN03.AR01
 func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]Bucket, error) {
+		return s.listDeletedBuckets()
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) listDeletedBuckets() ([]Bucket, error) {
 	storageAccountName := s.storageAccountName()
 	if storageAccountName == "" {
 		return nil, fmt.Errorf("no storage account name provided")
@@ -662,6 +785,12 @@ func (s *AzureBlobService) ListDeletedBuckets() ([]Bucket, error) {
 // RestoreBucket restores a soft-deleted container
 // Azure supports container-level soft delete for CN03.AR01
 func (s *AzureBlobService) RestoreBucket(bucketID string) error {
+	return retry.DoVoid(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() error {
+		return s.restoreBucket(bucketID)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) restoreBucket(bucketID string) error {
 	storageAccountName := s.storageAccountName()
 	if storageAccountName == "" {
 		return fmt.Errorf("no storage account name provided")
@@ -767,6 +896,12 @@ func (s *AzureBlobService) ResetAccess() error {
 // UpdateBucketPolicy updates container access policy (used for admin action logging tests)
 // containerName is just the container name; storage account is taken from cloudParams
 func (s *AzureBlobService) UpdateBucketPolicy(containerName string, policyTag string) (*Bucket, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (*Bucket, error) {
+		return s.updateBucketPolicy(containerName, policyTag)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureBlobService) updateBucketPolicy(containerName string, policyTag string) (*Bucket, error) {
 	storageAccountName := s.storageAccountName()
 
 	blobClient, err := s.getBlobServiceClient(storageAccountName)
@@ -857,12 +992,13 @@ func (s *AzureBlobService) GetReplicationStatus(resourceID string) (*generic.Rep
 	}
 
 	// Build locations: primary + secondary (for GRS/RA-GRS)
-	locations := []string{}
+	// Use LocationRegion so feature steps can assert with "array of objects with at least"
+	locations := []generic.LocationRegion{}
 	if props.PrimaryLocation != nil && *props.PrimaryLocation != "" {
-		locations = append(locations, *props.PrimaryLocation)
+		locations = append(locations, generic.LocationRegion{Value: *props.PrimaryLocation})
 	}
 	if props.SecondaryLocation != nil && *props.SecondaryLocation != "" {
-		locations = append(locations, *props.SecondaryLocation)
+		locations = append(locations, generic.LocationRegion{Value: *props.SecondaryLocation})
 	}
 	if len(locations) == 0 {
 		return nil, fmt.Errorf("could not determine storage account locations")
@@ -905,4 +1041,21 @@ func (s *AzureBlobService) GetReplicationStatus(resourceID string) (*generic.Rep
 		Status:     status,
 		SyncStatus: syncStatus,
 	}, nil
+}
+
+// TearDown deletes objects created during testing (best-effort; immutable objects are skipped)
+func (s *AzureBlobService) TearDown() error {
+	s.createdMu.Lock()
+	objs := make([]struct{ bucket, object string }, len(s.createdObjs))
+	copy(objs, s.createdObjs)
+	s.createdObjs = nil
+	s.createdMu.Unlock()
+
+	for _, r := range objs {
+		if err := s.DeleteObject(r.bucket, r.object); err != nil {
+			// Immutability or other constraints may block delete - log and continue
+			fmt.Printf("   ⚠️  TearDown: could not delete %s/%s: %v\n", r.bucket, r.object, err)
+		}
+	}
+	return nil
 }

@@ -522,3 +522,15 @@ func (s *AWSIAMService) IsDataReplicatedToSeparateLocation(resourceID string) (b
 func (s *AWSIAMService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
 	return nil, fmt.Errorf("not supported for IAM service")
 }
+
+// TearDown removes all provisioned test users
+func (s *AWSIAMService) TearDown() error {
+	for userName, identity := range s.provisionedUsers {
+		if err := s.DestroyUser(identity); err != nil {
+			fmt.Printf("⚠️  Failed to destroy user %s: %v\n", userName, err)
+		}
+	}
+	s.provisionedUsers = make(map[string]*Identity)
+	s.accessLevels = make(map[string]string)
+	return nil
+}

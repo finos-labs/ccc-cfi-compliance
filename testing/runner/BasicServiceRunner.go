@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
@@ -68,6 +69,8 @@ func (suite *TestSuite) InitializeServiceScenario(sc *godog.ScenarioContext, par
 		suite.setupServiceParams(params.Props)
 		// Expose the full Instance so the factory can be created in cloud_steps.go
 		suite.Props["Instance"] = params.Instance
+		// Timestamp (ms since Unix epoch) for unique object names in immutable storage scenarios
+		suite.Props["Timestamp"] = time.Now().UnixMilli()
 		return ctx, nil
 	})
 
@@ -160,6 +163,14 @@ func (r *BasicServiceRunner) Run() int {
 	if err != nil {
 		log.Fatalf("Failed to create factory: %v", err)
 	}
+	defer func() {
+		log.Println("🧹 Running TearDown to remove test-created resources...")
+		if err := cloudFactory.TearDown(); err != nil {
+			log.Printf("   ⚠️  TearDown completed with errors: %v", err)
+		} else {
+			log.Println("   ✅ TearDown complete")
+		}
+	}()
 
 	// Get the service from the factory
 	log.Printf("🔧 Getting service: %s", config.ServiceName)

@@ -11,22 +11,22 @@ Feature: CCC.ObjStor.CN05.AR04 - Retain Versions on Delete
 
   @Behavioural
   Scenario: Deleted object data can be reloaded from previous version
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "recover-deleted-object.txt", and "data to retain"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "recover-deleted-object={Timestamp}.txt", and "data to retain"
     And I refer to "{result.VersionID}" as "retainedVersionId"
-    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "recover-deleted-object.txt"
-    When I call "{storage}" with "ReadObjectAtVersion" using arguments "{ResourceName}", "recover-deleted-object.txt", and "{retainedVersionId}"
+    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "recover-deleted-object={Timestamp}.txt"
+    When I call "{storage}" with "ReadObjectAtVersion" using arguments "{ResourceName}", "recover-deleted-object={Timestamp}.txt", and "{retainedVersionId}"
     Then "{result.Data}" contains "data to retain"
     And I attach "{result}" to the test output as "recovered-deleted-version.json"
 
   @Behavioural
   Scenario: Deleted object version remains in version list
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "list-deleted-versions-object.txt", and "versioned data"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "list-deleted-versions-object={Timestamp}.txt", and "versioned data"
     And I refer to "{result.VersionID}" as "listedVersionId"
-    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "list-deleted-versions-object.txt"
-    When I call "{storage}" with "ListObjectVersions" using arguments "{ResourceName}" and "list-deleted-versions-object.txt"
+    When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "list-deleted-versions-object={Timestamp}.txt"
+    When I call "{storage}" with "ListObjectVersions" using arguments "{ResourceName}" and "list-deleted-versions-object={Timestamp}.txt"
     And "{result}" is an array of objects with at least the following contents
-      | VersionID       | ObjectID                        |
-      | {listedVersionId} | list-deleted-versions-object.txt |
+      | VersionID       | ObjectID                             |
+      | {listedVersionId} | list-deleted-versions-object={Timestamp}.txt |
     And I attach "{result}" to the test output as "versions-after-delete.json"
 
   @Policy @Duplicate

@@ -32,6 +32,9 @@ type Factory interface {
 
 	// GetProvider returns the cloud provider this factory is configured for
 	GetProvider() CloudProvider
+
+	// TearDown calls TearDown on all cached services to remove test-created resources
+	TearDown() error
 }
 
 // NewFactory creates a new factory for the specified cloud provider.

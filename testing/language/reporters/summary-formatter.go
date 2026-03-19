@@ -43,14 +43,12 @@ type SummaryFormatter struct {
 	currentResult  *SummaryResult
 }
 
-// Feature captures feature information (control ID)
+// Feature captures feature information (control ID and description, as in html-formatter)
 func (f *SummaryFormatter) Feature(gd *messages.GherkinDocument, uri string, c []byte) {
 	if gd.Feature != nil {
-		name := gd.Feature.Name
-		if parts := strings.SplitN(name, " - ", 2); len(parts) > 0 {
-			name = strings.TrimSpace(parts[0])
-		}
-		f.currentFeature = name
+		// Use full feature name (e.g. "CCC.Core.CN02.AR01 - Data Encryption at Rest")
+		// matching html-formatter display
+		f.currentFeature = strings.TrimSpace(gd.Feature.Name)
 	}
 }
 
@@ -349,12 +347,14 @@ func escapeHTML(s string) string {
 
 func generateSummaryText(controls []string, byControl map[string]*SummaryData) string {
 	var buf bytes.Buffer
-	buf.WriteString("\n" + strings.Repeat("=", 100) + "\n")
-	buf.WriteString("CCC Compliance Test Summary\n")
-	buf.WriteString(strings.Repeat("=", 100) + "\n\n")
-
 	headers := []string{"Control", "PASSING @Policy", "FAILING @Policy", "PASSING @Behavioural", "FAILING @Behavioural"}
+	controlColWidth := 55 // Wide enough for "CCC.XXX.YYYY.ARZZ - Description"
 	colWidth := 20
+	separatorLen := controlColWidth + 4*(3+colWidth) // control + 4 columns with " | "
+
+	buf.WriteString("\n" + strings.Repeat("=", separatorLen) + "\n")
+	buf.WriteString("CCC Compliance Test Summary\n")
+	buf.WriteString(strings.Repeat("=", separatorLen) + "\n\n")
 	pad := func(s string, w int) string {
 		if len(s) >= w {
 			return s[:w-2] + ".."
@@ -362,13 +362,13 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 		return s + strings.Repeat(" ", w-len(s))
 	}
 
-	buf.WriteString(pad(headers[0], 36))
+	buf.WriteString(pad(headers[0], controlColWidth))
 	for _, h := range headers[1:] {
 		buf.WriteString(" | ")
 		buf.WriteString(pad(h, colWidth))
 	}
 	buf.WriteString("\n")
-	buf.WriteString(strings.Repeat("-", 100))
+	buf.WriteString(strings.Repeat("-", separatorLen))
 	buf.WriteString("\n")
 
 	for _, ctrl := range controls {
@@ -380,7 +380,7 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 			strings.Join(d.PassingBehavioural, ", "),
 			strings.Join(d.FailingBehavioural, ", "),
 		}
-		buf.WriteString(pad(row[0], 36))
+		buf.WriteString(pad(row[0], controlColWidth))
 		for _, cell := range row[1:] {
 			buf.WriteString(" | ")
 			buf.WriteString(pad(cell, colWidth))
@@ -395,7 +395,7 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 			}
 		}
 		for i := 1; i < maxLen; i++ {
-			buf.WriteString(strings.Repeat(" ", 36))
+			buf.WriteString(strings.Repeat(" ", controlColWidth))
 			for _, col := range allCells {
 				buf.WriteString(" | ")
 				if i < len(col) {
@@ -408,6 +408,6 @@ func generateSummaryText(controls []string, byControl map[string]*SummaryData) s
 		}
 	}
 
-	buf.WriteString(strings.Repeat("=", 100) + "\n")
+	buf.WriteString(strings.Repeat("=", separatorLen) + "\n")
 	return buf.String()
 }

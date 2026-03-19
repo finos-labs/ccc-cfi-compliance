@@ -14,7 +14,7 @@ Feature: CCC.ObjStor.CN02.AR02 - Uniform Bucket-Level Access (Consistent Deny)
 
   @Behavioural
   Scenario: Service enforces uniform bucket-level access denial
-    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object.txt", and "test data"
+    When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "test-object={Timestamp}.txt", and "test data"
     Then "{result}" is not an error
     Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
@@ -22,12 +22,12 @@ Feature: CCC.ObjStor.CN02.AR02 - Uniform Bucket-Level Access (Consistent Deny)
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserNoAccess}", and "{false}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object.txt"
+    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object={Timestamp}.txt"
     Then "{result}" is an error
-    When I call "{storage}" with "SetObjectPermission" using arguments "{ResourceName}", "test-object.txt", and "read"
+    When I call "{storage}" with "SetObjectPermission" using arguments "{ResourceName}", "test-object={Timestamp}.txt", and "read"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "set-object-permission-error.txt"
-    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object.txt"
+    When I call "{userStorage}" with "ReadObject" using arguments "{ResourceName}" and "test-object={Timestamp}.txt"
     Then "{result}" is an error
 
   @Policy @Duplicate @object-storage

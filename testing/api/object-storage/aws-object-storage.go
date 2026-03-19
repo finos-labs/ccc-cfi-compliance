@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,10 +22,12 @@ import (
 
 // AWSS3Service implements Service for AWS S3
 type AWSS3Service struct {
-	client   *s3.Client
-	config   aws.Config
-	ctx      context.Context
-	instance types.InstanceConfig
+	client     *s3.Client
+	config     aws.Config
+	ctx        context.Context
+	instance   types.InstanceConfig
+	createdObjs []struct{ bucket, object string }
+	createdMu   sync.Mutex
 }
 
 // NewAWSS3Service creates a new AWS S3 service using default credentials
@@ -204,6 +207,16 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		encryptionAlgorithm = "aws:kms"
 	}
 
+	versionID := ""
+	if putResult.VersionId != nil {
+		versionID = *putResult.VersionId
+	}
+
+	// Track for TearDown
+	s.createdMu.Lock()
+	s.createdObjs = append(s.createdObjs, struct{ bucket, object string }{bucketID, objectID})
+	s.createdMu.Unlock()
+
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -212,6 +225,41 @@ func (s *AWSS3Service) CreateObject(bucketID string, objectID string, data strin
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           versionID,
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version of an object from a bucket
+func (s *AWSS3Service) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	bucketRegion, err := s.GetBucketRegion(bucketID)
+	if err != nil {
+		return nil, err
+	}
+	regionalConfig := s.config.Copy()
+	regionalConfig.Region = bucketRegion
+	regionalClient := s3.NewFromConfig(regionalConfig)
+
+	output, err := regionalClient.GetObject(s.ctx, &s3.GetObjectInput{
+		Bucket:    aws.String(bucketID),
+		Key:       aws.String(objectID),
+		VersionId: aws.String(versionID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object %s version %s from bucket %s: %w", objectID, versionID, bucketID, err)
+	}
+	defer output.Body.Close()
+
+	content, err := io.ReadAll(output.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object content: %w", err)
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     aws.ToInt64(output.ContentLength),
+		Data:     []string{string(content)},
 	}, nil
 }
 
@@ -589,4 +637,20 @@ func (s *AWSS3Service) IsDataReplicatedToSeparateLocation(resourceID string) (bo
 // Populates ReplicationStatus with Locations (source + CRR destination regions), Status, SyncStatus.
 func (s *AWSS3Service) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+// TearDown deletes objects created during testing
+func (s *AWSS3Service) TearDown() error {
+	s.createdMu.Lock()
+	objs := make([]struct{ bucket, object string }, len(s.createdObjs))
+	copy(objs, s.createdObjs)
+	s.createdObjs = nil
+	s.createdMu.Unlock()
+
+	for _, r := range objs {
+		if err := s.DeleteObject(r.bucket, r.object); err != nil {
+			fmt.Printf("   ⚠️  TearDown: could not delete %s/%s: %v\n", r.bucket, r.object, err)
+		}
+	}
+	return nil
 }

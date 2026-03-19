@@ -39,6 +39,7 @@ type Object struct {
 	Data                []string // Object content (for small objects)
 	Encryption          string   // Encryption status (e.g., "SSE-S3", "SSE-KMS", "AES256")
 	EncryptionAlgorithm string   // Encryption algorithm (e.g., "AES256", "aws:kms")
+	VersionID           string   // Version identifier (when versioning is enabled)
 }
 
 // Service provides operations for object storage testing
@@ -61,6 +62,7 @@ type Service interface {
 	ListObjects(bucketID string) ([]Object, error)
 	CreateObject(bucketID string, objectID string, data string) (*Object, error)
 	ReadObject(bucketID string, objectID string) (*Object, error)
+	ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error)
 	DeleteObject(bucketID string, objectID string) error
 	GetObjectRetentionDurationDays(bucketID string, objectID string) (int, error)
 

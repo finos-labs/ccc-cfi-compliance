@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -17,9 +19,11 @@ import (
 
 // GCPStorageService implements Service for Google Cloud Storage
 type GCPStorageService struct {
-	client   *storage.Client
-	ctx      context.Context
-	instance types.InstanceConfig
+	client      *storage.Client
+	ctx         context.Context
+	instance    types.InstanceConfig
+	createdObjs []struct{ bucket, object string }
+	createdMu   sync.Mutex
 }
 
 // NewGCPStorageService creates a new GCP Cloud Storage service using default credentials
@@ -199,6 +203,11 @@ func (s *GCPStorageService) CreateObject(bucketID string, objectID string, data 
 		encryptionAlgorithm = "CMEK" // Customer-Managed Encryption Key (Cloud KMS)
 	}
 
+	// Track for TearDown
+	s.createdMu.Lock()
+	s.createdObjs = append(s.createdObjs, struct{ bucket, object string }{bucketID, objectID})
+	s.createdMu.Unlock()
+
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -207,6 +216,41 @@ func (s *GCPStorageService) CreateObject(bucketID string, objectID string, data 
 		Data:                []string{data},
 		Encryption:          encryption,
 		EncryptionAlgorithm: encryptionAlgorithm,
+		VersionID:           fmt.Sprintf("%d", attrs.Generation),
+	}, nil
+}
+
+// ReadObjectAtVersion reads a specific version (generation) of an object from a bucket
+func (s *GCPStorageService) ReadObjectAtVersion(bucketID string, objectID string, versionID string) (*Object, error) {
+	gen, err := strconv.ParseInt(versionID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version ID %q: %w", versionID, err)
+	}
+	bucket := s.client.Bucket(bucketID)
+	obj := bucket.Object(objectID).Generation(gen)
+
+	reader, err := obj.NewReader(s.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader for object %s version %s: %w", objectID, versionID, err)
+	}
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object content: %w", err)
+	}
+
+	attrs, err := obj.Attrs(s.ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get object attributes: %w", err)
+	}
+
+	return &Object{
+		ID:       objectID,
+		BucketID: bucketID,
+		Name:     objectID,
+		Size:     attrs.Size,
+		Data:     []string{string(content)},
 	}, nil
 }
 
@@ -538,4 +582,20 @@ func (s *GCPStorageService) IsDataReplicatedToSeparateLocation(resourceID string
 // Populates ReplicationStatus with Locations (constituent regions for multi/dual-region buckets), Status, SyncStatus.
 func (s *GCPStorageService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+// TearDown deletes objects created during testing
+func (s *GCPStorageService) TearDown() error {
+	s.createdMu.Lock()
+	objs := make([]struct{ bucket, object string }, len(s.createdObjs))
+	copy(objs, s.createdObjs)
+	s.createdObjs = nil
+	s.createdMu.Unlock()
+
+	for _, r := range objs {
+		if err := s.DeleteObject(r.bucket, r.object); err != nil {
+			fmt.Printf("   ⚠️  TearDown: could not delete %s/%s: %v\n", r.bucket, r.object, err)
+		}
+	}
+	return nil
 }

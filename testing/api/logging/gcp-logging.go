@@ -88,6 +88,11 @@ func (s *GCPLoggingService) GetReplicationStatus(resourceID string) (*generic.Re
 	return nil, fmt.Errorf("not supported for logging service")
 }
 
+// TearDown is a no-op for logging service (does not create resources)
+func (s *GCPLoggingService) TearDown() error {
+	return nil
+}
+
 // QueryAdminLogs queries Cloud Audit Logs for admin activity events
 func (s *GCPLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
 	// TODO: Implement actual GCP Cloud Audit Logs querying

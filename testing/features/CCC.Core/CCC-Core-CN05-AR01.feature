@@ -19,7 +19,7 @@ Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserNoAccess}", and "{false}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-cn05-unauthorized-modify.txt", and "unauthorized data"
+    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-cn05-unauthorized-modify={Timestamp}.txt", and "unauthorized data"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "no-access-create-error.txt"
 
@@ -31,10 +31,9 @@ Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserWrite}", and "{true}"
     And "{result}" is not an error
     And I refer to "{result}" as "userStorage"
-    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-cn05-authorized-modify.txt", and "authorized data"
+    When I call "{userStorage}" with "CreateObject" using arguments "{ResourceName}", "test-cn05-authorized-modify={Timestamp}.txt", and "authorized data"
     Then "{result}" is not an error
     And I attach "{result}" to the test output as "write-create-object-result.json"
-    And I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "test-cn05-authorized-modify.txt"
 
   @Policy @object-storage
   Scenario: Storage is not configured for public write access

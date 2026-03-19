@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/operationalinsights/armoperationalinsights"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic/retry"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -126,8 +127,19 @@ func (s *AzureLoggingService) GetReplicationStatus(resourceID string) (*generic.
 	return nil, fmt.Errorf("not supported for logging service")
 }
 
+// TearDown is a no-op for logging service (does not create resources)
+func (s *AzureLoggingService) TearDown() error {
+	return nil
+}
+
 // QueryAdminLogs queries Azure Activity Log for admin events
 func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
+		return s.queryAdminLogs(resourceID, lookbackMinutes)
+	}, retry.IsAzureRBACPropagationError)
+}
+
+func (s *AzureLoggingService) queryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
 	startTime := time.Now().Add(-time.Duration(lookbackMinutes) * time.Minute)
 	endTime := time.Now()
 
@@ -171,13 +183,17 @@ func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes 
 // QueryDataWriteLogs queries Azure Log Analytics for storage write events
 // Note: Requires Diagnostic Settings configured to send StorageWrite logs to a Log Analytics workspace
 func (s *AzureLoggingService) QueryDataWriteLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageWrite")
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
+		return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageWrite")
+	}, retry.IsAzureRBACPropagationError)
 }
 
 // QueryDataReadLogs queries Azure Log Analytics for storage read events
 // Note: Requires Diagnostic Settings configured to send StorageRead logs to a Log Analytics workspace
 func (s *AzureLoggingService) QueryDataReadLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageRead")
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
+		return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageRead")
+	}, retry.IsAzureRBACPropagationError)
 }
 
 // getOrDiscoverWorkspaceID returns the Log Analytics workspace ID (CustomerID).
