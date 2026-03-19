@@ -146,6 +146,11 @@ func (s *AWSLoggingService) GetReplicationStatus(resourceID string) (*generic.Re
 	return nil, fmt.Errorf("not supported for logging service")
 }
 
+// TearDown is a no-op for logging service (does not create resources)
+func (s *AWSLoggingService) TearDown() error {
+	return nil
+}
+
 // QueryAdminLogs queries CloudTrail for admin/management events
 func (s *AWSLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
 	return s.queryCloudTrailLogs(resourceID, lookbackMinutes, "management")

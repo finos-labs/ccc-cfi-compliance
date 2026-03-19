@@ -8,6 +8,10 @@ variable "storage_account_name" {
 resource "azurerm_resource_group" "cfi_test" {
   name     = "cfi_test"
   location = "eastus"
+
+  tags = {
+    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
+  }
 }
 
 variable "location" {
@@ -26,6 +30,10 @@ variable "resource_group_name" {
 resource "azurerm_resource_group" "this" {
   name     = var.resource_group_name
   location = var.location
+
+  tags = {
+    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
+  }
 }
 
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
@@ -44,6 +52,10 @@ module "storage_account" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   name                = var.storage_account_name
+
+  tags = {
+    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
+  }
 
   account_tier             = "Standard"
   account_replication_type = "GRS"  # Geo-redundant for CN08.AR01/CN08.AR02

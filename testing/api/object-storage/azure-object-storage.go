@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -27,6 +28,8 @@ type AzureBlobService struct {
 	ctx           context.Context
 	instance      *types.InstanceConfig
 	elevator      *elevation.AzureStorageElevator // Handles access elevation (RBAC + network)
+	createdObjs   []struct{ bucket, object string }
+	createdMu     sync.Mutex
 }
 
 // storageAccountName returns the Azure storage account name from service params
@@ -320,6 +323,12 @@ func (s *AzureBlobService) createObject(bucketID string, objectID string, data s
 	if uploadResp.VersionID != nil {
 		versionID = *uploadResp.VersionID
 	}
+
+	// Track for TearDown
+	s.createdMu.Lock()
+	s.createdObjs = append(s.createdObjs, struct{ bucket, object string }{bucketID, objectID})
+	s.createdMu.Unlock()
+
 	return &Object{
 		ID:                  objectID,
 		BucketID:            bucketID,
@@ -1032,4 +1041,21 @@ func (s *AzureBlobService) GetReplicationStatus(resourceID string) (*generic.Rep
 		Status:     status,
 		SyncStatus: syncStatus,
 	}, nil
+}
+
+// TearDown deletes objects created during testing (best-effort; immutable objects are skipped)
+func (s *AzureBlobService) TearDown() error {
+	s.createdMu.Lock()
+	objs := make([]struct{ bucket, object string }, len(s.createdObjs))
+	copy(objs, s.createdObjs)
+	s.createdObjs = nil
+	s.createdMu.Unlock()
+
+	for _, r := range objs {
+		if err := s.DeleteObject(r.bucket, r.object); err != nil {
+			// Immutability or other constraints may block delete - log and continue
+			fmt.Printf("   ⚠️  TearDown: could not delete %s/%s: %v\n", r.bucket, r.object, err)
+		}
+	}
+	return nil
 }

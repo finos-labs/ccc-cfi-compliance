@@ -63,4 +63,9 @@ type Service interface {
 	// Used for CN08.AR01 (locations) and CN08.AR02 (status visibility).
 	// Object storage returns *types.ReplicationStatus; other services return nil with error.
 	GetReplicationStatus(resourceID string) (*ReplicationStatus, error)
+
+	// TearDown removes resources created during testing (objects, buckets, users, etc.).
+	// Each service tracks what it creates and removes them here.
+	// No-op for services that do not create resources (e.g. logging).
+	TearDown() error
 }

@@ -517,6 +517,18 @@ func (s *AzureIAMService) GetReplicationStatus(resourceID string) (*generic.Repl
 	return nil, fmt.Errorf("not supported for IAM service")
 }
 
+// TearDown removes all provisioned test users
+func (s *AzureIAMService) TearDown() error {
+	for userName, identity := range s.provisionedUsers {
+		if err := s.DestroyUser(identity); err != nil {
+			fmt.Printf("⚠️  Failed to destroy user %s: %v\n", userName, err)
+		}
+	}
+	s.provisionedUsers = make(map[string]*Identity)
+	s.accessLevels = make(map[string]string)
+	return nil
+}
+
 // Microsoft Graph API helper methods
 
 func (s *AzureIAMService) callGraphAPI(method, endpoint string, body interface{}) (map[string]interface{}, error) {

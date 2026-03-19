@@ -163,6 +163,14 @@ func (r *BasicServiceRunner) Run() int {
 	if err != nil {
 		log.Fatalf("Failed to create factory: %v", err)
 	}
+	defer func() {
+		log.Println("🧹 Running TearDown to remove test-created resources...")
+		if err := cloudFactory.TearDown(); err != nil {
+			log.Printf("   ⚠️  TearDown completed with errors: %v", err)
+		} else {
+			log.Println("   ✅ TearDown complete")
+		}
+	}()
 
 	// Get the service from the factory
 	log.Printf("🔧 Getting service: %s", config.ServiceName)

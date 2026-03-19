@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -18,9 +19,11 @@ import (
 
 // GCPStorageService implements Service for Google Cloud Storage
 type GCPStorageService struct {
-	client   *storage.Client
-	ctx      context.Context
-	instance types.InstanceConfig
+	client      *storage.Client
+	ctx         context.Context
+	instance    types.InstanceConfig
+	createdObjs []struct{ bucket, object string }
+	createdMu   sync.Mutex
 }
 
 // NewGCPStorageService creates a new GCP Cloud Storage service using default credentials
@@ -199,6 +202,11 @@ func (s *GCPStorageService) CreateObject(bucketID string, objectID string, data 
 	} else if attrs.KMSKeyName != "" {
 		encryptionAlgorithm = "CMEK" // Customer-Managed Encryption Key (Cloud KMS)
 	}
+
+	// Track for TearDown
+	s.createdMu.Lock()
+	s.createdObjs = append(s.createdObjs, struct{ bucket, object string }{bucketID, objectID})
+	s.createdMu.Unlock()
 
 	return &Object{
 		ID:                  objectID,
@@ -574,4 +582,20 @@ func (s *GCPStorageService) IsDataReplicatedToSeparateLocation(resourceID string
 // Populates ReplicationStatus with Locations (constituent regions for multi/dual-region buckets), Status, SyncStatus.
 func (s *GCPStorageService) GetReplicationStatus(resourceID string) (*generic.ReplicationStatus, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+// TearDown deletes objects created during testing
+func (s *GCPStorageService) TearDown() error {
+	s.createdMu.Lock()
+	objs := make([]struct{ bucket, object string }, len(s.createdObjs))
+	copy(objs, s.createdObjs)
+	s.createdObjs = nil
+	s.createdMu.Unlock()
+
+	for _, r := range objs {
+		if err := s.DeleteObject(r.bucket, r.object); err != nil {
+			fmt.Printf("   ⚠️  TearDown: could not delete %s/%s: %v\n", r.bucket, r.object, err)
+		}
+	}
+	return nil
 }

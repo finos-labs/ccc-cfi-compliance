@@ -127,6 +127,11 @@ func (s *AzureLoggingService) GetReplicationStatus(resourceID string) (*generic.
 	return nil, fmt.Errorf("not supported for logging service")
 }
 
+// TearDown is a no-op for logging service (does not create resources)
+func (s *AzureLoggingService) TearDown() error {
+	return nil
+}
+
 // QueryAdminLogs queries Azure Activity Log for admin events
 func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
 	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
