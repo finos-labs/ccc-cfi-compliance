@@ -17,31 +17,32 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/smithy-go"
-	"github.com/finos-labs/ccc-cfi-compliance/testing/environment"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic"
+	ccctypes "github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
 // AWSVPCService implements VPC Service for AWS EC2/VPC.
 type AWSVPCService struct {
 	client      *ec2.Client
 	ctx         context.Context
-	cloudParams environment.CloudParams
+	instance ccctypes.InstanceConfig
 }
 
 // NewAWSVPCService creates a new AWS VPC service using default credentials.
-func NewAWSVPCService(ctx context.Context, cloudParams environment.CloudParams) (*AWSVPCService, error) {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cloudParams.Region))
+func NewAWSVPCService(ctx context.Context, instance ccctypes.InstanceConfig) (*AWSVPCService, error) {
+	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(instance.Properties.Region))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
 	return &AWSVPCService{
-		client:      ec2.NewFromConfig(cfg),
-		ctx:         ctx,
-		cloudParams: cloudParams,
+		client:   ec2.NewFromConfig(cfg),
+		ctx:      ctx,
+		instance: instance,
 	}, nil
 }
 
-func (s *AWSVPCService) GetOrProvisionTestableResources() ([]environment.TestParams, error) {
+func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams, error) {
 	// Return all VPCs in the configured region as testable resources.
 	// Some controls are region-scoped, but returning per-VPC resources allows
 	// controls that require a VPC ID (e.g., subnet-level checks) to execute.
@@ -50,7 +51,7 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]environment.TestPar
 		return nil, fmt.Errorf("failed to describe VPCs: %w", err)
 	}
 
-	resources := make([]environment.TestParams, 0, len(output.Vpcs))
+	resources := make([]ccctypes.TestParams, 0, len(output.Vpcs))
 	for _, vpc := range output.Vpcs {
 		vpcID := aws.ToString(vpc.VpcId)
 		resourceName := vpcID
@@ -58,13 +59,13 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]environment.TestPar
 			resourceName = nameTag
 		}
 
-		resources = append(resources, environment.TestParams{
+		resources = append(resources, ccctypes.TestParams{
 			ResourceName:        resourceName,
 			UID:                 vpcID,
 			ProviderServiceType: "ec2:vpc",
 			ServiceType:         "vpc",
 			CatalogTypes:        []string{"CCC.VPC"},
-			CloudParams:         s.cloudParams,
+			Instance:            s.instance,
 		})
 	}
 
@@ -81,6 +82,14 @@ func (s *AWSVPCService) CheckUserProvisioned() error {
 
 func (s *AWSVPCService) ElevateAccessForInspection() error { return nil }
 func (s *AWSVPCService) ResetAccess() error                { return nil }
+func (s *AWSVPCService) UpdateResourcePolicy() error       { return nil }
+func (s *AWSVPCService) TriggerDataWrite(_ string) error   { return nil }
+func (s *AWSVPCService) GetResourceRegion(_ string) (string, error) {
+	return s.instance.Properties.Region, nil
+}
+func (s *AWSVPCService) GetReplicationStatus(_ string) (*generic.ReplicationStatus, error) {
+	return nil, fmt.Errorf("replication status not applicable for VPC service")
+}
 
 func (s *AWSVPCService) CountDefaultVpcs() (int, error) {
 	vpcs, err := s.describeDefaultVpcs()
@@ -151,7 +160,7 @@ func (s *AWSVPCService) ListDefaultVpcs() ([]DefaultVPC, error) {
 	for _, vpc := range vpcs {
 		out = append(out, DefaultVPC{
 			VpcID:  aws.ToString(vpc.VpcId),
-			Region: s.cloudParams.Region,
+			Region: s.instance.Properties.Region,
 		})
 	}
 	return out, nil
