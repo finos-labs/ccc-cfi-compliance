@@ -520,7 +520,7 @@ func (s *AzureIAMService) GetReplicationStatus(resourceID string) (*generic.Repl
 // Microsoft Graph API helper methods
 
 func (s *AzureIAMService) callGraphAPI(method, endpoint string, body interface{}) (map[string]interface{}, error) {
-	return retry.Do(3, 30*time.Second, func() (map[string]interface{}, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() (map[string]interface{}, error) {
 		return s.callGraphAPIOnce(method, endpoint, body)
 	}, retry.IsAzureGraphAuthorizationDeniedError)
 }

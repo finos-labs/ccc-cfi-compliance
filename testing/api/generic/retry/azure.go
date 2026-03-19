@@ -3,8 +3,15 @@ package retry
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+)
+
+// Default propagation retry parameters for Azure (RBAC and Graph API can take up to 5 min)
+const (
+	DefaultPropagationAttempts = 5
+	DefaultPropagationDelay   = 60 * time.Second
 )
 
 // IsAzureRBACPropagationError returns true for 403 AuthorizationPermissionMismatch,
@@ -13,6 +20,11 @@ func IsAzureRBACPropagationError(err error) bool {
 	var respErr *azcore.ResponseError
 	if errors.As(err, &respErr) {
 		return respErr.StatusCode == 403 && respErr.ErrorCode == "AuthorizationPermissionMismatch"
+	}
+	// Fallback: error may be wrapped or in string form (e.g. from policy/CLI output)
+	if err != nil {
+		msg := err.Error()
+		return strings.Contains(msg, "403") && strings.Contains(msg, "AuthorizationPermissionMismatch")
 	}
 	return false
 }

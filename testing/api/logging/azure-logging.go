@@ -129,7 +129,7 @@ func (s *AzureLoggingService) GetReplicationStatus(resourceID string) (*generic.
 
 // QueryAdminLogs queries Azure Activity Log for admin events
 func (s *AzureLoggingService) QueryAdminLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return retry.Do(3, 30*time.Second, func() ([]LogEntry, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
 		return s.queryAdminLogs(resourceID, lookbackMinutes)
 	}, retry.IsAzureRBACPropagationError)
 }
@@ -178,7 +178,7 @@ func (s *AzureLoggingService) queryAdminLogs(resourceID string, lookbackMinutes 
 // QueryDataWriteLogs queries Azure Log Analytics for storage write events
 // Note: Requires Diagnostic Settings configured to send StorageWrite logs to a Log Analytics workspace
 func (s *AzureLoggingService) QueryDataWriteLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return retry.Do(3, 30*time.Second, func() ([]LogEntry, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
 		return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageWrite")
 	}, retry.IsAzureRBACPropagationError)
 }
@@ -186,7 +186,7 @@ func (s *AzureLoggingService) QueryDataWriteLogs(resourceID string, lookbackMinu
 // QueryDataReadLogs queries Azure Log Analytics for storage read events
 // Note: Requires Diagnostic Settings configured to send StorageRead logs to a Log Analytics workspace
 func (s *AzureLoggingService) QueryDataReadLogs(resourceID string, lookbackMinutes int) ([]LogEntry, error) {
-	return retry.Do(3, 30*time.Second, func() ([]LogEntry, error) {
+	return retry.Do(retry.DefaultPropagationAttempts, retry.DefaultPropagationDelay, func() ([]LogEntry, error) {
 		return s.queryStorageLogs(resourceID, lookbackMinutes, "StorageRead")
 	}, retry.IsAzureRBACPropagationError)
 }
