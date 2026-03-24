@@ -16,4 +16,5 @@ type Service interface {
 	CN02Service
 	CN03Service
 	CN04Service
+	TestResourceService
 }
