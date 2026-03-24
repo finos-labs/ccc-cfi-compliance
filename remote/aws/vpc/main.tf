@@ -1,9 +1,15 @@
+# Used by CN03 guardrail to scope the allow-list to the deploying account when
+# no explicit cn03_allowed_account_ids are provided.
 data "aws_caller_identity" "current" {}
 
 locals {
-  name                    = "cfi-${var.target_id}-vpc"
-  cn04_flow_log_role_name = substr("cfi-${var.target_id}-cn04-flowlogs-role", 0, 64)
-  cn04_log_group_name     = "${var.cn04_flow_log_log_group_prefix}/${local.name}"
+  name = "cfi-${var.target_id}-vpc"
+
+  # ---------------------------------------------------------------------------
+  # CN03 — Restrict VPC peering to allowed requesters (CCC.VPC.CN03)
+  # Locals used to build requester VPC fixtures, discover tagged peers, and
+  # render the IAM guardrail policy that enforces the allow-list at runtime.
+  # ---------------------------------------------------------------------------
 
   cn03_allowed_requester_cidr_map = var.cn03_create_peers ? {
     for index, cidr in var.cn03_allowed_requester_vpc_cidrs : format("%02d", index + 1) => cidr
@@ -22,10 +28,11 @@ locals {
   cn03_guardrail_policy_arn          = local.cn03_update_guardrail_policy ? local.cn03_existing_guardrail_policy_arn : try(aws_iam_policy.cn03_guardrail[0].arn, null)
   cn03_guardrail_policy_mode         = local.cn03_update_guardrail_policy ? "existing" : (local.cn03_create_guardrail_policy ? "create" : "disabled")
 
-  # Dynamic allow/disallow discovery:
-  # - VPCs created by this module (when cn03_create_peers=true)
-  # - Existing VPCs discovered by tags
-  # - Optional explicit ARN additions
+  # Allowed/disallowed accepter VPC ARNs fed into the guardrail policy template.
+  # Sources (merged in priority order):
+  #   1. VPCs created by this module (cn03_create_peers=true)
+  #   2. Existing VPCs discovered by peer-class tag
+  #   3. Explicit ARN overrides via cn03_allowed_accepter_vpc_arns variable
   cn03_allowed_accepter_vpc_arns = distinct(concat(
     [for key in sort(keys(aws_vpc.cn03_allowed_peer)) : aws_vpc.cn03_allowed_peer[key].arn],
     [for key in sort(keys(data.aws_vpc.cn03_tagged_allowed)) : data.aws_vpc.cn03_tagged_allowed[key].arn],
@@ -40,7 +47,24 @@ locals {
   cn03_guardrail_policy_json = templatefile("${path.module}/policies/cn03-guardrail-policy.json.tftpl", {
     allowed_requester_vpc_arns_json = jsonencode(local.cn03_allowed_accepter_vpc_arns)
   })
+
+  # ---------------------------------------------------------------------------
+  # CN04 — VPC flow logs must capture all traffic (CCC.VPC.CN04)
+  # Locals used to name the CloudWatch log group and IAM role created when
+  # cn04_enable_flow_logs=true.
+  # ---------------------------------------------------------------------------
+
+  cn04_flow_log_role_name = substr("cfi-${var.target_id}-cn04-flowlogs-role", 0, 64)
+  cn04_log_group_name     = "${var.cn04_flow_log_log_group_prefix}/${local.name}"
 }
+
+# =============================================================================
+# BASE — Shared test VPC (used by all CN01–CN04 controls)
+# Provisions the primary VPC and public subnets that serve as the test target
+# across all CCC.VPC controls. CN02 behaviour is controlled by
+# map_public_ip_on_launch; CN03 uses this VPC as the peering receiver;
+# CN04 attaches flow logs to this VPC when cn04_enable_flow_logs=true.
+# =============================================================================
 
 module "vpc" {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=v5.7.0"
@@ -68,6 +92,14 @@ module "vpc" {
     Tier = "public"
   })
 }
+
+# =============================================================================
+# CN03 — Restrict VPC peering to allowed requesters (CCC.VPC.CN03)
+# Creates requester fixture VPCs (allowed/disallowed/non-allowlisted) and an
+# optional IAM guardrail policy that denies CreateVpcPeeringConnection from
+# requesters not in the allow-list. All resources are gated by cn03_create_peers
+# and cn03_apply_guardrail flags — disabled by default.
+# =============================================================================
 
 # CN03: requester trial VPCs to verify allow/disallow peering outcomes.
 resource "aws_vpc" "cn03_allowed_peer" {
@@ -216,6 +248,13 @@ resource "aws_iam_user_policy_attachment" "cn03_guardrail" {
   user       = local.cn03_guardrail_user_names[count.index]
   policy_arn = local.cn03_guardrail_policy_arn
 }
+
+# =============================================================================
+# CN04 — VPC flow logs must capture all traffic (CCC.VPC.CN04)
+# Creates a CloudWatch log group, IAM role/policy, and aws_flow_log resource
+# scoped to the base VPC. All resources are gated by cn04_enable_flow_logs
+# flag — disabled by default.
+# =============================================================================
 
 # CN04: optional flow-log declaration for policy/config evidence.
 resource "aws_cloudwatch_log_group" "cn04_flow_logs" {
