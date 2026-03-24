@@ -84,6 +84,7 @@ func (s *AWSVPCService) ElevateAccessForInspection() error { return nil }
 func (s *AWSVPCService) ResetAccess() error                { return nil }
 func (s *AWSVPCService) UpdateResourcePolicy() error       { return nil }
 func (s *AWSVPCService) TriggerDataWrite(_ string) error   { return nil }
+func (s *AWSVPCService) TearDown() error                   { return nil }
 func (s *AWSVPCService) GetResourceRegion(_ string) (string, error) {
 	return s.instance.Properties.Region, nil
 }
