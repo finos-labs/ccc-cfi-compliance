@@ -17,6 +17,7 @@ instances:
         object-storage-retention-period-days: 2
       - type: logging
         aws-cloud-trail-log-group-name: cfi-test-log-group
+      - type: vpc
 
   - id: main-azure
     properties:
