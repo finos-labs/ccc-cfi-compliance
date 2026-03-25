@@ -1,0 +1,41 @@
+name: Restrict Default Network Creation - Default Subnets
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
+service_type: vpc
+requirement_text: >
+  When a subscription is created, the subscription MUST NOT contain default network resources.
+
+validity_score: 6
+validity_commentary: >
+  This query checks whether default subnets exist in the default VPC.
+  Strengths:
+  - Uses control-plane inventory only and does not generate traffic
+  - Targets default subnets with `default-for-az=true`
+  Limitations:
+  - Meaningful only when a default VPC exists
+  - This is a current-state check, not a direct proof at subscription-creation time
+
+query: |
+  DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --region ${AWS_REGION} \
+    --filters Name=is-default,Values=true \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null || true)
+
+  if [ -z "${DEFAULT_VPC_ID}" ] || [ "${DEFAULT_VPC_ID}" = "None" ]; then
+    echo '{"Subnets":[]}'
+  else
+    aws ec2 describe-subnets \
+      --region ${AWS_REGION} \
+      --filters Name=vpc-id,Values=${DEFAULT_VPC_ID} Name=default-for-az,Values=true
+  fi
+
+rules:
+  - jsonpath: "$.Subnets"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Compliant when no default subnets are returned for the default VPC.
