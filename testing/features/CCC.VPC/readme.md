@@ -79,11 +79,12 @@ Feature-level baseline:
 Scenario-level classification:
 
 - `@Policy`
-- `@Behavior`
+- `@Behavioural`
 - `@Destructive`
 
 Scenario-level execution intent:
 
+- `@MAIN` — required on all default CI scenarios (paired with `@DEFAULT`)
 - `@DEFAULT`
 - `@NEGATIVE`
 - `@SANITY`
@@ -93,6 +94,7 @@ Notes:
 
 - Default VPC service runs rely on `@CCC.VPC` inclusion.
 - A scenario without `@CCC.VPC` is excluded from default VPC runs.
+- `@MAIN @DEFAULT` appear together on all default scenarios.
 - `@Type.P`, `@Type.B`, `@Type.D` are optional and useful only if you filter on them.
 
 ## 6) Naming Rules
@@ -129,7 +131,7 @@ Avoid unsupported forms such as:
 ### Policy Template
 
 ```gherkin
-@Policy @DEFAULT
+@Policy @MAIN @DEFAULT
 @CCC.VPC
 Scenario: PASS when <policy condition>
   Given ...
@@ -137,10 +139,10 @@ Scenario: PASS when <policy condition>
   Then "{result.<PrimaryObservable>}" is "<ExpectedValue>"
 ```
 
-### Behavior Template
+### Behaviour Template
 
 ```gherkin
-@Behavior @DEFAULT
+@Behavioural @DEFAULT
 @CCC.VPC
 Scenario: PASS when runtime behavior shows <expected behavior>
   Given ...

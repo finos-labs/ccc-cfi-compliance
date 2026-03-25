@@ -149,6 +149,7 @@ Main policy check:
 Opt-in behavior check (creates and deletes test resource):
 
 ```bash
+export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN04
 ./testing/run-compliance-tests.sh \
   --provider aws \
   --region "$REGION" \
@@ -242,6 +243,7 @@ Main policy check:
 Opt-in behavior check (generates traffic; may incur cloud cost):
 
 ```bash
+export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN02
 ./testing/run-compliance-tests.sh \
   --provider aws \
   --region "$REGION" \
