@@ -13,5 +13,6 @@ type DefaultVPC struct {
 // CN01–CN04 interfaces are composed in as each control PR lands.
 type Service interface {
 	generic.Service
+	CN03Service
 	TestResourceService
 }
