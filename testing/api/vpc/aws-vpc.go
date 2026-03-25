@@ -57,6 +57,7 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams
 			ProviderServiceType: "ec2:vpc",
 			ServiceType:         "vpc",
 			CatalogTypes:        []string{"CCC.VPC"},
+			TagFilter:           []string{"@vpc", "@CCC.VPC"},
 			Instance:            s.instance,
 		})
 	}
