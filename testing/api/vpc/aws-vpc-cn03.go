@@ -304,6 +304,11 @@ func (s *AWSVPCService) enrichCN03EnforcementEvidence(requesterVpcID string, evi
 	return evidence
 }
 
+// resolveCN03AllowedRequesterVpcIDs resolves the CN03 allow-list in priority order:
+//  1. CN03_ALLOWED_REQUESTER_VPC_IDS (CSV)
+//  2. CN03_ALLOWED_REQUESTER_VPC_ID_1..N (indexed env vars)
+//  3. CN03_ALLOWED_PEER_VPC_IDS / CN03_ALLOWED_PEER_VPC_ID_1..N (legacy aliases)
+//  4. CN03_PEER_TRIAL_MATRIX_FILE (JSON matrix file)
 func (s *AWSVPCService) resolveCN03AllowedRequesterVpcIDs() ([]string, string, error) {
 	if ids := normalizeStringList([]string{os.Getenv("CN03_ALLOWED_REQUESTER_VPC_IDS")}); len(ids) > 0 {
 		return ids, "CN03_ALLOWED_REQUESTER_VPC_IDS", nil
@@ -357,6 +362,8 @@ func (s *AWSVPCService) loadCN03TrialMatrix(filePath string) (cn03TrialMatrix, s
 		return cn03TrialMatrix{}, "", fmt.Errorf("failed to parse CN03 trial matrix file %s: %w", resolvedPath, err)
 	}
 
+	// Multiple field name aliases are accepted for format flexibility across
+	// manually authored files and export-cn03-artifacts.sh generated outputs.
 	receiverVpcID := firstNonEmptyString(
 		cn03String(raw["receiver_vpc_id"]),
 		cn03String(raw["peer_vpc_id"]),
@@ -406,6 +413,9 @@ func (s *AWSVPCService) loadCN03TrialMatrix(filePath string) (cn03TrialMatrix, s
 	}, resolvedPath, nil
 }
 
+// cn03IndexedEnvValues reads up to 99 sequentially numbered env vars with the
+// given prefix (e.g. CN03_ALLOWED_REQUESTER_VPC_ID_1..99). Iteration stops at
+// the first gap but collects all non-empty values regardless of order.
 func cn03IndexedEnvValues(prefix string) []string {
 	values := make([]string, 0)
 	for i := 1; i <= 99; i++ {
