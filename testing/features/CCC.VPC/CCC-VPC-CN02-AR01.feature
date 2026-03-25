@@ -20,7 +20,7 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
     Then "{result.ViolatingSubnetCount}" is "0"
     And "{result.Reason}" contains "public subnet"
 
-  @Behavior @OPT_IN @PENDING_API
+  @Behavioural @OPT_IN @PENDING_API
   # NOTE: no @CCC.VPC tag => opt-in only (creates and deletes a test resource)
   Scenario: Behavioral check (active): creating a resource in a public subnet does not assign an external IP by default
     Given I refer to "{UID}" as "TargetVpcId"
