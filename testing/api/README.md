@@ -132,6 +132,7 @@ export REGION=us-east-1
 ```
 
 IaC note:
+
 - Optional. CN01 is observational on AWS account default-network state.
 
 ### CN02 - No default external IP in public subnets (`CCC.VPC.CN02.AR01`)
@@ -158,6 +159,7 @@ export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with
 ```
 
 IaC note:
+
 - Recommended for deterministic pass/fail by setting `TF_VAR_map_public_ip_on_launch=true|false`.
 
 ### CN03 - Restrict peering from non-allowlisted requesters (`CCC.VPC.CN03.AR01`)
@@ -184,6 +186,32 @@ Optional env:
 export CN03_ALLOWED_REQUESTER_VPC_IDS="<csv-allowed-requester-vpc-ids>"
 export CN03_PEER_OWNER_ID="<peer-account-id>"
 export CN03_PEER_TRIAL_MATRIX_FILE="<abs-path-to-cn03-peer-trials.json>"
+```
+
+#### Allow-list sources (union merge)
+
+The CN03 allow-list is resolved by merging **all** of the following sources:
+
+1. `CN03_ALLOWED_REQUESTER_VPC_IDS` env var (CSV string, e.g. `"vpc-aaa,vpc-bbb"`)
+2. Indexed env vars `CN03_ALLOWED_REQUESTER_VPC_ID_1` … `CN03_ALLOWED_REQUESTER_VPC_ID_N`
+3. `cn03-allowed-requester-vpc-ids` field in `testing/environment.yaml` under the `vpc` service (YAML list or CSV string)
+4. `cn03-peer-trials.json` matrix file (sourced from IaC artifacts)
+
+All sources are deduplicated and merged. An **empty combined result** skips guardrail checks — set at least one source to enable them.
+
+For manual runs without IaC, populate `testing/environment.yaml`:
+
+```yaml
+services:
+  - type: vpc
+    cn03-allowed-requester-vpc-ids: ["vpc-abc123", "vpc-def456"]
+```
+
+Or export individual env vars before running tests (no config file change needed):
+
+```bash
+export CN03_ALLOWED_REQUESTER_VPC_ID_1="vpc-abc123"
+export CN03_ALLOWED_REQUESTER_VPC_ID_2="vpc-def456"
 ```
 
 If using IaC artifacts from `remote/aws/vpc`:
@@ -216,6 +244,7 @@ Opt-in sanity and matrix checks:
 ```
 
 IaC note:
+
 - Strongly recommended. CN03 depends on controlled requester sets and guardrail policy behavior.
 
 CN03 result diagnostics (for failure reasoning):
@@ -252,6 +281,7 @@ export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with
 ```
 
 IaC note:
+
 - Recommended. Enable with:
   - `TF_VAR_cn04_enable_flow_logs=true`
   - `TF_VAR_cn04_flow_log_traffic_type=ALL`
