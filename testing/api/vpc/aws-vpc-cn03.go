@@ -304,37 +304,63 @@ func (s *AWSVPCService) enrichCN03EnforcementEvidence(requesterVpcID string, evi
 	return evidence
 }
 
-// resolveCN03AllowedRequesterVpcIDs resolves the CN03 allow-list in priority order:
-//  1. CN03_ALLOWED_REQUESTER_VPC_IDS (CSV)
-//  2. CN03_ALLOWED_REQUESTER_VPC_ID_1..N (indexed env vars)
-//  3. CN03_ALLOWED_PEER_VPC_IDS / CN03_ALLOWED_PEER_VPC_ID_1..N (legacy aliases)
-//  4. CN03_PEER_TRIAL_MATRIX_FILE (JSON matrix file)
+// resolveCN03AllowedRequesterVpcIDs collects the CN03 allow-list from all
+// available sources and returns a deduplicated union. Sources:
+//   - Dynamic: env vars set from cn03-feature.env CI artifacts
+//     (CN03_ALLOWED_REQUESTER_VPC_IDS CSV, CN03_ALLOWED_REQUESTER_VPC_ID_1..N,
+//     CN03_PEER_TRIAL_MATRIX_FILE, and legacy CN03_ALLOWED_PEER_VPC_* aliases)
+//   - Manual: cn03-allowed-requester-vpc-ids in environment.yaml vpc service config
+//
+// If no source yields any IDs the caller should skip CN03 checks — no criteria
+// can be established without at least one known allowed requester.
 func (s *AWSVPCService) resolveCN03AllowedRequesterVpcIDs() ([]string, string, error) {
+	var all []string
+	var sources []string
+
+	// Dynamic source: env vars (populated from cn03-feature.env CI artifacts)
 	if ids := normalizeStringList([]string{os.Getenv("CN03_ALLOWED_REQUESTER_VPC_IDS")}); len(ids) > 0 {
-		return ids, "CN03_ALLOWED_REQUESTER_VPC_IDS", nil
+		all = append(all, ids...)
+		sources = append(sources, "CN03_ALLOWED_REQUESTER_VPC_IDS")
 	}
 	if ids := cn03IndexedEnvValues("CN03_ALLOWED_REQUESTER_VPC_ID_"); len(ids) > 0 {
-		return ids, "CN03_ALLOWED_REQUESTER_VPC_ID_1..N", nil
+		all = append(all, ids...)
+		sources = append(sources, "CN03_ALLOWED_REQUESTER_VPC_ID_1..N")
 	}
 	if ids := normalizeStringList([]string{os.Getenv("CN03_ALLOWED_PEER_VPC_IDS")}); len(ids) > 0 {
-		return ids, "CN03_ALLOWED_PEER_VPC_IDS", nil
+		all = append(all, ids...)
+		sources = append(sources, "CN03_ALLOWED_PEER_VPC_IDS")
 	}
 	if ids := cn03IndexedEnvValues("CN03_ALLOWED_PEER_VPC_ID_"); len(ids) > 0 {
-		return ids, "CN03_ALLOWED_PEER_VPC_ID_1..N", nil
+		all = append(all, ids...)
+		sources = append(sources, "CN03_ALLOWED_PEER_VPC_ID_1..N")
 	}
-
-	matrixPath := strings.TrimSpace(os.Getenv("CN03_PEER_TRIAL_MATRIX_FILE"))
-	if matrixPath != "" {
+	if matrixPath := strings.TrimSpace(os.Getenv("CN03_PEER_TRIAL_MATRIX_FILE")); matrixPath != "" {
 		matrix, resolvedPath, err := s.loadCN03TrialMatrix(matrixPath)
 		if err != nil {
 			return nil, "", err
 		}
 		if len(matrix.AllowedRequesterVpcIDs) > 0 {
-			return matrix.AllowedRequesterVpcIDs, fmt.Sprintf("CN03_PEER_TRIAL_MATRIX_FILE (%s)", resolvedPath), nil
+			all = append(all, matrix.AllowedRequesterVpcIDs...)
+			sources = append(sources, fmt.Sprintf("CN03_PEER_TRIAL_MATRIX_FILE (%s)", resolvedPath))
 		}
 	}
 
-	return []string{}, "", nil
+	// Manual source: cn03-allowed-requester-vpc-ids from environment.yaml vpc service config
+	if svcProps := s.instance.ServiceProperties("vpc"); svcProps != nil {
+		if raw, ok := svcProps["cn03-allowed-requester-vpc-ids"]; ok {
+			if ids := cn03StringSlice(raw); len(ids) > 0 {
+				all = append(all, ids...)
+				sources = append(sources, "environment.yaml/vpc/cn03-allowed-requester-vpc-ids")
+			}
+		}
+	}
+
+	combined := normalizeStringList(all)
+	source := strings.Join(sources, ", ")
+	if source == "" {
+		source = "none"
+	}
+	return combined, source, nil
 }
 
 func (s *AWSVPCService) loadCN03TrialMatrix(filePath string) (cn03TrialMatrix, string, error) {

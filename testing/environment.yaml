@@ -19,9 +19,10 @@ instances:
         aws-cloud-trail-log-group-name: cfi-test-log-group
       - type: vpc
         # CN03.AR01: Allowed requester VPC IDs for peering guardrail evaluation.
-        # In CI these are sourced automatically from cn03-feature.env artifacts.
-        # For manual runs, set comma-separated VPC IDs (e.g. "vpc-abc123,vpc-def456").
-        cn03-allowed-requester-vpc-ids: ""
+        # Merged with dynamic IDs sourced from cn03-feature.env CI artifacts.
+        # For manual runs add VPC IDs as a YAML list (e.g. ["vpc-abc123", "vpc-def456"]).
+        # Leave empty to rely on CI artifacts alone.
+        cn03-allowed-requester-vpc-ids: []
 
   - id: main-azure
     properties:
