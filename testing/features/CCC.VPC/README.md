@@ -20,7 +20,7 @@ Write scenarios that are:
    - runtime behavior
 3. Classify test type:
    - `Policy` (configuration/state only)
-   - `Behavior` (runtime observation, non-destructive)
+   - `Behavioural` (runtime observation, non-destructive)
    - `Destructive` (intentional blocked/negative action)
 4. Decide run mode:
    - default run (`@CCC.VPC` present)

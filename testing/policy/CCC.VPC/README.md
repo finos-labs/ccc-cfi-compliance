@@ -13,5 +13,5 @@ This folder contains policy reference material for CCC `VPC` (virtual network) c
 
 For AWS, the VPC service implementation is in `testing/api/vpc/` and is exposed to tests via `GetServiceAPI("vpc")` in `testing/api/factory/aws_factory.go`.
 
-Feature tests for these controls live under `testing/features/CCC.VPC/` and are selected by tags like `@CCC.VPC.CN01.AR01`.
+Feature tests for these controls live under `testing/features/CCC.VPC/` and are selected by tags like `@CCC.VPC.CN01`.
 

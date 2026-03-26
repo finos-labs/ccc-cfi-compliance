@@ -70,7 +70,7 @@ Use these commands from repo root.
 
 ### Do I need IaC and an AWS account?
 
-- `AWS account`: yes, for `--provider aws` runs.
+- `AWS account`: yes, for `--instance main-aws` runs.
 - `IaC required`: not strictly for every CN if your account already has suitable VPC resources and guardrails.
 - `IaC recommended`: yes, for repeatable/local validation and CI parity.
 
@@ -94,7 +94,7 @@ Typical sequence:
 ```bash
 # 1) Auth/context
 export AWS_PROFILE=default
-export REGION=us-east-1
+export AWS_REGION=us-east-1
 
 # 2) IaC apply (shared base + CN fixtures controlled by TF_VARs)
 cd remote/aws/vpc
@@ -108,27 +108,27 @@ export CN03_PEER_TRIAL_MATRIX_FILE="$(pwd)/cn03-peer-trials.json"
 cd ../../..
 
 # 4) Run tests
-./testing/run-compliance-tests.sh --provider aws --region "$REGION" --service vpc --tag 'CCC.VPC.CN01.AR01 && MAIN'
-./testing/run-compliance-tests.sh --provider aws --region "$REGION" --service vpc --tag 'CCC.VPC.CN02.AR01 && MAIN'
-./testing/run-compliance-tests.sh --provider aws --region "$REGION" --service vpc --tag 'CCC.VPC.CN03.AR01 && MAIN'
-./testing/run-compliance-tests.sh --provider aws --region "$REGION" --service vpc --tag 'CCC.VPC.CN04.AR01 && MAIN'
+./testing/run-compliance-tests.sh --instance main-aws --region "$AWS_REGION" --service vpc --tags 'CCC.VPC.CN01.AR01 MAIN'
+./testing/run-compliance-tests.sh --instance main-aws --region "$AWS_REGION" --service vpc --tags 'CCC.VPC.CN02.AR01 MAIN'
+./testing/run-compliance-tests.sh --instance main-aws --region "$AWS_REGION" --service vpc --tags 'CCC.VPC.CN03.AR01 MAIN'
+./testing/run-compliance-tests.sh --instance main-aws --region "$AWS_REGION" --service vpc --tags 'CCC.VPC.CN04.AR01 MAIN'
 ```
 
 ### Baseline environment
 
 ```bash
 export AWS_PROFILE=default
-export REGION=us-east-1
+export AWS_REGION=us-east-1
 ```
 
 ### CN01 - Default network resources absent (`CCC.VPC.CN01.AR01`)
 
 ```bash
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN01.AR01 && MAIN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN01.AR01 MAIN'
 ```
 
 IaC note:
@@ -141,10 +141,10 @@ Main policy check:
 
 ```bash
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN02.AR01 && MAIN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN02.AR01 MAIN'
 ```
 
 Opt-in behavior check (creates and deletes test resource):
@@ -152,10 +152,10 @@ Opt-in behavior check (creates and deletes test resource):
 ```bash
 export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN04
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN02.AR01 && OPT_IN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN02.AR01 OPT_IN'
 ```
 
 IaC note:
@@ -202,9 +202,11 @@ All sources are deduplicated and merged. An **empty combined result** skips guar
 For manual runs without IaC, populate `testing/environment.yaml`:
 
 ```yaml
-services:
-  - type: vpc
-    cn03-allowed-requester-vpc-ids: ["vpc-abc123", "vpc-def456"]
+instances:
+  - id: main-aws
+    services:
+      - type: vpc
+        cn03-allowed-requester-vpc-ids: ["vpc-abc123", "vpc-def456"]
 ```
 
 Or export individual env vars before running tests (no config file change needed):
@@ -227,20 +229,20 @@ Main enforcement checks:
 
 ```bash
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN03.AR01 && MAIN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN03.AR01 MAIN'
 ```
 
 Opt-in sanity and matrix checks:
 
 ```bash
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN03.AR01 && SANITY && OPT_IN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN03.AR01 SANITY OPT_IN'
 ```
 
 IaC note:
@@ -263,10 +265,10 @@ Main policy check:
 
 ```bash
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN04.AR01 && MAIN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN04.AR01 MAIN'
 ```
 
 Opt-in behavior check (generates traffic; may incur cloud cost):
@@ -274,10 +276,10 @@ Opt-in behavior check (generates traffic; may incur cloud cost):
 ```bash
 export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN02
 ./testing/run-compliance-tests.sh \
-  --provider aws \
-  --region "$REGION" \
-  --service vpc \
-  --tag 'CCC.VPC.CN04.AR01 && OPT_IN'
+  --instance main-aws \
+
+  --service vpc
+  --tags 'CCC.VPC.CN04.AR01 OPT_IN'
 ```
 
 IaC note:
