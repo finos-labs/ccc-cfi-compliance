@@ -126,8 +126,7 @@ export AWS_REGION=us-east-1
 ```bash
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN01.AR01 MAIN'
 ```
 
@@ -142,19 +141,18 @@ Main policy check:
 ```bash
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN02.AR01 MAIN'
 ```
 
 Opt-in behavior check (creates and deletes test resource):
 
 ```bash
-export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN04
+# CN_TEST_AMI_ID is optional — omit to auto-detect the latest Amazon Linux 2023 AMI in the region
+export CN_TEST_AMI_ID="<ami-id-for-region>"   # shared with CN04
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN02.AR01 OPT_IN'
 ```
 
@@ -230,8 +228,7 @@ Main enforcement checks:
 ```bash
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN03.AR01 MAIN'
 ```
 
@@ -240,8 +237,7 @@ Opt-in sanity and matrix checks:
 ```bash
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN03.AR01 SANITY OPT_IN'
 ```
 
@@ -255,6 +251,8 @@ CN03 result diagnostics (for failure reasoning):
 - `RequesterInAllowList`: whether tested requester VPC is in the allow-list.
 - `GuardrailExpectation`: expected runtime decision from allow-list (`allow` or `deny`).
 - `GuardrailMismatch`: `true` when dry-run runtime outcome does not match allow-list expectation.
+- `ConflictType`: set on mismatch — `ALLOWLIST_CONFLICT` (allowlisted requester denied), `DENYLIST_CONFLICT` (non-allowlisted requester permitted), or `GUARDRAIL_CONFLICT` (other mismatch). Empty on success.
+- `ConflictMessage`: human-readable description of the conflict. Empty on success.
 - `Reason`: includes explicit suffix:
   - `CN03 guardrail aligned: ...` when behavior matches expectation.
   - `CN03 guardrail mismatch: ...` when behavior differs (missing/misconfigured enforcement).
@@ -266,19 +264,18 @@ Main policy check:
 ```bash
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN04.AR01 MAIN'
 ```
 
 Opt-in behavior check (generates traffic; may incur cloud cost):
 
 ```bash
-export CN_TEST_AMI_ID="<ami-id-for-region>"   # required for OPT_IN; shared with CN02
+# CN_TEST_AMI_ID is optional — omit to auto-detect the latest Amazon Linux 2023 AMI in the region
+export CN_TEST_AMI_ID="<ami-id-for-region>"   # shared with CN02
 ./testing/run-compliance-tests.sh \
   --instance main-aws \
-
-  --service vpc
+  --service vpc \
   --tags 'CCC.VPC.CN04.AR01 OPT_IN'
 ```
 
