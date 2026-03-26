@@ -25,7 +25,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
   #
   # Dry-run is used so no real peering connection is created.
 
-  @Policy @SANITY @ALLOWLIST @OPT_IN @CCC.VPC
+  @Policy @SANITY @ALLOWLIST @OPT_IN
   # Evaluates every VPC in the allow-list from all sources (terraform fixtures,
   # env vars, environment.yaml guardrail entries) and asserts all are correctly
   # classified.
@@ -66,7 +66,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.Reason}" contains "guardrail aligned"
     And "{result.ConflictType}" is ""
 
-  @Destructive @SANITY @OPT_IN @CCC.VPC
+  @Destructive @SANITY @OPT_IN
   # Dry-runs every VPC in the allow-list against the in-scope receiver VPC.
   # A guardrail mismatch means a legitimately allowed VPC was denied — that
   # indicates misconfigured guardrail policy.
@@ -78,7 +78,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.AllCorrect}" is true
     And "{result.ViolationCount}" is "0"
 
-  @Destructive @SANITY @OPT_IN @CCC.VPC
+  @Destructive @SANITY @OPT_IN
   Scenario: Batch trial matrix (dry-run): all file-listed requesters match expected outcomes
     Given "{PeerTrialMatrixFile}" is not nil
     When I call "{vpcService}" with "RunVpcPeeringDryRunTrialsFromFile" using argument "{PeerTrialMatrixFile}"
