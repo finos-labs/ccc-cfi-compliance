@@ -87,6 +87,6 @@ variable "cn01_observation_only" {
 variable "map_public_ip_on_launch" {
   description = "Whether instances launched in public subnets receive a public IP by default (set true to simulate CCC.VPC.CN02 failure; set false to satisfy CCC.VPC.CN02)."
   type        = bool
-  default     = true
+  default     = false
 }
 

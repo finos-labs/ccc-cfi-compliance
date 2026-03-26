@@ -81,7 +81,7 @@ jobs:
       - name: Load compliance testing environment
         run: |
           echo "📋 Loading compliance testing environment..."
-          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
           echo "✅ Environment variables loaded"
 
       - name: Configure AWS Credentials (OIDC)
