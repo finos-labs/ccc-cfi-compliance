@@ -68,7 +68,8 @@ Examples: `ControlId`, `TestRequirementCategory`.
 
 Feature-level baseline:
 
-- `@CCC.VPC.CNxx.ARyy`
+- `@CCC.VPC.CNxx` — control-level tag (enables `--tags '@CCC.VPC.CN01'` filtering)
+- `@CCC.VPC.CNxx.ARyy` — assessment requirement tag
 - `@tlp-amber` / `@tlp-red`
 
 `@CCC.VPC` placement rule:
@@ -135,7 +136,7 @@ Avoid unsupported forms such as:
 @CCC.VPC
 Scenario: PASS when <policy condition>
   Given ...
-  When I call "{vpcService}" with "<MethodName>" <with parameter ...>
+  When I call "{vpcService}" with "<MethodName>" using argument "<param>"
   Then "{result.<PrimaryObservable>}" is "<ExpectedValue>"
 ```
 
@@ -146,7 +147,7 @@ Scenario: PASS when <policy condition>
 @CCC.VPC
 Scenario: PASS when runtime behavior shows <expected behavior>
   Given ...
-  When I call "{vpcService}" with "<MethodName>" <with parameter ...>
+  When I call "{vpcService}" with "<MethodName>" using argument "<param>"
   Then "{result.<RuntimeObservable>}" is "<ExpectedValue>"
 ```
 
@@ -156,7 +157,7 @@ Scenario: PASS when runtime behavior shows <expected behavior>
 @Destructive @NEGATIVE @OPT_IN
 Scenario: blocked when <disallowed action>
   Given ...
-  When I call "{vpcService}" with "<MethodName>" <with parameter ...>
+  When I call "{vpcService}" with "<MethodName>" using argument "<param>"
   Then "{result.<BlockObservable>}" is true
 ```
 
@@ -171,7 +172,68 @@ Before finalizing a feature file, confirm:
 - no unnecessary coupling to non-essential output fields
 - default scenarios are stable in normal environments
 
-## 10) Definition of Done
+## 10) Account Prerequisites
+
+Some controls require a one-time manual action in the target AWS account before the default CI scenario will pass. These are not Terraform responsibilities — they reflect account-level state that AWS creates automatically.
+
+### CN01 — Delete the default AWS VPC
+
+AWS automatically creates a default VPC in every region for every account. CN01 checks that no default VPC exists. Until it is manually deleted, **CN01 MAIN will always fail** — this does not indicate broken infrastructure.
+
+```bash
+# Check if a default VPC exists
+aws ec2 describe-vpcs --filters "Name=is-default,Values=true" --query "Vpcs[*].VpcId"
+
+# Delete subnets inside it first, then the IGW, then the VPC itself
+# (AWS will reject the delete if dependent resources remain)
+aws ec2 delete-vpc --vpc-id vpc-xxxxxxxx
+```
+
+Once deleted, CN01 MAIN passes. CN01 NEGATIVE (which proves detection works) will then fail — that is expected when in the compliant state.
+
+## 11) Simulating Failures (Negative Testing)
+
+Default deployments are compliant by design. To verify detection works, each control should include a `@NEGATIVE @OPT_IN` scenario and a documented way to trigger the failure state.
+
+### CN01 — Default VPC as failure state
+
+CN01 checks for the presence of the AWS account-level default VPC. The compliant state is no default VPC. To simulate failure, leave the default VPC in place (AWS creates one per region automatically).
+
+```bash
+# Verify a default VPC exists (failure state)
+aws ec2 describe-vpcs --filters "Name=is-default,Values=true" --query "Vpcs[*].VpcId"
+
+# Run negative check
+./run-compliance-tests.sh --instance main-aws --service vpc --tags '@NEGATIVE' --output output
+```
+
+### CN02 — Redeploy with MapPublicIpOnLaunch=true
+
+CN02 checks that public subnets do not auto-assign external IPs. The default is `false` (compliant). To simulate failure:
+
+```bash
+# 1. Set failure state
+echo 'map_public_ip_on_launch = true' > remote/aws/vpc/terraform.tfvars
+terraform -chdir=remote/aws/vpc apply -auto-approve
+
+# 2. Run negative check
+cd testing
+./run-compliance-tests.sh --instance main-aws --service vpc --tags '@NEGATIVE' --output output
+
+# 3. Restore compliant state
+rm remote/aws/vpc/terraform.tfvars
+terraform -chdir=remote/aws/vpc apply -auto-approve
+```
+
+### General pattern
+
+Every control should have:
+
+- A `@MAIN @DEFAULT` scenario proving the compliant state passes in normal CI.
+- A `@NEGATIVE @OPT_IN` scenario proving the non-compliant state is detected.
+- Documentation here (or in the policy README) on how to reach the failure state.
+
+## 12) Definition of Done
 
 A scenario is done when a reviewer can answer all three without reading code:
 
