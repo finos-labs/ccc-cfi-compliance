@@ -43,7 +43,7 @@ func (s *AWSVPCService) SummarizeVpcFlowLogs(vpcID string) (string, error) {
 }
 
 func (s *AWSVPCService) EvaluateVpcFlowLogsControl(vpcID string) (map[string]interface{}, error) {
-	vpcIDStr := fmt.Sprintf("%v", vpcID)
+	vpcIDStr := strings.TrimSpace(fmt.Sprintf("%v", vpcID))
 	if vpcIDStr == "" {
 		return nil, fmt.Errorf("vpcID is required")
 	}
@@ -54,6 +54,7 @@ func (s *AWSVPCService) EvaluateVpcFlowLogsControl(vpcID string) (map[string]int
 	}
 
 	nonCompliantFlowLogIDs := make([]string, 0)
+	compliantCount := 0
 	for _, item := range flowLogs {
 		row, ok := item.(map[string]interface{})
 		if !ok {
@@ -62,7 +63,9 @@ func (s *AWSVPCService) EvaluateVpcFlowLogsControl(vpcID string) (map[string]int
 
 		status := strings.TrimSpace(fmt.Sprintf("%v", row["FlowLogStatus"]))
 		trafficType := strings.TrimSpace(fmt.Sprintf("%v", row["TrafficType"]))
-		if status != "ACTIVE" || trafficType != "ALL" {
+		if status == "ACTIVE" && trafficType == "ALL" {
+			compliantCount++
+		} else {
 			nonCompliantFlowLogIDs = append(nonCompliantFlowLogIDs, strings.TrimSpace(fmt.Sprintf("%v", row["FlowLogId"])))
 		}
 	}
@@ -70,18 +73,18 @@ func (s *AWSVPCService) EvaluateVpcFlowLogsControl(vpcID string) (map[string]int
 	verdict := "PASS"
 	resultClass := "PASS"
 	compliant := true
-	reason := fmt.Sprintf("all %d VPC flow log(s) are ACTIVE with TrafficType=ALL", len(flowLogs))
+	reason := fmt.Sprintf("%d VPC flow log(s) are ACTIVE with TrafficType=ALL", compliantCount)
 
 	if len(flowLogs) == 0 {
 		verdict = "FAIL"
 		resultClass = "FAIL"
 		compliant = false
 		reason = "no VPC flow logs are configured"
-	} else if len(nonCompliantFlowLogIDs) > 0 {
+	} else if compliantCount == 0 {
 		verdict = "FAIL"
 		resultClass = "FAIL"
 		compliant = false
-		reason = fmt.Sprintf("%d flow log(s) are not ACTIVE and TrafficType=ALL", len(nonCompliantFlowLogIDs))
+		reason = fmt.Sprintf("%d flow log(s) are not ACTIVE or not TrafficType=ALL", len(nonCompliantFlowLogIDs))
 	}
 
 	return map[string]interface{}{

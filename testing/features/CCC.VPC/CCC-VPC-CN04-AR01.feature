@@ -1,11 +1,11 @@
-@tlp-amber @tlp-red @CCC.VPC.CN04.AR01
+@vpc @tlp-amber @tlp-red @CCC.VPC.CN04.AR01
 Feature: CCC.VPC.CN04.AR01 - Flow logs must capture all VPC traffic
   As a security administrator
   I want VPC traffic to be captured and logged
   So that audit and investigation requirements are met
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" with parameter "vpc"
     And I refer to "{result}" as "vpcService"
 
