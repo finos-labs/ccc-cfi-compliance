@@ -27,8 +27,10 @@ with open(sys.argv[1], "w", encoding="utf-8") as env_file:
         env_file.write(f"export {key}={shlex.quote(str(env_map[key]))}\n")
 PY
 
-MATRIX_ABS="$(cd "$(dirname "${MATRIX_FILE}")" && pwd)/$(basename "${MATRIX_FILE}")"
-echo "export CN03_PEER_TRIAL_MATRIX_FILE='${MATRIX_ABS}'" >> "${ENV_FILE}"
+# Keep matrix path portable (no machine-specific absolute path).
+# Resolve only a leading "./" to reduce noise while preserving relative structure.
+MATRIX_PORTABLE="${MATRIX_FILE#./}"
+echo "export CN03_PEER_TRIAL_MATRIX_FILE='${MATRIX_PORTABLE}'" >> "${ENV_FILE}"
 
 echo "Wrote ${MATRIX_FILE}"
 echo "Wrote ${ENV_FILE}"

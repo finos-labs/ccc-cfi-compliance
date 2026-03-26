@@ -81,10 +81,19 @@ output "cn03_guardrail_policy_arn" {
   value       = local.cn03_guardrail_policy_arn
 }
 
+output "cn03_test_role_arn" {
+  description = "ARN of the CN03 test IAM role (non-empty only when cn03_create_test_role=true)."
+  value       = try(aws_iam_role.cn03_test_role[0].arn, null)
+}
+
 output "cn03_guardrail_status" {
   description = "CN03 guardrail declaration summary."
   value = {
     applied                       = var.cn03_apply_guardrail
+    attach_to_caller_principal    = var.cn03_attach_guardrail_to_caller_principal
+    caller_arn                    = local.cn03_caller_arn
+    caller_user_name              = local.cn03_caller_user_name
+    caller_role_name              = local.cn03_caller_role_name
     condition_key                 = "ec2:RequesterVpc"
     allowed_account_ids           = local.cn03_allowed_account_ids_effective
     allowed_accepter_vpc_arns     = local.cn03_allowed_accepter_vpc_arns
@@ -94,6 +103,7 @@ output "cn03_guardrail_status" {
     attached_role_names           = local.cn03_guardrail_role_names
     attached_user_names           = local.cn03_guardrail_user_names
     policy_mode                   = local.cn03_guardrail_policy_mode
+    policy_name                   = local.cn03_target_guardrail_policy_name
     existing_policy_arn_input     = local.cn03_existing_guardrail_policy_arn
     guardrail_policy_arn          = local.cn03_guardrail_policy_arn
   }

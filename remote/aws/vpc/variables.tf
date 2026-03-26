@@ -167,10 +167,22 @@ variable "cn03_guardrail_attach_user_names" {
   default     = []
 }
 
+variable "cn03_attach_guardrail_to_caller_principal" {
+  description = "Whether to auto-attach CN03 guardrail policy to the current AWS caller principal (user or role) inferred from caller ARN."
+  type        = bool
+  default     = true
+}
+
 variable "cn03_existing_guardrail_policy_arn" {
   description = "Existing managed IAM policy ARN to update in-place for CN03 guardrail. When set, Terraform updates this policy document instead of creating a new managed policy."
   type        = string
   default     = ""
+}
+
+variable "cn03_guardrail_policy_name" {
+  description = "Managed IAM policy name for CN03 guardrail when creating/updating by name."
+  type        = string
+  default     = "CN03PeeringGuardrail"
 }
 
 variable "cn03_peer_class_tag_key" {
@@ -203,3 +215,8 @@ variable "cn03_peer_owner_id" {
   default     = ""
 }
 
+variable "cn03_create_test_role" {
+  description = "Create a dedicated IAM role for CN03 guardrail enforcement testing. When true, a role is created and automatically added to the guardrail attachment list."
+  type        = bool
+  default     = false
+}

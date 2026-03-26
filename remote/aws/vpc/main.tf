@@ -40,13 +40,34 @@ locals {
   } : {}
 
   cn03_allowed_account_ids_effective = length(var.cn03_allowed_account_ids) > 0 ? var.cn03_allowed_account_ids : [data.aws_caller_identity.current.account_id]
-  cn03_guardrail_role_names          = compact(var.cn03_guardrail_attach_role_names)
-  cn03_guardrail_user_names          = compact(var.cn03_guardrail_attach_user_names)
+  cn03_caller_arn                    = data.aws_caller_identity.current.arn
+  cn03_caller_arn_resource           = try(split(":", local.cn03_caller_arn)[5], "")
+  cn03_caller_is_user                = startswith(local.cn03_caller_arn_resource, "user/")
+  cn03_caller_is_assumed_role        = startswith(local.cn03_caller_arn_resource, "assumed-role/")
+  cn03_caller_is_role                = startswith(local.cn03_caller_arn_resource, "role/")
+  cn03_caller_user_name              = local.cn03_caller_is_user ? element(reverse(split("/", local.cn03_caller_arn_resource)), 0) : ""
+  cn03_caller_role_name = local.cn03_caller_is_assumed_role ? try(split("/", local.cn03_caller_arn_resource)[1], "") : (
+    local.cn03_caller_is_role ? element(reverse(split("/", local.cn03_caller_arn_resource)), 0) : ""
+  )
+  cn03_guardrail_role_names = compact(distinct(concat(
+    var.cn03_guardrail_attach_role_names,
+    var.cn03_attach_guardrail_to_caller_principal ? [local.cn03_caller_role_name] : [],
+    [try(aws_iam_role.cn03_test_role[0].name, "")]
+  )))
+  cn03_guardrail_user_names = compact(distinct(concat(
+    var.cn03_guardrail_attach_user_names,
+    var.cn03_attach_guardrail_to_caller_principal ? [local.cn03_caller_user_name] : []
+  )))
   cn03_existing_guardrail_policy_arn = trimspace(var.cn03_existing_guardrail_policy_arn)
-  cn03_create_guardrail_policy       = var.cn03_apply_guardrail && local.cn03_existing_guardrail_policy_arn == ""
-  cn03_update_guardrail_policy       = var.cn03_apply_guardrail && local.cn03_existing_guardrail_policy_arn != ""
-  cn03_guardrail_policy_arn          = local.cn03_update_guardrail_policy ? local.cn03_existing_guardrail_policy_arn : try(aws_iam_policy.cn03_guardrail[0].arn, null)
-  cn03_guardrail_policy_mode         = local.cn03_update_guardrail_policy ? "existing" : (local.cn03_create_guardrail_policy ? "create" : "disabled")
+  cn03_guardrail_policy_name         = trimspace(var.cn03_guardrail_policy_name)
+  cn03_target_guardrail_policy_arn = local.cn03_existing_guardrail_policy_arn != "" ? local.cn03_existing_guardrail_policy_arn : format(
+    "arn:aws:iam::%s:policy/%s",
+    data.aws_caller_identity.current.account_id,
+    local.cn03_guardrail_policy_name,
+  )
+  cn03_target_guardrail_policy_name = local.cn03_existing_guardrail_policy_arn != "" ? element(reverse(split("/", local.cn03_existing_guardrail_policy_arn)), 0) : local.cn03_guardrail_policy_name
+  cn03_guardrail_policy_arn         = var.cn03_apply_guardrail ? local.cn03_target_guardrail_policy_arn : null
+  cn03_guardrail_policy_mode        = var.cn03_apply_guardrail ? "reconcile" : "disabled"
 
   cn03_allowed_accepter_vpc_arns = distinct(concat(
     [for key in sort(keys(aws_vpc.cn03_allowed_peer)) : aws_vpc.cn03_allowed_peer[key].arn],
@@ -171,33 +192,34 @@ data "aws_vpc" "cn03_tagged_disallowed" {
   id       = each.value
 }
 
-resource "aws_iam_policy" "cn03_guardrail" {
-  count = local.cn03_create_guardrail_policy ? 1 : 0
+resource "aws_iam_role" "cn03_test_role" {
+  count = var.cn03_apply_guardrail && var.cn03_create_test_role ? 1 : 0
 
-  name_prefix = "${local.name}-cn03-guardrail-"
-  description = "CN03 guardrail policy for CreateVpcPeeringConnection requester VPC allow-list enforcement."
-  policy      = local.cn03_guardrail_policy_json
-
-  tags = merge(local.common_resource_tags, {
-    Name       = "${local.name}-cn03-guardrail"
-    CFIControl = "CCC.VPC.CN03"
+  name        = "${local.name}-cn03-test-role"
+  description = "Dedicated IAM role for CN03 guardrail enforcement testing."
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }
+      Action    = "sts:AssumeRole"
+    }]
   })
 
-  lifecycle {
-    precondition {
-      condition     = length(local.cn03_allowed_accepter_vpc_arns) > 0
-      error_message = "CN03 guardrail requires at least one allowlisted requester VPC ARN. Add the allowed tag or set cn03_allowed_accepter_vpc_arns."
-    }
-  }
+  tags = merge(local.common_resource_tags, {
+    Name       = "${local.name}-cn03-test-role"
+    CFIControl = "CCC.VPC.CN03"
+  })
 }
 
-resource "null_resource" "cn03_guardrail_existing" {
-  count = local.cn03_update_guardrail_policy ? 1 : 0
+resource "null_resource" "cn03_guardrail_reconcile" {
+  count = var.cn03_apply_guardrail ? 1 : 0
 
   triggers = {
-    policy_arn = local.cn03_existing_guardrail_policy_arn
-    policy_sha = sha256(local.cn03_guardrail_policy_json)
-    policy_b64 = base64encode(local.cn03_guardrail_policy_json)
+    policy_arn  = local.cn03_target_guardrail_policy_arn
+    policy_name = local.cn03_target_guardrail_policy_name
+    policy_sha  = sha256(local.cn03_guardrail_policy_json)
+    policy_b64  = base64encode(local.cn03_guardrail_policy_json)
   }
 
   lifecycle {
@@ -214,22 +236,29 @@ resource "null_resource" "cn03_guardrail_existing" {
       set -euo pipefail
 
       POLICY_ARN='${self.triggers.policy_arn}'
+      POLICY_NAME='${self.triggers.policy_name}'
       TMP_POLICY_FILE="$$(mktemp)"
       echo '${self.triggers.policy_b64}' | base64 --decode > "$${TMP_POLICY_FILE}"
-
-      VERSION_COUNT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'length(Versions)' --output text)"
-      if [ "$${VERSION_COUNT}" -ge 5 ]; then
-        OLDEST_NON_DEFAULT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' --output text)"
-        if [ "$${OLDEST_NON_DEFAULT}" != "None" ] && [ -n "$${OLDEST_NON_DEFAULT}" ]; then
-          aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id "$${OLDEST_NON_DEFAULT}"
+      if aws iam get-policy --policy-arn "$${POLICY_ARN}" >/dev/null 2>&1; then
+        VERSION_COUNT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'length(Versions)' --output text)"
+        if [ "$${VERSION_COUNT}" -ge 5 ]; then
+          OLDEST_NON_DEFAULT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' --output text)"
+          if [ "$${OLDEST_NON_DEFAULT}" != "None" ] && [ -n "$${OLDEST_NON_DEFAULT}" ]; then
+            aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id "$${OLDEST_NON_DEFAULT}"
+          fi
         fi
-      fi
 
-      aws iam create-policy-version \
-        --policy-arn "$${POLICY_ARN}" \
-        --policy-document "file://$${TMP_POLICY_FILE}" \
-        --set-as-default \
-        >/dev/null
+        aws iam create-policy-version \
+          --policy-arn "$${POLICY_ARN}" \
+          --policy-document "file://$${TMP_POLICY_FILE}" \
+          --set-as-default \
+          >/dev/null
+      else
+        aws iam create-policy \
+          --policy-name "$${POLICY_NAME}" \
+          --policy-document "file://$${TMP_POLICY_FILE}" \
+          >/dev/null
+      fi
 
       rm -f "$${TMP_POLICY_FILE}"
     EOT
@@ -241,6 +270,7 @@ resource "aws_iam_role_policy_attachment" "cn03_guardrail" {
 
   role       = local.cn03_guardrail_role_names[count.index]
   policy_arn = local.cn03_guardrail_policy_arn
+  depends_on = [null_resource.cn03_guardrail_reconcile]
 }
 
 resource "aws_iam_user_policy_attachment" "cn03_guardrail" {
@@ -248,5 +278,5 @@ resource "aws_iam_user_policy_attachment" "cn03_guardrail" {
 
   user       = local.cn03_guardrail_user_names[count.index]
   policy_arn = local.cn03_guardrail_policy_arn
+  depends_on = [null_resource.cn03_guardrail_reconcile]
 }
-
