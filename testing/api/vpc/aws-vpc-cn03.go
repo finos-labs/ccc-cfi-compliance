@@ -88,7 +88,7 @@ func (s *AWSVPCService) LoadVpcPeeringTrialMatrix(filePath string) (map[string]i
 		"AllRequesterCount":          len(allRequesterIDs),
 		"AllowedListDefined":         len(matrix.AllowedRequesterVpcIDs) > 0,
 		"DisallowedListDefined":      len(matrix.DisallowedRequesterVpcIDs) > 0,
-		"ReceiverVpcIdMatchesRegion": matrix.ReceiverVpcID != "",
+		"ReceiverVpcIdDefined":       matrix.ReceiverVpcID != "",
 	}, nil
 }
 
@@ -440,8 +440,8 @@ func (s *AWSVPCService) loadCN03TrialMatrix(filePath string) (cn03TrialMatrix, s
 }
 
 // cn03IndexedEnvValues reads up to 99 sequentially numbered env vars with the
-// given prefix (e.g. CN03_ALLOWED_REQUESTER_VPC_ID_1..99). Iteration stops at
-// the first gap but collects all non-empty values regardless of order.
+// given prefix (e.g. CN03_ALLOWED_REQUESTER_VPC_ID_1..99). All indices are
+// scanned; empty entries are skipped without stopping iteration.
 func cn03IndexedEnvValues(prefix string) []string {
 	values := make([]string, 0)
 	for i := 1; i <= 99; i++ {

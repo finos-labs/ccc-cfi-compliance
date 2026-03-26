@@ -1,11 +1,11 @@
-@tlp-amber @tlp-red @CCC.VPC.CN03.AR01
+@vpc @tlp-amber @tlp-red @CCC.VPC.CN03.AR01
 Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted requesters
   As a security administrator
   I want peering requests from non-approved requester VPCs to be denied
   So that network connectivity is restricted to authorized boundaries
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" with parameter "vpc"
     And I refer to "{result}" as "vpcService"
     And I refer to "{CN03_RECEIVER_VPC_ID}" as "ReceiverVpcId"

@@ -203,7 +203,7 @@ jobs:
           ENV_FILE="cn03-artifacts/cn03-feature.env"
           if [ -f "$ENV_FILE" ]; then
             echo "📋 Loading CN03 feature environment..."
-            grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/^export //' >> $GITHUB_ENV
+            grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
             # Override matrix file path to runner-local location
             echo "CN03_PEER_TRIAL_MATRIX_FILE=$GITHUB_WORKSPACE/cn03-artifacts/cn03-peer-trials.json" >> $GITHUB_ENV
             echo "✅ CN03 environment loaded"
