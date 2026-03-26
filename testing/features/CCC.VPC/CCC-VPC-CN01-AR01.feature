@@ -1,4 +1,4 @@
-@vpc @tlp-amber @tlp-red @CCC.VPC.CN01.AR01
+@vpc @tlp-amber @tlp-red @CCC.VPC.CN01 @CCC.VPC.CN01.AR01
 Feature: CCC.VPC.CN01.AR01 - Subscription must not contain default network resources
   As a security administrator
   I want to ensure default network resources are not present in the subscription
@@ -6,7 +6,7 @@ Feature: CCC.VPC.CN01.AR01 - Subscription must not contain default network resou
 
   Background:
     Given a cloud api for "{Instance}" in "api"
-    And I call "{api}" with "GetServiceAPI" with parameter "vpc"
+    And I call "{api}" with "GetServiceAPI" using argument "vpc"
     And I refer to "{result}" as "vpcService"
 
   @Policy @MAIN @DEFAULT @CCC.VPC
