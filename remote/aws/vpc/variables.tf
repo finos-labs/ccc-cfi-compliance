@@ -220,3 +220,34 @@ variable "cn03_create_test_role" {
   type        = bool
   default     = false
 }
+
+# --- CN04 ---
+
+variable "cn04_enable_flow_logs" {
+  description = "Enable VPC flow logs on the primary VPC (disabled by default; set true for CN04 policy checks)."
+  type        = bool
+  default     = false
+}
+
+variable "cn04_flow_log_traffic_type" {
+  description = "Traffic type for CN04 flow logs: ALL, ACCEPT, or REJECT."
+  type        = string
+  default     = "ALL"
+
+  validation {
+    condition     = contains(["ALL", "ACCEPT", "REJECT"], upper(var.cn04_flow_log_traffic_type))
+    error_message = "cn04_flow_log_traffic_type must be one of: ALL, ACCEPT, REJECT."
+  }
+}
+
+variable "cn04_flow_log_retention_days" {
+  description = "Retention period in days for the CN04 CloudWatch log group."
+  type        = number
+  default     = 7
+}
+
+variable "cn04_flow_log_log_group_prefix" {
+  description = "Prefix for the CN04 CloudWatch log group name."
+  type        = string
+  default     = "/aws/vpc/flow-logs"
+}
