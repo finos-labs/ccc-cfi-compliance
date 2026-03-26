@@ -1,11 +1,11 @@
-@tlp-red @CCC.VPC.CN02.AR01
+@vpc @tlp-red @CCC.VPC.CN02.AR01
 Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
   As a security administrator
   I want to ensure resources created in public subnets are not assigned an external IP address by default
   So that public exposure is minimized
 
   Background:
-    Given a cloud api for "{Provider}" in "api"
+    Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" with parameter "vpc"
     And I refer to "{result}" as "vpcService"
 
@@ -30,7 +30,7 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
     And I refer to "{result.ResourceId}" as "TestResourceId"
     And I call "{vpcService}" with "GetResourceExternalIpAssignment" with parameter "{TestResourceId}"
     And I refer to "{result.HasExternalIp}" as "HasExternalIp"
-    # And we wait for a period of "20000" ms # uncomment to allow visisble confirmation for checking instance live for 20 seconds
+    # And we wait for a period of "20000" ms # uncomment to allow visible confirmation for checking instance live for 20 seconds
     And I call "{vpcService}" with "DeleteTestResource" with parameter "{TestResourceId}"
     Then "{result.Deleted}" is true
     And "{HasExternalIp}" is false

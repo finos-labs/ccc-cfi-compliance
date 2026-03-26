@@ -20,7 +20,7 @@ validity_commentary: >
 
 query: |
   DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
-    --region ${AWS_REGION} \
+    --region ${Region} \
     --filters Name=is-default,Values=true \
     --query 'Vpcs[0].VpcId' \
     --output text 2>/dev/null || true)
@@ -29,7 +29,7 @@ query: |
     echo '{"InternetGateways":[]}'
   else
     aws ec2 describe-internet-gateways \
-      --region ${AWS_REGION} \
+      --region ${Region} \
       --filters Name=attachment.vpc-id,Values=${DEFAULT_VPC_ID}
   fi
 

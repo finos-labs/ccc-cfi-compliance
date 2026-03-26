@@ -29,28 +29,28 @@ query: |
   # has a 0.0.0.0/0 route to an Internet Gateway, then check MapPublicIpOnLaunch=false.
   #
   # Required inputs:
-  # - AWS_REGION
-  # - VPC_ID
+  # - Region
+  # - UID (VPC ID)
 
   SUBNET_IDS=$(aws ec2 describe-subnets \
-    --region ${AWS_REGION} \
-    --filters Name=vpc-id,Values=${VPC_ID} \
+    --region ${Region} \
+    --filters Name=vpc-id,Values=${UID} \
     --query 'Subnets[].SubnetId' \
     --output text)
 
-  PUBLIC_SUBNETS=()
+  PUBLIC_SUBNETS=""
   for SUBNET_ID in ${SUBNET_IDS}; do
     # Find the route table associated to the subnet; fall back to main route table.
     ROUTE_TABLE_ID=$(aws ec2 describe-route-tables \
-      --region ${AWS_REGION} \
+      --region ${Region} \
       --filters Name=association.subnet-id,Values=${SUBNET_ID} \
       --query 'RouteTables[0].RouteTableId' \
       --output text 2>/dev/null || true)
 
     if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
       ROUTE_TABLE_ID=$(aws ec2 describe-route-tables \
-        --region ${AWS_REGION} \
-        --filters Name=vpc-id,Values=${VPC_ID} Name=association.main,Values=true \
+        --region ${Region} \
+        --filters Name=vpc-id,Values=${UID} Name=association.main,Values=true \
         --query 'RouteTables[0].RouteTableId' \
         --output text 2>/dev/null || true)
     fi
@@ -60,22 +60,23 @@ query: |
     fi
 
     IGW_TARGET=$(aws ec2 describe-route-tables \
-      --region ${AWS_REGION} \
+      --region ${Region} \
       --route-table-ids ${ROUTE_TABLE_ID} \
       --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId | [0]" \
       --output text 2>/dev/null || true)
 
     if echo "${IGW_TARGET}" | grep -q "^igw-"; then
-      PUBLIC_SUBNETS+=("${SUBNET_ID}")
+      PUBLIC_SUBNETS="${PUBLIC_SUBNETS} ${SUBNET_ID}"
     fi
   done
 
-  if [ ${#PUBLIC_SUBNETS[@]} -eq 0 ]; then
+  PUBLIC_SUBNETS=$(echo "${PUBLIC_SUBNETS}" | tr -s ' ' | sed 's/^ //')
+  if [ -z "${PUBLIC_SUBNETS}" ]; then
     echo '{"Subnets":[]}'
   else
     aws ec2 describe-subnets \
-      --region ${AWS_REGION} \
-      --subnet-ids ${PUBLIC_SUBNETS[@]}
+      --region ${Region} \
+      --subnet-ids ${PUBLIC_SUBNETS}
   fi
 
 rules:

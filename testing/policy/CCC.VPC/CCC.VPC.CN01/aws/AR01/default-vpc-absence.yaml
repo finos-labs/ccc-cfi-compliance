@@ -20,7 +20,7 @@ validity_commentary: >
 
 query: |
   aws ec2 describe-vpcs \
-    --region ${AWS_REGION} \
+    --region ${Region} \
     --filters Name=is-default,Values=true
 
 rules:
