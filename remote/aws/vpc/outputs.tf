@@ -1,0 +1,14 @@
+output "vpc_id" {
+  description = "Created VPC ID"
+  value       = module.vpc.vpc_id
+}
+
+output "public_subnet_ids" {
+  description = "Created public subnet IDs"
+  value       = module.vpc.public_subnets
+}
+
+output "common_resource_tags" {
+  description = "Resolved common tag set applied to all resources."
+  value       = local.common_resource_tags
+}

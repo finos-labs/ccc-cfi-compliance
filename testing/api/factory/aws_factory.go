@@ -9,6 +9,7 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/iam"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/logging"
 	objstorage "github.com/finos-labs/ccc-cfi-compliance/testing/api/object-storage"
+	vpcapi "github.com/finos-labs/ccc-cfi-compliance/testing/api/vpc"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
@@ -73,6 +74,13 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 			return nil, fmt.Errorf("failed to create AWS logging service: %w", err)
 		}
 
+	case "vpc":
+		service, err := vpcapi.NewAWSVPCService(f.ctx, f.instance)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AWS service '%s': %w", serviceID, err)
+		}
+		return service, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)
 	}
@@ -118,6 +126,11 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 				return nil, fmt.Errorf("user provisioning validation failed: %w", err)
 			}
 		}
+
+	case "vpc":
+		// VPC tests currently run with the runner's ambient credentials.
+		// Per-identity clients can be added later when needed for negative testing.
+		return nil, fmt.Errorf("vpc with identity not yet implemented for AWS")
 
 	default:
 		return nil, fmt.Errorf("unsupported service type for AWS: %s", serviceID)

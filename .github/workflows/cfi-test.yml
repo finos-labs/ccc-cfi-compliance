@@ -81,7 +81,7 @@ jobs:
       - name: Load compliance testing environment
         run: |
           echo "📋 Loading compliance testing environment..."
-          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
           echo "✅ Environment variables loaded"
 
       - name: Configure AWS Credentials (OIDC)
@@ -111,7 +111,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version-file: "testing/go.mod"
 
       - name: Install testssl.sh
         run: |
@@ -203,10 +203,11 @@ jobs:
             *)     echo "❌ Unknown provider: $TARGET_PROVIDER"; exit 1 ;;
           esac
 
-          # Map config service to compliance service type (storage → object-storage)
+          # Map config service to compliance service type (storage → object-storage, networking → vpc)
           case "$TARGET_SERVICE" in
-            storage) SERVICE_TYPE="object-storage" ;;
-            *)       SERVICE_TYPE="$TARGET_SERVICE" ;;
+            storage)    SERVICE_TYPE="object-storage" ;;
+            networking) SERVICE_TYPE="vpc" ;;
+            *)          SERVICE_TYPE="$TARGET_SERVICE" ;;
           esac
 
           ./run-compliance-tests.sh --instance "$INSTANCE_ID" --service "$SERVICE_TYPE" --output "output"
