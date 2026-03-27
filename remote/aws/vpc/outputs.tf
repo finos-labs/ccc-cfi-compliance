@@ -178,3 +178,23 @@ output "CN03_DISALLOWED_REQUESTER_VPC_ID_2" {
   description = "Second disallowed requester VPC ID."
   value       = try(local.cn03_disallowed_requester_vpc_ids[1], "")
 }
+
+output "cn_control_declarations" {
+  description = "Control-level declaration summary for this VPC module."
+  value = {
+    cn01_observation_only        = var.cn01_observation_only
+    cn02_map_public_ip_on_launch = var.map_public_ip_on_launch
+    cn04_flow_logs_enabled       = var.cn04_enable_flow_logs
+    cn04_flow_log_traffic_type   = upper(var.cn04_flow_log_traffic_type)
+  }
+}
+
+output "cn04_flow_log_id" {
+  description = "CN04 VPC flow log ID when flow logs are enabled."
+  value       = try(aws_flow_log.cn04_vpc[0].id, null)
+}
+
+output "cn04_flow_log_log_group_name" {
+  description = "CN04 CloudWatch log group used by flow logs."
+  value       = try(aws_cloudwatch_log_group.cn04_flow_logs[0].name, null)
+}

@@ -83,6 +83,13 @@ locals {
   cn03_guardrail_policy_json = templatefile("${path.module}/policies/cn03-guardrail-policy.json.tftpl", {
     allowed_requester_vpc_arns_json = jsonencode(local.cn03_allowed_accepter_vpc_arns)
   })
+
+  # ---------------------------------------------------------------------------
+  # CN04 — VPC flow logs must capture all traffic (CCC.VPC.CN04)
+  # ---------------------------------------------------------------------------
+
+  cn04_flow_log_role_name = substr("cfi-${var.target_id}-cn04-flowlogs-role", 0, 64)
+  cn04_log_group_name     = "${var.cn04_flow_log_log_group_prefix}/${local.name}"
 }
 
 # =============================================================================
@@ -280,3 +287,89 @@ resource "aws_iam_user_policy_attachment" "cn03_guardrail" {
   policy_arn = local.cn03_guardrail_policy_arn
   depends_on = [null_resource.cn03_guardrail_reconcile]
 }
+
+# =============================================================================
+# CN04 — VPC flow logs must capture all traffic (CCC.VPC.CN04)
+# Creates a CloudWatch log group, IAM role/policy, and aws_flow_log resource
+# scoped to the base VPC. All resources are gated by cn04_enable_flow_logs
+# flag — disabled by default.
+# =============================================================================
+
+resource "aws_cloudwatch_log_group" "cn04_flow_logs" {
+  count = var.cn04_enable_flow_logs ? 1 : 0
+
+  name              = local.cn04_log_group_name
+  retention_in_days = var.cn04_flow_log_retention_days
+
+  tags = merge(local.common_resource_tags, {
+    Name       = "${local.name}-cn04-flow-logs"
+    CFIControl = "CCC.VPC.CN04"
+  })
+}
+
+resource "aws_iam_role" "cn04_flow_logs" {
+  count = var.cn04_enable_flow_logs ? 1 : 0
+
+  name = local.cn04_flow_log_role_name
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = merge(local.common_resource_tags, {
+    Name       = "${local.name}-cn04-flow-logs-role"
+    CFIControl = "CCC.VPC.CN04"
+  })
+}
+
+resource "aws_iam_role_policy" "cn04_flow_logs" {
+  count = var.cn04_enable_flow_logs ? 1 : 0
+
+  name = "${local.cn04_flow_log_role_name}-policy"
+  role = aws_iam_role.cn04_flow_logs[0].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:PutLogEvents"
+        ]
+        Resource = [
+          aws_cloudwatch_log_group.cn04_flow_logs[0].arn,
+          "${aws_cloudwatch_log_group.cn04_flow_logs[0].arn}:*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "cn04_vpc" {
+  count = var.cn04_enable_flow_logs ? 1 : 0
+
+  vpc_id               = module.vpc.vpc_id
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.cn04_flow_logs[0].arn
+  iam_role_arn         = aws_iam_role.cn04_flow_logs[0].arn
+  traffic_type         = upper(var.cn04_flow_log_traffic_type)
+
+  tags = merge(local.common_resource_tags, {
+    Name       = "${local.name}-cn04-flow-log"
+    CFIControl = "CCC.VPC.CN04"
+  })
+
+  depends_on = [aws_iam_role_policy.cn04_flow_logs]
+}
+
+
