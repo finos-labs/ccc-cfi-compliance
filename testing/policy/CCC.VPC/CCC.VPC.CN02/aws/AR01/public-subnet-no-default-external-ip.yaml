@@ -1,0 +1,88 @@
+name: Limit Resource Creation in Public Subnet
+metadata:
+  control_id: CCC.VPC.CN02
+  assessment_requirement_id: CCC.VPC.CN02.AR01
+  test_type: Policy
+  test_requirement_category: P
+service_type: vpc
+requirement_text: >
+  When a resource is created in a public subnet, that resource MUST NOT be assigned an external IP address by default.
+
+validity_score: 7
+validity_commentary: >
+  This query validates subnet-level default public IP assignment behavior in AWS.
+  In AWS, whether instances receive a public IPv4 address by default is primarily
+  controlled by the subnet attribute `MapPublicIpOnLaunch`.
+
+  Strengths:
+  - Uses control-plane inventory (DescribeSubnets/DescribeRouteTables) and does not generate traffic
+  - Directly checks the setting that drives default public IP assignment behavior
+
+  Limitations:
+  - Determining whether a subnet is "public" requires route table analysis (IGW route + association)
+  - Some workloads can still request/attach public IPs explicitly (outside the scope of this default behavior check)
+  - IPv6 and EIP attachment behaviors require additional checks if in scope
+  - If no public subnets are present, the check becomes N/A for that VPC
+
+query: |
+  # Identify public subnets in a VPC by finding subnets whose effective route table
+  # has a 0.0.0.0/0 route to an Internet Gateway, then check MapPublicIpOnLaunch=false.
+  #
+  # Required inputs:
+  # - Region
+  # - UID (VPC ID)
+
+  SUBNET_IDS=$(aws ec2 describe-subnets \
+    --region ${Region} \
+    --filters Name=vpc-id,Values=${UID} \
+    --query 'Subnets[].SubnetId' \
+    --output text)
+
+  PUBLIC_SUBNETS=""
+  for SUBNET_ID in ${SUBNET_IDS}; do
+    # Find the route table associated to the subnet; fall back to main route table.
+    ROUTE_TABLE_ID=$(aws ec2 describe-route-tables \
+      --region ${Region} \
+      --filters Name=association.subnet-id,Values=${SUBNET_ID} \
+      --query 'RouteTables[0].RouteTableId' \
+      --output text 2>/dev/null || true)
+
+    if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+      ROUTE_TABLE_ID=$(aws ec2 describe-route-tables \
+        --region ${Region} \
+        --filters Name=vpc-id,Values=${UID} Name=association.main,Values=true \
+        --query 'RouteTables[0].RouteTableId' \
+        --output text 2>/dev/null || true)
+    fi
+
+    if [ -z "${ROUTE_TABLE_ID}" ] || [ "${ROUTE_TABLE_ID}" = "None" ]; then
+      continue
+    fi
+
+    IGW_TARGET=$(aws ec2 describe-route-tables \
+      --region ${Region} \
+      --route-table-ids ${ROUTE_TABLE_ID} \
+      --query "RouteTables[0].Routes[?DestinationCidrBlock=='0.0.0.0/0'].GatewayId | [0]" \
+      --output text 2>/dev/null || true)
+
+    if echo "${IGW_TARGET}" | grep -q "^igw-"; then
+      PUBLIC_SUBNETS="${PUBLIC_SUBNETS} ${SUBNET_ID}"
+    fi
+  done
+
+  PUBLIC_SUBNETS=$(echo "${PUBLIC_SUBNETS}" | tr -s ' ' | sed 's/^ //')
+  if [ -z "${PUBLIC_SUBNETS}" ]; then
+    echo '{"Subnets":[]}'
+  else
+    aws ec2 describe-subnets \
+      --region ${Region} \
+      --subnet-ids ${PUBLIC_SUBNETS}
+  fi
+
+rules:
+  - jsonpath: "$.Subnets[?(@.MapPublicIpOnLaunch==true)]"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      The result MUST NOT contain any public subnet where MapPublicIpOnLaunch is true.
+      If no public subnets are present, the result is empty (treated as N/A for that VPC).

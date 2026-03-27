@@ -67,9 +67,9 @@ func (s *AWSVPCService) CreateTestResourceInSubnet(subnetID string) (map[string]
 		return nil, fmt.Errorf("subnetID is required")
 	}
 
-	amiID := cnTestAmiID()
-	if amiID == "" {
-		return nil, fmt.Errorf("missing test AMI input: set CN_TEST_AMI_ID or CN02_TEST_AMI_ID")
+	amiID, err := s.resolveTestAmiID()
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve AMI for test instance: %w", err)
 	}
 
 	instanceType := cnTestInstanceType()
@@ -382,6 +382,35 @@ func cnTestAmiID() string {
 		}
 	}
 	return ""
+}
+
+// resolveTestAmiID returns the AMI ID to use for test instances.
+// Uses CN_TEST_AMI_ID (or fallback env vars) if set; otherwise queries EC2 for
+// the latest Amazon Linux 2023 x86_64 AMI in the current region.
+func (s *AWSVPCService) resolveTestAmiID() (string, error) {
+	if id := cnTestAmiID(); id != "" {
+		return id, nil
+	}
+
+	out, err := s.client.DescribeImages(s.ctx, &ec2.DescribeImagesInput{
+		Owners: []string{"amazon"},
+		Filters: []types.Filter{
+			{Name: aws.String("name"), Values: []string{"al2023-ami-*-x86_64"}},
+			{Name: aws.String("state"), Values: []string{"available"}},
+			{Name: aws.String("architecture"), Values: []string{"x86_64"}},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve latest Amazon Linux 2023 AMI: %w", err)
+	}
+	if len(out.Images) == 0 {
+		return "", fmt.Errorf("no Amazon Linux 2023 AMI found in region")
+	}
+
+	sort.Slice(out.Images, func(i, j int) bool {
+		return aws.ToString(out.Images[i].CreationDate) > aws.ToString(out.Images[j].CreationDate)
+	})
+	return aws.ToString(out.Images[0].ImageId), nil
 }
 
 // cnTestInstanceType resolves the test instance type from env vars.

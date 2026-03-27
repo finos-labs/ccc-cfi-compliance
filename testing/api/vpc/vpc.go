@@ -14,5 +14,7 @@ type DefaultVPC struct {
 type Service interface {
 	generic.Service
 	CN03Service
+	CN01Service
+	CN02Service
 	TestResourceService
 }
