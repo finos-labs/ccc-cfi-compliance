@@ -1,0 +1,31 @@
+name: Restrict Default Network Creation - Default VPC
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
+service_type: vpc
+requirement_text: >
+  When a subscription is created, the subscription MUST NOT contain default network resources.
+
+validity_score: 6
+validity_commentary: >
+  This query checks whether a default VPC exists in the target AWS region.
+  Strengths:
+  - Uses control-plane inventory only and does not generate traffic
+  - Directly filters default VPCs with `is-default=true`
+  Limitations:
+  - This is a current-state check, not a direct proof at subscription-creation time
+  - Must run for every in-scope region
+
+query: |
+  aws ec2 describe-vpcs \
+    --region ${Region} \
+    --filters Name=is-default,Values=true
+
+rules:
+  - jsonpath: "$.Vpcs"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Compliant when no default VPC is returned for the region.

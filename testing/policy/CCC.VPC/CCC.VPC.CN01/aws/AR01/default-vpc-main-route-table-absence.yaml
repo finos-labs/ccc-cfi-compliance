@@ -1,0 +1,41 @@
+name: Restrict Default Network Creation - Default Route Table
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
+service_type: vpc
+requirement_text: >
+  When a subscription is created, the subscription MUST NOT contain default network resources.
+
+validity_score: 6
+validity_commentary: >
+  This query checks whether the default VPC still has a main route table.
+  Strengths:
+  - Uses control-plane inventory only and does not generate traffic
+  - Verifies main association with `association.main=true`
+  Limitations:
+  - Meaningful only when a default VPC exists
+  - This is a current-state check, not a direct proof at subscription-creation time
+
+query: |
+  DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --region ${Region} \
+    --filters Name=is-default,Values=true \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null || true)
+
+  if [ -z "${DEFAULT_VPC_ID}" ] || [ "${DEFAULT_VPC_ID}" = "None" ]; then
+    echo '{"RouteTables":[]}'
+  else
+    aws ec2 describe-route-tables \
+      --region ${Region} \
+      --filters Name=vpc-id,Values=${DEFAULT_VPC_ID} Name=association.main,Values=true
+  fi
+
+rules:
+  - jsonpath: "$.RouteTables"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Compliant when no main route table is returned for the default VPC.

@@ -1,0 +1,41 @@
+name: Restrict Default Network Creation - Internet Gateway
+metadata:
+  control_id: CCC.VPC.CN01
+  assessment_requirement_id: CCC.VPC.CN01.AR01
+  test_type: Policy
+  test_requirement_category: P
+service_type: vpc
+requirement_text: >
+  When a subscription is created, the subscription MUST NOT contain default network resources.
+
+validity_score: 6
+validity_commentary: >
+  This query checks whether an internet gateway is attached to the default VPC.
+  Strengths:
+  - Uses control-plane inventory only and does not generate traffic
+  - Verifies gateway attachment scoped to the derived default VPC ID
+  Limitations:
+  - Detached gateways are not evaluated
+  - This is a current-state check, not a direct proof at subscription-creation time
+
+query: |
+  DEFAULT_VPC_ID=$(aws ec2 describe-vpcs \
+    --region ${Region} \
+    --filters Name=is-default,Values=true \
+    --query 'Vpcs[0].VpcId' \
+    --output text 2>/dev/null || true)
+
+  if [ -z "${DEFAULT_VPC_ID}" ] || [ "${DEFAULT_VPC_ID}" = "None" ]; then
+    echo '{"InternetGateways":[]}'
+  else
+    aws ec2 describe-internet-gateways \
+      --region ${Region} \
+      --filters Name=attachment.vpc-id,Values=${DEFAULT_VPC_ID}
+  fi
+
+rules:
+  - jsonpath: "$.InternetGateways"
+    expected_values: []
+    validation_rule: "^\\[\\]$"
+    description: >
+      Compliant when no internet gateway attachment is returned for the default VPC.
