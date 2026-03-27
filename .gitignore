@@ -100,3 +100,5 @@ remote/aws/vpc/cn03-artifacts/
 # Local IaC scratch files
 remote/aws/vpc/plan
 remote/aws/vpc/*(mktemp)
+
+testing/output*
