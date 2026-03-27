@@ -183,6 +183,34 @@ jobs:
 
           echo "✅ Prowler metadata modifications completed"
 
+      # =======================================================================
+      # CN03 — Load peering trial artifacts (AWS VPC only)
+      # Downloads artifacts uploaded by cfi-nuke-and-rebuild and sources
+      # cn03-feature.env to populate CN03_* env vars for feature scenarios.
+      # Skipped gracefully if artifacts are not yet available.
+      # =======================================================================
+      - name: Download CN03 artifacts
+        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        uses: actions/download-artifact@v4
+        with:
+          name: cn03-artifacts-${{ matrix.target.id }}
+          path: cn03-artifacts/
+        continue-on-error: true
+
+      - name: Load CN03 environment
+        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        run: |
+          ENV_FILE="cn03-artifacts/cn03-feature.env"
+          if [ -f "$ENV_FILE" ]; then
+            echo "📋 Loading CN03 feature environment..."
+            grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
+            # Override matrix file path to runner-local location
+            echo "CN03_PEER_TRIAL_MATRIX_FILE=$GITHUB_WORKSPACE/cn03-artifacts/cn03-peer-trials.json" >> $GITHUB_ENV
+            echo "✅ CN03 environment loaded"
+          else
+            echo "⚠️  CN03 artifacts not found — CN03 scenarios requiring env vars will be skipped"
+          fi
+
       - name: Run Compliance Tests
         if: env.RUN_CFI == 'true'
         id: compliance-tests

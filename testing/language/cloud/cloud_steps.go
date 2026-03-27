@@ -189,6 +189,8 @@ func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 
 	// Cloud API steps
 	ctx.Step(`^a cloud api for "([^"]*)" in "([^"]*)"$`, cw.aCloudAPIForProviderIn)
+	ctx.Step(`^I load environment variable "([^"]*)" as "([^"]*)"$`, cw.loadEnvironmentVariableAs)
+	ctx.Step(`^I require environment variable "([^"]*)" as "([^"]*)"$`, cw.requireEnvironmentVariableAs)
 
 	// Policy assessment steps
 	ctx.Step(`^I attempt policy check "([^"]*)" for control "([^"]*)" assessment requirement "([^"]*)" for service "([^"]*)" on resource "([^"]*)" and provider "([^"]*)"$`, cw.attemptPolicyCheck)
@@ -563,6 +565,39 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(instanceArg string, apiName string)
 	}
 
 	cw.Props[apiName] = f
+	return nil
+}
+
+// loadEnvironmentVariableAs copies an OS env var into scenario Props under alias.
+// Missing vars are stored as nil so feature assertions can decide strictness.
+func (cw *CloudWorld) loadEnvironmentVariableAs(envKey string, alias string) error {
+	key := strings.TrimSpace(envKey)
+	propAlias := strings.TrimSpace(alias)
+	if key == "" {
+		return fmt.Errorf("environment variable key is required")
+	}
+	if propAlias == "" {
+		return fmt.Errorf("alias is required")
+	}
+
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		cw.Props[propAlias] = nil
+		return nil
+	}
+	cw.Props[propAlias] = value
+	return nil
+}
+
+// requireEnvironmentVariableAs copies an OS env var into Props and fails if missing.
+func (cw *CloudWorld) requireEnvironmentVariableAs(envKey string, alias string) error {
+	if err := cw.loadEnvironmentVariableAs(envKey, alias); err != nil {
+		return err
+	}
+	resolved := cw.HandleResolve("{" + strings.TrimSpace(alias) + "}")
+	if resolved == nil || strings.TrimSpace(fmt.Sprintf("%v", resolved)) == "" {
+		return fmt.Errorf("required environment variable %q is not set", strings.TrimSpace(envKey))
+	}
 	return nil
 }
 

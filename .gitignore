@@ -95,6 +95,7 @@ out.txt
 # CN03 generated local artifacts (do not commit environment-specific IDs)
 remote/aws/vpc/cn03-feature.env
 remote/aws/vpc/cn03-peer-trials.json
+remote/aws/vpc/cn03-artifacts/
 
 # Local IaC scratch files
 remote/aws/vpc/plan

@@ -1,0 +1,77 @@
+name: Restrict VPC Peering to Authorized Accounts
+metadata:
+  control_id: CCC.VPC.CN03
+  assessment_requirement_id: CCC.VPC.CN03.AR01
+  test_type: Destructive
+  test_requirement_category: D
+  enforcement_model: targeted_guardrail
+  enforcement_source: iac_policy_attachment
+service_type: vpc
+requirement_text: >
+  When a VPC peering connection is requested, the service MUST prevent connections from VPCs that are not explicitly allowed.
+
+validity_score: 7
+validity_commentary: >
+  This query attempts to create a VPC peering connection to a peer VPC that is
+  intentionally not authorized, and asserts that the request is denied.
+
+  Strengths:
+  - Directly exercises the prohibited behavior and observes enforcement
+  - Uses `--dry-run` to avoid creating real peering connections during testing
+  - Captures both exit code and error output for validation
+
+  Limitations:
+  - Requires a known "disallowed" peer VPC ID (and potentially peer account ID)
+  - The exact failure mode varies (IAM AccessDenied, SCP denial, org guardrail, etc.)
+  - If the environment allows the action, AWS returns a `DryRunOperation` error (which should be treated as a failure for this control)
+  - Deterministic results require the deny policy definition and attachment to be managed and applied (typically via IaC) before execution
+
+query: |
+  # Attempt to create a VPC peering connection to a peer VPC that is NOT allowed.
+  # Output is normalized to JSON for rule evaluation.
+
+  if [ -z "${AWS_REGION}" ] || [ -z "${REQUESTER_VPC_ID}" ] || [ -z "${PEER_VPC_ID}" ]; then
+    echo "{\"ExitCode\":2,\"DryRunAllowed\":false,\"Stderr\":\"Missing required input(s): AWS_REGION, REQUESTER_VPC_ID, PEER_VPC_ID\"}"
+    exit 0
+  fi
+
+  set +e
+  STDERR_FILE=$(mktemp)
+  aws ec2 create-vpc-peering-connection \
+    --region ${AWS_REGION} \
+    --vpc-id ${REQUESTER_VPC_ID} \
+    --peer-vpc-id ${PEER_VPC_ID} \
+    ${PEER_OWNER_ID:+--peer-owner-id ${PEER_OWNER_ID}} \
+    --dry-run \
+    1>/dev/null 2>"${STDERR_FILE}"
+  EXIT_CODE=$?
+  STDERR_RAW=$(cat "${STDERR_FILE}" | tr -d '\n')
+  STDERR_TEXT=$(printf "%s" "${STDERR_RAW}" | sed 's/"/\\"/g')
+  DRYRUN_ALLOWED=false
+  if echo "${STDERR_RAW}" | grep -q "DryRunOperation"; then
+    DRYRUN_ALLOWED=true
+  fi
+  rm -f "${STDERR_FILE}"
+  set -e
+
+  echo "{\"ExitCode\":${EXIT_CODE},\"DryRunAllowed\":${DRYRUN_ALLOWED},\"Stderr\":\"${STDERR_TEXT}\"}"
+
+rules:
+  - jsonpath: "$.ExitCode"
+    expected_values: []
+    validation_rule: "^[1-9][0-9]*$"
+    description: >
+      The create peering request must be prevented; command should exit non-zero.
+
+  - jsonpath: "$.DryRunAllowed"
+    expected_values:
+      - false
+    validation_rule: "^false$"
+    description: >
+      DryRunOperation means the action would have been allowed, which is a failure.
+
+  - jsonpath: "$.Stderr"
+    expected_values: []
+    validation_rule: "(?i)(AccessDenied|UnauthorizedOperation|AuthFailure|not authorized|explicit deny|denied)"
+    description: >
+      The error output should indicate the request was denied by policy/guardrails.

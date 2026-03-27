@@ -195,6 +195,29 @@ jobs:
           echo "✅ Terraform apply completed for $TARGET_ID"
 
       # =======================================================================
+      # CN03 — Export peering trial artifacts (AWS VPC only)
+      # Runs export-cn03-artifacts.sh from the Terraform working directory and
+      # uploads cn03-peer-trials.json + cn03-feature.env for use by cfi-test.
+      # =======================================================================
+      - name: Export CN03 artifacts
+        if: steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/output/cn03"
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+          chmod +x "$GITHUB_WORKSPACE/remote/aws/vpc/export-cn03-artifacts.sh"
+          "$GITHUB_WORKSPACE/remote/aws/vpc/export-cn03-artifacts.sh" "$GITHUB_WORKSPACE/output/cn03"
+          echo "✅ CN03 artifacts exported"
+
+      - name: Upload CN03 artifacts
+        if: steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn03-artifacts-${{ matrix.target.id }}
+          path: output/cn03/
+          retention-days: 30
+
+      # =======================================================================
       # Save results
       # =======================================================================
       - name: Save output
