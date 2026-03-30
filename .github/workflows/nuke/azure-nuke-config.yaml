@@ -20,6 +20,9 @@ accounts:
   "fa193ac0-9c06-4111-bf55-341e4db193d3":
     filters:
       ResourceGroup:
+        - property: Name
+          type: exact
+          value: "cfi_test"
         - property: tag:CCC_INFRA_DONT_DELETE
           type: exact
           value: "true"
