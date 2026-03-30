@@ -15,85 +15,29 @@ on:
   workflow_dispatch:
 
 jobs:
-  prepare-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Generate matrix from config files
-        id: set-matrix
-        run: |
-          TARGETS_DIR=config
-          matrix='{"target": []}'
-
-          for target_file in $TARGETS_DIR/*.json; do
-            if [[ "$target_file" == *".json" ]]; then
-              target_json=$(jq -c '.' "$target_file")
-              matrix=$(echo "$matrix" | jq --argjson target "$target_json" '.target += [$target]')
-            fi
-          done
-
-          echo "matrix={\"target\": $(echo "$matrix" | jq -c '.target')}" >> $GITHUB_OUTPUT
-          echo "Generated matrix with $(echo "$matrix" | jq '.target | length') targets"
-
-  nuke-and-rebuild:
-    needs: prepare-matrix
+  # PHASE 1: Parallel Nuke across all providers
+  nuke:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 3
-      matrix:
-        target: ${{ fromJson(needs.prepare-matrix.outputs.matrix).target }}
       fail-fast: false
-
+      matrix:
+        provider: [aws, azure, gcp]
     env:
+      TARGET_PROVIDER: ${{ matrix.provider }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      TARGET_ID: ${{ matrix.target.id }}
-      TARGET_NAME: ${{ matrix.target.name }}
-      TARGET_PATH: ${{ matrix.target.path }}
-      TARGET_PROVIDER: ${{ matrix.target.provider }}
-      TARGET_SERVICE: ${{ matrix.target.service }}
-      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-      TF_VAR_target_id: ${{ matrix.target.id }}
-      TF_VAR_github_run_id: ${{ github.run_id }}
-      TF_VAR_github_run_number: ${{ github.run_number }}
-      TF_VAR_github_actor: ${{ github.actor }}
-      TF_VAR_github_repository: ${{ github.repository }}
-      TF_VAR_github_workflow: ${{ github.workflow }}
-      TF_VAR_github_sha: ${{ github.sha }}
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Load compliance testing environment
-        run: |
-          echo "📋 Loading compliance testing environment..."
-          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
-          echo "✅ Environment variables loaded"
-
-      # =======================================================================
-      # Authentication
-      # =======================================================================
       - name: Configure AWS Credentials (OIDC)
-        if: matrix.target.provider == 'aws'
+        if: matrix.provider == 'aws'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Configure Azure Credentials (OIDC)
-        if: matrix.target.provider == 'azure'
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
       - name: Authenticate to Google Cloud (OIDC)
-        if: matrix.target.provider == 'gcp'
+        if: matrix.provider == 'gcp'
         uses: google-github-actions/auth@v1
         with:
           token_format: "id_token"
@@ -101,9 +45,6 @@ jobs:
           workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
           service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
 
-      # =======================================================================
-      # Nuke - Clean up existing resources for this provider
-      # =======================================================================
       - name: Install nuke tool
         run: |
           if [ "$TARGET_PROVIDER" = "aws" ]; then
@@ -123,20 +64,17 @@ jobs:
           sudo mv "$BINARY_NAME" /usr/local/bin/
           sudo chmod +x /usr/local/bin/"$BINARY_NAME"
           $BINARY_NAME --version
-          echo "✅ $BINARY_NAME installed"
 
       - name: Run nuke
         continue-on-error: true
         run: |
           echo "💥 Running nuke for $TARGET_PROVIDER..."
-
           if [ "$TARGET_PROVIDER" = "aws" ]; then
             aws-nuke run \
               --config .github/workflows/nuke/aws-nuke-config.yaml \
               --no-dry-run \
               --force || true
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
-            # Get OIDC token
             FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
               "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
             
@@ -160,11 +98,79 @@ jobs:
               --no-prompt || true
           fi
 
-          echo "✅ Nuke completed for $TARGET_PROVIDER"
+  # PHASE 2: Parallel Rebuild across all providers
+  rebuild:
+    needs: nuke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - provider: aws
+            id: aws-vpc
+            name: "CCC AWS VPC"
+            path: remote/aws/vpc
+            service: networking
+          - provider: azure
+            id: azure-storage-account
+            name: "CCC Azure Storage Account"
+            path: remote/azure/storageaccount
+            service: storage
+          - provider: gcp
+            id: gcp-cloud-storage
+            name: "CCC GCP Cloud Storage"
+            path: remote/gcp/cloudstorage
+            service: storage
+    
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      TARGET_ID: ${{ matrix.id }}
+      TARGET_NAME: ${{ matrix.name }}
+      TARGET_PATH: ${{ matrix.path }}
+      TARGET_PROVIDER: ${{ matrix.provider }}
+      TARGET_SERVICE: ${{ matrix.service }}
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_target_id: ${{ matrix.id }}
+      TF_VAR_github_run_id: ${{ github.run_id }}
+      TF_VAR_github_run_number: ${{ github.run_number }}
+      TF_VAR_github_actor: ${{ github.actor }}
+      TF_VAR_github_repository: ${{ github.repository }}
+      TF_VAR_github_workflow: ${{ github.workflow }}
+      TF_VAR_github_sha: ${{ github.sha }}
+      
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      # =======================================================================
-      # Rebuild - Terraform apply
-      # =======================================================================
+      - name: Load compliance testing environment
+        run: |
+          echo "📋 Loading compliance testing environment..."
+          grep -v '^#' testing/compliance-testing.env | grep -v '^$' >> $GITHUB_ENV
+
+      - name: Configure AWS Credentials (OIDC)
+        if: matrix.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure Azure Credentials (OIDC)
+        if: matrix.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: matrix.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
@@ -172,11 +178,6 @@ jobs:
         id: terraform-apply
         run: |
           set -euo pipefail
-
-          echo "🚀 Deploying: $TARGET_NAME (id: $TARGET_ID)"
-          echo "📁 Path: $TARGET_PATH"
-          echo "☁️  Provider: $TARGET_PROVIDER"
-
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
 
           if [ "$TARGET_PROVIDER" = "aws" ]; then
@@ -191,52 +192,40 @@ jobs:
             terraform init
             terraform apply -auto-approve -input=false
           fi
-
           echo "✅ Terraform apply completed for $TARGET_ID"
 
-      # =======================================================================
-      # CN03 — Export peering trial artifacts (AWS VPC only)
-      # Runs export-cn03-artifacts.sh from the Terraform working directory and
-      # uploads cn03-peer-trials.json + cn03-feature.env for use by cfi-test.
-      # =======================================================================
       - name: Export CN03 artifacts
-        if: steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        if: steps.terraform-apply.outcome == 'success' && matrix.provider == 'aws' && matrix.service == 'networking'
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/output/cn03"
           cd "$GITHUB_WORKSPACE/$TARGET_PATH"
           chmod +x "$GITHUB_WORKSPACE/remote/aws/vpc/export-cn03-artifacts.sh"
           "$GITHUB_WORKSPACE/remote/aws/vpc/export-cn03-artifacts.sh" "$GITHUB_WORKSPACE/output/cn03"
-          echo "✅ CN03 artifacts exported"
 
       - name: Upload CN03 artifacts
-        if: steps.terraform-apply.outcome == 'success' && matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        if: steps.terraform-apply.outcome == 'success' && matrix.provider == 'aws' && matrix.service == 'networking'
         uses: actions/upload-artifact@v4
         with:
-          name: cn03-artifacts-${{ matrix.target.id }}
+          name: cn03-artifacts-${{ matrix.id }}
           path: output/cn03/
           retention-days: 30
 
-      # =======================================================================
-      # Save results
-      # =======================================================================
       - name: Save output
         if: always()
         run: |
           mkdir -p output
-          cat > output/${{ matrix.target.id }}-log.txt << EOF
+          cat > output/${{ matrix.id }}-log.txt << EOF
           Nuke and Rebuild completed at $(date)
-          Target: ${{ matrix.target.id }}
-          Provider: ${{ matrix.target.provider }}
+          Target: ${{ matrix.id }}
+          Provider: ${{ matrix.provider }}
           Terraform outcome: ${{ steps.terraform-apply.outcome }}
-          Workflow: ${{ github.workflow }}
-          Run ID: ${{ github.run_id }}
           EOF
 
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nuke-rebuild-${{ matrix.target.id }}
+          name: nuke-rebuild-${{ matrix.id }}
           path: output/
           retention-days: 30

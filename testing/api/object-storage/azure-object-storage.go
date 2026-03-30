@@ -37,6 +37,15 @@ func (s *AzureBlobService) storageAccountName() string {
 	return serviceParamString(s.instance.ServiceProperties("object-storage"), "azure-storage-account")
 }
 
+// defaultContainerName returns the Azure default container name from service params
+func (s *AzureBlobService) defaultContainerName() string {
+	name := serviceParamString(s.instance.ServiceProperties("object-storage"), "default-container")
+	if name == "" {
+		return "ccc-test-container-2" // Fallback
+	}
+	return name
+}
+
 // NewAzureBlobService creates a new Azure Blob Storage service using default credentials
 func NewAzureBlobService(ctx context.Context, instance *types.InstanceConfig) (*AzureBlobService, error) {
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
@@ -562,7 +571,7 @@ func (s *AzureBlobService) EnsureDefaultResourceExists(buckets []Bucket, err err
 	// No containers found - create a default container in the identified storage account
 	fmt.Printf("📦 No containers found. Creating default container...\n")
 
-	defaultContainerName := "ccc-test-container"
+	defaultContainerName := s.defaultContainerName()
 	fmt.Printf("   Creating container: %s\n", defaultContainerName)
 
 	bucket, err := s.CreateBucket(defaultContainerName)

@@ -89,11 +89,14 @@ module "storage_account" {
 
   # Create default container with immutable storage (CN04 tests - retention policy added below)
   containers = {
-    ccc-test-container = {
-      name     = "ccc-test-container"
+    ccc-test-container-2 = {
+      name     = "ccc-test-container-2"
       public_access = "None"
       immutable_storage_with_versioning = {
         enabled = true  # Required before immutability policy can be set
+      }
+      tags = {
+        CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke
       }
     }
   }
@@ -101,8 +104,8 @@ module "storage_account" {
 
 # Container-level immutability policy (CN04.AR02 - object retention enforcement)
 # Must be separate from module; AVM module does not support immutability_policy on containers.
-resource "azurerm_storage_container_immutability_policy" "ccc_test_container" {
-  storage_container_resource_manager_id = module.storage_account.containers["ccc-test-container"].id
+resource "azurerm_storage_container_immutability_policy" "ccc_test_container_2" {
+  storage_container_resource_manager_id = module.storage_account.containers["ccc-test-container-2"].id
   immutability_period_in_days            = 2
   locked                                 = true
 }

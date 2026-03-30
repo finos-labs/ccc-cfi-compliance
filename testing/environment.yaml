@@ -44,6 +44,7 @@ instances:
         azure-storage-account: storagecfitesting2026
         # CN04.AR02: Minimum immutability period in days for policy checks (matches TF)
         object-storage-retention-period-days: 2
+        default-container: ccc-test-container-2
       - type: logging 
 
   - id: main-gcp
