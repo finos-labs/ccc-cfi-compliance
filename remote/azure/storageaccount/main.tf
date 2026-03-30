@@ -4,16 +4,6 @@ variable "storage_account_name" {
   default     = "storagecfitesting2026"
 }
 
-# Resource group for CFI testing
-resource "azurerm_resource_group" "cfi_test" {
-  name     = "cfi_test"
-  location = "eastus"
-
-  tags = {
-    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
-  }
-}
-
 variable "location" {
   description = "Azure region"
   type        = string
@@ -26,15 +16,18 @@ variable "resource_group_name" {
   default     = "cfi_test"
 }
 
-# Create the resource group if it doesn't exist
+# Resource group for CFI testing
+# Managed as a resource to allow creation, but we import it if it already exists
+# because it is excluded from the automated cleanup (nuke).
 resource "azurerm_resource_group" "this" {
   name     = var.resource_group_name
   location = var.location
 
   tags = {
-    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
+    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (foundation)
   }
 }
+
 
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
 # Azure Policy/Defender may auto-create blob-diagnostic-setting targeting this workspace

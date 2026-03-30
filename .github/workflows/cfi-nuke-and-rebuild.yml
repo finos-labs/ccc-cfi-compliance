@@ -186,6 +186,14 @@ jobs:
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
             export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
             terraform init -upgrade
+            
+            # Import existing resource group if it exists (since we skip nuking it)
+            echo "🔍 Checking for existing resource group 'cfi_test'..."
+            if az group show --name cfi_test &>/dev/null; then
+              echo "   ✅ Resource group 'cfi_test' exists. Importing into Terraform state..."
+              terraform import azurerm_resource_group.this /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/cfi_test || true
+            fi
+            
             terraform apply -auto-approve -input=false
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
             export TF_VAR_gcp_project_id="${{ secrets.GCP_PROJECT_ID }}"
