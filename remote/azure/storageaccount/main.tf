@@ -1,3 +1,12 @@
+terraform {
+  cloud {
+    organization = "FINOS-Common-Cloud-Controls"
+    workspaces {
+      name = "azure-storage-account"
+    }
+  }
+}
+
 variable "storage_account_name" {
   description = "Azure storage account name"
   type        = string

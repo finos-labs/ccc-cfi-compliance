@@ -1,3 +1,12 @@
+terraform {
+  cloud {
+    organization = "FINOS-Common-Cloud-Controls"
+    workspaces {
+      name = "gcp-cloud-storage"
+    }
+  }
+}
+
 variable "gcp_project_id" {
   type = string
 }
