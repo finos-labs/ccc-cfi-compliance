@@ -137,6 +137,7 @@ jobs:
       TF_VAR_github_repository: ${{ github.repository }}
       TF_VAR_github_workflow: ${{ github.workflow }}
       TF_VAR_github_sha: ${{ github.sha }}
+      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
       
     steps:
       - name: Checkout repo
