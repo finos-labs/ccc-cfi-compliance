@@ -13,11 +13,10 @@ locals {
 
   cn03_allowed_account_ids_csv          = join(",", local.cn03_allowed_account_ids_effective)
   cn03_non_allowlisted_requester_vpc_id = try(aws_vpc.cn03_non_allowlisted_requester[0].id, "")
-  cn03_default_requester_vpc_id = coalesce(
-    try(local.cn03_disallowed_requester_vpc_ids[0], ""),
-    try(local.cn03_allowed_requester_vpc_ids[0], ""),
-    ""
-  )
+  cn03_default_requester_vpc_id = try(coalesce(
+    try(local.cn03_disallowed_requester_vpc_ids[0], null),
+    try(local.cn03_allowed_requester_vpc_ids[0], null),
+  ), "")
 
   cn03_peer_trial_matrix = {
     schema_version               = 1
