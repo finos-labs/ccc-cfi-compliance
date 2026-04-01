@@ -137,7 +137,6 @@ jobs:
       TF_VAR_github_repository: ${{ github.repository }}
       TF_VAR_github_workflow: ${{ github.workflow }}
       TF_VAR_github_sha: ${{ github.sha }}
-      TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
       
     steps:
       - name: Checkout repo
@@ -186,10 +185,36 @@ jobs:
             terraform apply -auto-approve -input=false
           elif [ "$TARGET_PROVIDER" = "azure" ]; then
             export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            
-            # Since we moved to Terraform Cloud, no manual imports are needed!
-            # The permanent state in TFC already knows about our 'Don't Delete' resources.
             terraform init -upgrade
+            
+            # Import existing resource group and storage account if they exist (since we skip nuking them)
+            echo "🔍 Checking for existing foundational resources..."
+            if az group show --name cfi_test &>/dev/null; then
+              echo "   ✅ Resource group 'cfi_test' exists. Importing..."
+              terraform import azurerm_resource_group.this /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/cfi_test || true
+              
+              # Check for storage account
+              ST_NAME="storagecfitesting2026"
+              if az storage account show --name $ST_NAME --resource-group cfi_test &>/dev/null; then
+                echo "   ✅ Storage account '$ST_NAME' exists. Importing..."
+                terraform import module.storage_account.azurerm_storage_account.this /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/cfi_test/providers/Microsoft.Storage/storageAccounts/$ST_NAME || true
+              fi
+
+              # Check for log analytics workspace
+              LAW_NAME="cfi-storage-diag"
+              if az monitor log-analytics workspace show --resource-group cfi_test --workspace-name $LAW_NAME &>/dev/null; then
+                echo "   ✅ Log Analytics Workspace '$LAW_NAME' exists. Importing..."
+                terraform import azurerm_log_analytics_workspace.storage_diag /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/cfi_test/providers/Microsoft.OperationalInsights/workspaces/$LAW_NAME || true
+              fi
+
+              # Check for container (handled as azapi_resource in this module)
+              CONT_NAME="ccc-test-container-2"
+              if az storage container show --name $CONT_NAME --account-name $ST_NAME &>/dev/null; then
+                echo "   ✅ Blob Container '$CONT_NAME' exists. Importing..."
+                terraform import "module.storage_account.azapi_resource.containers[\"$CONT_NAME\"]" /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/cfi_test/providers/Microsoft.Storage/storageAccounts/$ST_NAME/blobServices/default/containers/$CONT_NAME || true
+              fi
+            fi
+            
             terraform apply -auto-approve -input=false
           elif [ "$TARGET_PROVIDER" = "gcp" ]; then
             export TF_VAR_gcp_project_id="${{ secrets.GCP_PROJECT_ID }}"
