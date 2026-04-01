@@ -36,8 +36,8 @@ variable "public_subnet_cidrs" {
 
 # --- Naming & Tags ---
 
-variable "target_id" {
-  description = "CFI Target ID (e.g., aws-vpc)"
+variable "instance_id" {
+  description = "CFI Instance ID"
   type        = string
   default     = "local-test"
 }
@@ -58,18 +58,6 @@ variable "common_tags" {
   description = "Additional common tags merged into all resources."
   type        = map(string)
   default     = {}
-}
-
-variable "github_run_id" {
-  description = "GitHub Actions run ID"
-  type        = string
-  default     = "local"
-}
-
-variable "github_repository" {
-  description = "GitHub repository"
-  type        = string
-  default     = "local"
 }
 
 # --- CN01 ---
