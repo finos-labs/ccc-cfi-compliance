@@ -1,12 +1,3 @@
-terraform {
-  cloud {
-    organization = "FINOS-Common-Cloud-Controls"
-    workspaces {
-      name = "aws-vpc"
-    }
-  }
-}
-
 # Used by CN03 guardrail to scope the allow-list to the deploying account when
 # no explicit cn03_allowed_account_ids are provided.
 data "aws_caller_identity" "current" {}
