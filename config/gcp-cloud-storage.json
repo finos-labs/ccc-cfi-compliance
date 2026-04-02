@@ -8,5 +8,6 @@
     "test-frameworks": [
         "cfi"
     ],
+    "test-on-branches": ["main"],
     "git": "https://github.com/terraform-google-modules/terraform-google-cloud-storage"
 }

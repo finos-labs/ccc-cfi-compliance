@@ -163,7 +163,7 @@ After deploying infrastructure:
 ./testing/run-compliance-tests.sh --provider gcp
 ```
 
-All required variables are auto-loaded from `terraform_setup.env`, but you can override with command-line options if you want.
+Depending on the contents of environment.yaml, you may need to set up some additional environment variables. e.g. INSTANCE_ID for Azure object storage.
 
 ```
 ./run-compliance-tests.sh --help

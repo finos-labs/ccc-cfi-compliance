@@ -28,18 +28,20 @@ jobs:
         run: |
           TARGETS_DIR=config
           matrix='{"target": []}'
+          CURRENT_BRANCH="${GITHUB_REF_NAME}"
 
           for target_file in $TARGETS_DIR/*.json; do
-            if [[ "$target_file" == *".json" ]]; then
-              id=$(jq -r '.id' "$target_file")
-              name=$(jq -r '.name' "$target_file")
-              path=$(jq -r '.path' "$target_file")
-              provider=$(jq -r '.provider' "$target_file")
-              service=$(jq -r '.service' "$target_file")
-              
-              target_json=$(jq -c '.' "$target_file")
-              matrix=$(echo "$matrix" | jq --argjson target "$target_json" '.target += [$target]')
+            if [[ "$target_file" != *".json" ]]; then
+              continue
             fi
+            tb_len=$(jq '.["test-on-branches"] // [] | length' "$target_file")
+            if [[ "$tb_len" -gt 0 ]] && ! jq -e --arg b "$CURRENT_BRANCH" '(.["test-on-branches"] | index($b)) != null' "$target_file" >/dev/null 2>&1; then
+              echo "Skipping $(basename "$target_file"): test-on-branches does not include \"$CURRENT_BRANCH\""
+              continue
+            fi
+
+            target_json=$(jq -c '.' "$target_file")
+            matrix=$(echo "$matrix" | jq --argjson target "$target_json" '.target += [$target]')
           done
 
           echo "matrix={\"target\": $(echo "$matrix" | jq -c '.target')}" >> $GITHUB_OUTPUT
@@ -71,21 +73,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Load compliance testing environment
+      - name: Terraform setup (load testing env)
         run: |
-          echo "📋 Loading compliance testing environment..."
-          # Set a unique instance ID based on current UTC time in lowercase iso-like format without spaces/dashes (e.g. 20240401t161714z)
-          export INSTANCE_ID=$(date -u +"%Y%m%dt%H%M%Sz")
-          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
-          
-          # Load env vars into GHA and current session, ensuring bash evaluates ${INSTANCE_ID}
+          echo "📋 Terraform setup: sourcing testing/terraform_setup.env ..."
           set -a
           source testing/terraform_setup.env
           set +a
-          
-          # Save evaluated variables to GITHUB_ENV for future steps (like Terraform Apply)
-          env | grep -E '^(TF_VAR_|AWS_|ARM_|CN_TEST_)' >> $GITHUB_ENV
-          
+          # Persist for later job steps (Terraform apply, compliance tests / envconfig)
+          env | grep -E '^(INSTANCE_ID|TF_VAR_|AWS_|ARM_|CN_TEST_)' >> $GITHUB_ENV
           echo "✅ Environment variables loaded and envconfig initialized"
 
       - name: Configure AWS Credentials (OIDC)
