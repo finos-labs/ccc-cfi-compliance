@@ -263,6 +263,12 @@ jobs:
 
           echo "CN04_FLOW_LOG_GROUP_NAME=$(terraform output -raw cn04_flow_log_log_group_name)" >> $GITHUB_ENV
 
+          # Trial matrix JSON file — portable audit artifact used by the batch
+          # dry-run scenario. Captures receiver + allowed + disallowed VPC IDs
+          # as a point-in-time snapshot independent of env var resolution.
+          terraform output -raw cn03_peer_trial_matrix_json > /tmp/cn03-peer-trials.json
+          echo "CN03_PEER_TRIAL_MATRIX_FILE=/tmp/cn03-peer-trials.json" >> $GITHUB_ENV
+
           echo "✅ Terraform outputs exported to GITHUB_ENV"
 
       - name: Refresh AWS Credentials for Compliance Tests (OIDC)
