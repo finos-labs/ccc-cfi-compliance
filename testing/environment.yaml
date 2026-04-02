@@ -41,7 +41,7 @@ instances:
 
     services:
       - type: object-storage
-        azure-storage-account: "storagecfitest${INSTANCE_ID}"
+        azure-storage-account: "stgcfi${INSTANCE_ID}"
         # CN04.AR02: Minimum immutability period in days for policy checks (matches TF)
         object-storage-retention-period-days: 2
         default-container: "ccc-test-container-${INSTANCE_ID}"

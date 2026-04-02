@@ -1,6 +1,11 @@
 variable "instance_id" {
-  description = "Unique ID for this run"
+  description = "Unique ID for this run (lowercase letters and digits only; with prefix stgcfi the full storage account name must be ≤24 chars)"
   type        = string
+
+  validation {
+    condition = length("stgcfi${var.instance_id}") <= 24 && length("stgcfi${var.instance_id}") >= 3 && can(regex("^[a-z0-9]+$", var.instance_id))
+    error_message = "instance_id must be lowercase alphanumeric, and stgcfi+instance_id must be 3–24 characters for Azure storage account naming."
+  }
 }
 
 variable "location" {
@@ -10,9 +15,11 @@ variable "location" {
 }
 
 locals {
-  storage_account_name = "storagecfitest${var.instance_id}"
+  # Azure storage account name: 3–24 chars, lowercase letters and numbers only.
+  # Prefix must leave room for instance_id (e.g. UTC compact ~16 chars): 6 + 16 = 22 ≤ 24.
+  storage_account_name = "stgcfi${var.instance_id}"
   resource_group_name  = "cfi_test_${var.instance_id}"
-  default_container    = "ccc-test-container-${var.instance_id}"
+  default_container   = "ccc-test-container-${var.instance_id}"
 }
 
 # Resource group for CFI testing
