@@ -240,12 +240,25 @@ jobs:
       # cn03-feature.env to populate CN03_* env vars for feature scenarios.
       # Skipped gracefully if artifacts are not yet available.
       # =======================================================================
-      - name: Download CN03 artifacts
+      - name: Find latest nuke-and-rebuild run
         if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
+        id: find-nuke-run
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID=$(gh api repos/${{ github.repository }}/actions/workflows/cfi-nuke-and-rebuild.yml/runs \
+            --jq '[.workflow_runs[] | select(.conclusion=="success")] | first | .id')
+          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Download CN03 artifacts
+        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking' && steps.find-nuke-run.outputs.run-id != ''
         uses: actions/download-artifact@v4
         with:
           name: cn03-artifacts-${{ matrix.target.id }}
           path: cn03-artifacts/
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.find-nuke-run.outputs.run-id }}
         continue-on-error: true
 
       - name: Load CN03 environment
