@@ -193,25 +193,34 @@ jobs:
       - name: Find latest nuke-and-rebuild run
         if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
         id: find-nuke-run
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RUN_ID=$(gh api repos/${{ github.repository }}/actions/workflows/cfi-nuke-and-rebuild.yml/runs \
-            --jq '[.workflow_runs[] | select(.conclusion=="success")] | first? | .id // ""')
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "⚠️  No successful nuke-and-rebuild run found — CN03 artifacts unavailable"
-            RUN_ID=''
-          fi
-          echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'cfi-nuke-and-rebuild.yml',
+              status: 'completed',
+              per_page: 50,
+            });
+            const successful = response.data.workflow_runs.filter(r => r.conclusion === 'success');
+            if (successful.length > 0) {
+              core.setOutput('run-id', String(successful[0].id));
+            } else {
+              core.info('⚠️  No successful nuke-and-rebuild run found — CN03 artifacts unavailable');
+              core.setOutput('run-id', '');
+            }
 
       - name: Download CN03 artifacts
-        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking' && steps.find-nuke-run.outputs.run-id != ''
+        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking' && steps.find-nuke-run.outputs['run-id'] != ''
         uses: actions/download-artifact@v4
         with:
           name: cn03-artifacts-${{ matrix.target.id }}
           path: cn03-artifacts/
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ steps.find-nuke-run.outputs.run-id }}
+          run-id: ${{ steps.find-nuke-run.outputs['run-id'] }}
         continue-on-error: true
 
       - name: Load CN03 environment
