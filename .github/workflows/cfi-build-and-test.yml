@@ -74,8 +74,8 @@ jobs:
       - name: Load compliance testing environment
         run: |
           echo "📋 Loading compliance testing environment..."
-          # Set a unique instance ID based on current unix epoch if not set
-          export INSTANCE_ID=$(date +%s)
+          # Set a unique instance ID based on current UTC time in lowercase iso-like format without spaces/dashes (e.g. 20240401t161714z)
+          export INSTANCE_ID=$(date -u +"%Y%m%dt%H%M%Sz")
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
           
           # Load env vars into GHA and current session, ensuring bash evaluates ${INSTANCE_ID}
@@ -167,6 +167,30 @@ jobs:
           pipx install poetry
           poetry install
 
+      - name: Refresh AWS Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Azure Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh GCP Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
       - name: Run Prowler Scan
         if: env.RUN_PROWLER == 'true'
         id: prowler-scan
@@ -237,6 +261,30 @@ jobs:
           else
             echo "⚠️  CN03 artifacts not found — CN03 scenarios requiring env vars will be skipped"
           fi
+
+      - name: Refresh AWS Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Azure Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh GCP Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
 
       - name: Run Compliance Tests
         if: env.RUN_CFI == 'true'
