@@ -10,6 +10,12 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      instance_id:
+        description: "Reuse this INSTANCE_ID (existing infra). Skips sourcing terraform_setup.env—set TF_VAR_instance_id only. Leave empty to generate a new ID."
+        required: false
+        type: string
+        default: ""
   push:
     branches:
       - '**'
@@ -75,7 +81,12 @@ jobs:
 
       - name: Terraform setup (load testing env)
         run: |
-          echo "📋 Terraform setup: sourcing testing/terraform_setup.env ..."
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.instance_id }}" ]; then
+            export INSTANCE_ID="${{ inputs.instance_id }}"
+            echo "📋 INSTANCE_ID set from workflow_dispatch; terraform_setup.env will keep it"
+          else
+            echo "📋 INSTANCE_ID unset; terraform_setup.env will generate UTC compact id"
+          fi
           set -a
           source testing/terraform_setup.env
           set +a
