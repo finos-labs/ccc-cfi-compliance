@@ -18,11 +18,12 @@ instances:
       - type: logging
         aws-cloud-trail-log-group-name: cfi-test-log-group
       - type: vpc
-        # CN03.AR01: Allowed requester VPC IDs for peering guardrail evaluation.
-        # Merged with dynamic IDs sourced from cn03-feature.env CI artifacts.
-        # For manual runs add VPC IDs as a YAML list (e.g. ["vpc-abc123", "vpc-def456"]).
-        # Leave empty to rely on CI artifacts alone.
-        cn03-allowed-requester-vpc-ids: []
+        # CN03.AR01: Allowed/disallowed requester VPC IDs for peering guardrail evaluation.
+        # Populated at runtime via ${VAR} substitution (os.ExpandEnv in envconfig.go)
+        # from Terraform outputs exported after apply. For manual runs, set the
+        # corresponding env vars or replace with explicit VPC ID strings.
+        cn03-allowed-requester-vpc-ids: "${CN03_ALLOWED_REQUESTER_VPC_IDS}"
+        cn03-disallowed-requester-vpc-ids: "${CN03_DISALLOWED_REQUESTER_VPC_IDS}"
 
   - id: main-azure
     properties:
