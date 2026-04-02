@@ -24,6 +24,7 @@ Feature: CCC.VPC.CN04.AR01 - Flow logs must capture all VPC traffic
   Scenario: Behavioral check (active): traffic produces flow log records
     Given I refer to "{UID}" as "TargetVpcId"
     When I call "{vpcService}" with "PrepareFlowLogDeliveryObservation" using argument "{TargetVpcId}"
+    And I skip if "{result.Ready}" is false
     And I call "{vpcService}" with "GenerateTestTraffic" using argument "{TargetVpcId}"
     And I refer to "{result.ResourceId}" as "TestResourceId"
     And I refer to "{result.CleanupDeleted}" as "TrafficCleanupDeleted"

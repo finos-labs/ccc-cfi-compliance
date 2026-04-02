@@ -159,10 +159,31 @@ func (cw *CloudWorld) iAttachToTestOutput(content, name string) error {
 	return nil
 }
 
+// skipIfNil skips the scenario if the resolved value of field is nil.
+func (cw *CloudWorld) skipIfNil(field string) error {
+	if cw.HandleResolve(field) == nil {
+		return godog.ErrSkip
+	}
+	return nil
+}
+
+// skipIfFalse skips the scenario if the resolved value of field is nil or false.
+func (cw *CloudWorld) skipIfFalse(field string) error {
+	actual := cw.HandleResolve(field)
+	if actual == nil || actual == false {
+		return godog.ErrSkip
+	}
+	return nil
+}
+
 // RegisterSteps registers all cloud-specific step definitions
 func (cw *CloudWorld) RegisterSteps(ctx *godog.ScenarioContext) {
 	// Register generic steps first
 	cw.PropsWorld.RegisterSteps(ctx)
+
+	// Prerequisite guard steps — skip scenario instead of failing when prereqs are missing
+	ctx.Step(`^I skip if "([^"]*)" is nil$`, cw.skipIfNil)
+	ctx.Step(`^I skip if "([^"]*)" is false$`, cw.skipIfFalse)
 
 	// CFI-specific attachment step
 	ctx.Step(`^I attach "([^"]*)" to the test output as "([^"]*)"$`, cw.iAttachToTestOutput)

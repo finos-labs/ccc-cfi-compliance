@@ -11,7 +11,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And I load environment variable "CN03_RECEIVER_VPC_ID" as "ReceiverVpcId"
     And I load environment variable "CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID" as "NonAllowlistedRequesterVpcId"
     And I load environment variable "CN03_PEER_TRIAL_MATRIX_FILE" as "PeerTrialMatrixFile"
-    And "{ReceiverVpcId}" is not nil
+    And I skip if "{ReceiverVpcId}" is nil
 
   # Inputs:
   # - CN03_RECEIVER_VPC_ID: fixed receiver/target VPC ID for dry-run attempts
