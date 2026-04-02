@@ -3,6 +3,7 @@ name: CFI Build and Test  # Note - this action must be called cfi-test.yml for r
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 concurrency:
   group: cfi-test
@@ -243,12 +244,15 @@ jobs:
       - name: Find latest nuke-and-rebuild run
         if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
         id: find-nuke-run
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RUN_ID=$(gh api repos/${{ github.repository }}/actions/workflows/cfi-nuke-and-rebuild.yml/runs \
-            --jq '[.workflow_runs[] | select(.conclusion=="success")] | first | .id')
+            --jq '[.workflow_runs[] | select(.conclusion=="success")] | first? | .id // ""')
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "⚠️  No successful nuke-and-rebuild run found — CN03 artifacts unavailable"
+            RUN_ID=''
+          fi
           echo "run-id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Download CN03 artifacts
