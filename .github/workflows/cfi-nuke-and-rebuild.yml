@@ -138,6 +138,12 @@ jobs:
       TF_VAR_github_workflow: ${{ github.workflow }}
       TF_VAR_github_sha: ${{ github.sha }}
       TF_TOKEN_app_terraform_io: ${{ secrets.TF_API_TOKEN }}
+      # CN03 — provision peer VPCs and apply IAM guardrail for peering enforcement tests
+      TF_VAR_cn03_create_peers: 'true'
+      TF_VAR_cn03_create_non_allowlisted_requester: 'true'
+      TF_VAR_cn03_apply_guardrail: 'true'
+      # CN04 — enable VPC flow logs for flow log compliance and behavioural tests
+      TF_VAR_cn04_enable_flow_logs: 'true'
       
     steps:
       - name: Checkout repo
