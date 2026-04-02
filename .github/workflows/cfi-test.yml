@@ -1,4 +1,4 @@
-name: CFI Build and Test
+name: CFI Build and Test  # Note - this action must be called cfi-test.yml for results to be pulled into CCC.
 
 permissions:
   id-token: write

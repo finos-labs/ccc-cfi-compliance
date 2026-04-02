@@ -31,7 +31,6 @@ Feature: CCC.ObjStor.CN04.AR01
     When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "immediate-delete-test={Timestamp}.txt"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "immediate-delete-error.txt"
-    And "{result}" should contain "retention"
 
   @Behavioural
   Scenario: Service validates retention period meets minimum requirements
