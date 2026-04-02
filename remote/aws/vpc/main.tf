@@ -3,7 +3,7 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  name = "cfi-${var.target_id}-vpc"
+  name = "cfi-${var.instance_id}-vpc"
 
   # ---------------------------------------------------------------------------
   # Naming & Tags — common tags applied to all resources via provider default_tags
@@ -17,10 +17,6 @@ locals {
       ManagedBy        = "Terraform"
       Project          = "CCC-CFI-Compliance"
       AutoCleanup      = "true"
-      CFITargetID      = var.target_id
-      GitHubWorkflow   = "CFI-Build"
-      GitHubRunID      = var.github_run_id
-      GitHubRepository = var.github_repository
     },
     var.common_tags
   )
@@ -88,7 +84,7 @@ locals {
   # CN04 — VPC flow logs must capture all traffic (CCC.VPC.CN04)
   # ---------------------------------------------------------------------------
 
-  cn04_flow_log_role_name = substr("cfi-${var.target_id}-cn04-flowlogs-role", 0, 64)
+  cn04_flow_log_role_name = substr("cfi-${var.instance_id}-cn04-flowlogs-role", 0, 64)
   cn04_log_group_name     = "${var.cn04_flow_log_log_group_prefix}/${local.name}"
 }
 

@@ -1,16 +1,6 @@
-terraform {
-  cloud {
-    organization = "FINOS-Common-Cloud-Controls"
-    workspaces {
-      name = "azure-storage-account"
-    }
-  }
-}
-
-variable "storage_account_name" {
-  description = "Azure storage account name"
+variable "instance_id" {
+  description = "Unique ID for this run"
   type        = string
-  default     = "storagecfitesting2026"
 }
 
 variable "location" {
@@ -19,29 +9,25 @@ variable "location" {
   default     = "eastus"
 }
 
-variable "resource_group_name" {
-  description = "Azure resource group name"
-  type        = string
-  default     = "cfi_test"
+locals {
+  storage_account_name = "storagecfitest${var.instance_id}"
+  resource_group_name  = "cfi_test_${var.instance_id}"
+  default_container    = "ccc-test-container-${var.instance_id}"
 }
 
 # Resource group for CFI testing
 # Managed as a resource to allow creation, but we import it if it already exists
 # because it is excluded from the automated cleanup (nuke).
 resource "azurerm_resource_group" "this" {
-  name     = var.resource_group_name
+  name     = local.resource_group_name
   location = var.location
-
-  tags = {
-    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (foundation)
-  }
 }
 
 
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
 # Azure Policy/Defender may auto-create blob-diagnostic-setting targeting this workspace
 resource "azurerm_log_analytics_workspace" "storage_diag" {
-  name                = "cfi-storage-diag"
+  name                = "cfi-storage-diag-${var.instance_id}"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   sku                 = "PerGB2018"
@@ -53,11 +39,7 @@ module "storage_account" {
   source = "git::https://github.com/Azure/terraform-azurerm-avm-res-storage-storageaccount.git?ref=main"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
-  name                = var.storage_account_name
-
-  tags = {
-    CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke (immutability policy)
-  }
+  name                = local.storage_account_name
 
   account_tier             = "Standard"
   account_replication_type = "GRS"  # Geo-redundant for CN08.AR01/CN08.AR02
@@ -91,14 +73,11 @@ module "storage_account" {
 
   # Create default container with immutable storage (CN04 tests - retention policy added below)
   containers = {
-    ccc-test-container-2 = {
-      name     = "ccc-test-container-2"
+    (local.default_container) = {
+      name     = local.default_container
       public_access = "None"
       immutable_storage_with_versioning = {
         enabled = true  # Required before immutability policy can be set
-      }
-      tags = {
-        CCC_INFRA_DONT_DELETE = "true"  # Excluded from nuke
       }
     }
   }
@@ -106,8 +85,8 @@ module "storage_account" {
 
 # Container-level immutability policy (CN04.AR02 - object retention enforcement)
 # Must be separate from module; AVM module does not support immutability_policy on containers.
-resource "azurerm_storage_container_immutability_policy" "ccc_test_container_2" {
-  storage_container_resource_manager_id = module.storage_account.containers["ccc-test-container-2"].id
+resource "azurerm_storage_container_immutability_policy" "ccc_test_container" {
+  storage_container_resource_manager_id = module.storage_account.containers[local.default_container].id
   immutability_period_in_days            = 2
   locked                                 = true
 }

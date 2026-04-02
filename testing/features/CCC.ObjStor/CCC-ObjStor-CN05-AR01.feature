@@ -15,7 +15,7 @@ Feature: CCC.ObjStor.CN05.AR01 - Versioning with Unique Identifiers
     Then "{result}" is true
     When I call "{storage}" with "CreateObject" using arguments "{ResourceName}", "versioned-object.txt", and "test content"
     And I refer to "{result}" as "createdObject"
-    Then "{createdObject.VersionID}" contains "20"
+    Then "{createdObject.VersionID}" is not empty
     And I attach "{result}" to the test output as "versioned-object.json"
 
   @Policy

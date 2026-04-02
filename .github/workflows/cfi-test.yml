@@ -1,4 +1,4 @@
-name: CFI Test
+name: CFI Build and Test  # Note - this action must be called cfi-test.yml for results to be pulled into CCC.
 
 permissions:
   id-token: write
@@ -66,13 +66,6 @@ jobs:
       TARGET_PROVIDER: ${{ matrix.target.provider }}
       TARGET_SERVICE: ${{ matrix.target.service }}
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-      TF_VAR_target_id: ${{ matrix.target.id }}
-      TF_VAR_github_run_id: ${{ github.run_id }}
-      TF_VAR_github_run_number: ${{ github.run_number }}
-      TF_VAR_github_actor: ${{ github.actor }}
-      TF_VAR_github_repository: ${{ github.repository }}
-      TF_VAR_github_workflow: ${{ github.workflow }}
-      TF_VAR_github_sha: ${{ github.sha }}
 
     steps:
       - name: Checkout repo
@@ -81,8 +74,19 @@ jobs:
       - name: Load compliance testing environment
         run: |
           echo "📋 Loading compliance testing environment..."
-          grep -v '^#' testing/compliance-testing.env | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
-          echo "✅ Environment variables loaded"
+          # Set a unique instance ID based on current UTC time in lowercase iso-like format without spaces/dashes (e.g. 20240401t161714z)
+          export INSTANCE_ID=$(date -u +"%Y%m%dt%H%M%Sz")
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          
+          # Load env vars into GHA and current session, ensuring bash evaluates ${INSTANCE_ID}
+          set -a
+          source testing/terraform_setup.env
+          set +a
+          
+          # Save evaluated variables to GITHUB_ENV for future steps (like Terraform Apply)
+          env | grep -E '^(TF_VAR_|AWS_|ARM_|CN_TEST_)' >> $GITHUB_ENV
+          
+          echo "✅ Environment variables loaded and envconfig initialized"
 
       - name: Configure AWS Credentials (OIDC)
         if: matrix.target.provider == 'aws'
@@ -113,6 +117,29 @@ jobs:
         with:
           go-version-file: "testing/go.mod"
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Apply
+        id: terraform-apply
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            terraform init
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            export ARM_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            terraform init -upgrade
+            terraform apply -auto-approve -input=false
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            export TF_VAR_gcp_project_id="${{ secrets.GCP_PROJECT_ID }}"
+            terraform init
+            terraform apply -auto-approve -input=false
+          fi
+          echo "✅ Terraform apply completed for $TARGET_ID"
+
       - name: Install testssl.sh
         run: |
           echo "📦 Installing testssl.sh..."
@@ -139,6 +166,30 @@ jobs:
           cd prowler
           pipx install poetry
           poetry install
+
+      - name: Refresh AWS Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Azure Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh GCP Credentials for Prowler (OIDC)
+        if: env.RUN_PROWLER == 'true' && matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
 
       - name: Run Prowler Scan
         if: env.RUN_PROWLER == 'true'
@@ -211,6 +262,30 @@ jobs:
             echo "⚠️  CN03 artifacts not found — CN03 scenarios requiring env vars will be skipped"
           fi
 
+      - name: Refresh AWS Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refresh Azure Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'azure'
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Refresh GCP Credentials for Compliance Tests (OIDC)
+        if: env.RUN_CFI == 'true' && matrix.target.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
       - name: Run Compliance Tests
         if: env.RUN_CFI == 'true'
         id: compliance-tests
@@ -223,11 +298,11 @@ jobs:
 
           chmod +x run-compliance-tests.sh
 
-          # Map provider to instance ID (from environment.yaml)
+          # Map provider to target instance ID (from environment.yaml)
           case "$TARGET_PROVIDER" in
-            aws)   INSTANCE_ID="main-aws" ;;
-            azure) INSTANCE_ID="main-azure" ;;
-            gcp)   INSTANCE_ID="main-gcp" ;;
+            aws)   TARGET_INSTANCE_ID="main-aws" ;;
+            azure) TARGET_INSTANCE_ID="main-azure" ;;
+            gcp)   TARGET_INSTANCE_ID="main-gcp" ;;
             *)     echo "❌ Unknown provider: $TARGET_PROVIDER"; exit 1 ;;
           esac
 
@@ -238,7 +313,7 @@ jobs:
             *)          SERVICE_TYPE="$TARGET_SERVICE" ;;
           esac
 
-          ./run-compliance-tests.sh --instance "$INSTANCE_ID" --service "$SERVICE_TYPE" --output "output"
+          ./run-compliance-tests.sh --instance "$TARGET_INSTANCE_ID" --service "$SERVICE_TYPE" --output "output"
 
           echo "✅ Compliance tests completed for $TARGET_ID"
 
