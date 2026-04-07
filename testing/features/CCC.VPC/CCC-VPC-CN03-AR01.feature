@@ -55,7 +55,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.AllCorrect}" is true
     And "{result.ViolationCount}" is "0"
 
-  @Destructive @MAIN @DEFAULT @CCC.VPC
+  @Destructive @MAIN @CCC.VPC
   Scenario: Enforcement proof (dry-run): non-allowlisted requester is denied even when not explicitly listed as disallowed
     Given "{NonAllowlistedRequesterVpcId}" is not nil
     When I call "{vpcService}" with "EvaluatePeerAgainstAllowList" using argument "{NonAllowlistedRequesterVpcId}"

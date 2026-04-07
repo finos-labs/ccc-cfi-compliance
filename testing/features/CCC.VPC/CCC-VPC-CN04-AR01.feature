@@ -10,7 +10,7 @@ Feature: CCC.VPC.CN04.AR01 - Flow logs must capture all VPC traffic
     And I refer to "{result}" as "vpcService"
 
   # Policy check: flow logs are configured as ACTIVE with TrafficType=ALL.
-  @Policy @MAIN @DEFAULT
+  @Policy @MAIN @CCC.VPC @DEFAULT
   @CCC.VPC
   Scenario: Main check (config): flow logs are active and capture all traffic
     Given I refer to "{UID}" as "TargetVpcId"
@@ -19,8 +19,7 @@ Feature: CCC.VPC.CN04.AR01 - Flow logs must capture all VPC traffic
     And "{result.NonCompliantCount}" is "0"
 
   # Behavior check: generate traffic and observe new flow log records.
-  @Behavioural @OPT_IN
-  # NOTE: no @CCC.VPC tag => opt-in only (may generate traffic and incur cost)
+  @Behavioural @MAIN @CCC.VPC
   Scenario: Behavioral check (active): traffic produces flow log records
     Given I refer to "{UID}" as "TargetVpcId"
     When I call "{vpcService}" with "PrepareFlowLogDeliveryObservation" using argument "{TargetVpcId}"

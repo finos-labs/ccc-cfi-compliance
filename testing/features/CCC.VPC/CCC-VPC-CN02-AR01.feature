@@ -12,8 +12,7 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
   # Public subnet: has a route to an Internet Gateway (IGW)
   # Default external IP assignment: subnet setting MapPublicIpOnLaunch = true
 
-  @Policy @MAIN @DEFAULT
-  @CCC.VPC
+  @Policy @MAIN @CCC.VPC @DEFAULT
   Scenario: Main check (config): public subnets do not auto-assign external IPs
     Given I refer to "{UID}" as "TargetVpcId"
     When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
@@ -29,7 +28,7 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
     Then "{result.ViolatingSubnetCount}" should be greater than "0"
     And "{result.Reason}" contains "MapPublicIpOnLaunch=true"
 
-  @Behavioural @OPT_IN
+  @Behavioural @MAIN @CCC.VPC 
   # Requires CN_TEST_AMI_ID set in compliance-testing.env (region-specific AMI ID).
   # Leave CN_TEST_AMI_ID blank to skip. Launches and deletes a short-lived EC2 instance.
   # Run with: --tags '@Behavioural'
