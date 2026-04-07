@@ -174,6 +174,7 @@ resource "aws_vpc" "cn03_allowed_peer" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-allowed-requester-${each.key}"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
     PeerClass  = var.cn03_allowed_peer_tag_value
   })
 }
@@ -188,6 +189,7 @@ resource "aws_vpc" "cn03_disallowed_peer" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-disallowed-requester-${each.key}"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
     PeerClass  = var.cn03_disallowed_peer_tag_value
   })
 }
@@ -202,6 +204,7 @@ resource "aws_vpc" "cn03_non_allowlisted_requester" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-non-allowlisted-requester-01"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
   })
 }
 
@@ -401,5 +404,4 @@ resource "aws_flow_log" "cn04_vpc" {
 
   depends_on = [aws_iam_role_policy.cn04_flow_logs]
 }
-
 

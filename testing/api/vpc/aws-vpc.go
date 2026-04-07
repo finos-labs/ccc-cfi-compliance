@@ -37,8 +37,9 @@ func NewAWSVPCService(ctx context.Context, instance ccctypes.InstanceConfig) (*A
 func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams, error) {
 	// Only return VPCs tagged CFIControlSet=CCC.VPC — this excludes:
 	//   - CN03 peer VPCs (tagged CFIControl=CCC.VPC.CN03, not CFIControlSet)
-	//   - Bad VPC (tagged CFIVpcRole=bad, skipped below)
 	//   - Default VPC and any other account VPCs (no CFI tags)
+	// Both compliant and intentionally non-compliant (CFIVpcRole=bad) VPCs are
+	// included so the report reflects real compliance state for all fixtures.
 	output, err := s.client.DescribeVpcs(s.ctx, &ec2.DescribeVpcsInput{
 		Filters: []types.Filter{
 			{
@@ -53,12 +54,6 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams
 
 	resources := make([]ccctypes.TestParams, 0, len(output.Vpcs))
 	for _, vpc := range output.Vpcs {
-		// Skip the intentionally non-compliant VPC — it is accessed only via
-		// {BadVpcId} in @NEGATIVE scenarios, never as an iterated test resource.
-		if tagValue(vpc.Tags, "CFIVpcRole") == "bad" {
-			continue
-		}
-
 		vpcID := aws.ToString(vpc.VpcId)
 		resourceName := vpcID
 		if nameTag := tagValue(vpc.Tags, "Name"); nameTag != "" {
