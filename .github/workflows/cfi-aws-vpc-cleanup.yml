@@ -43,6 +43,30 @@ jobs:
           for VPC_ID in $VPC_IDS; do
             echo "--- Cleaning VPC: $VPC_ID ---"
 
+            # Terminate running EC2 instances (blocks IGW detach if they have public IPs)
+            INSTANCE_IDS=$(aws ec2 describe-instances \
+                --filters Name=vpc-id,Values=$VPC_ID Name=instance-state-name,Values=pending,running,stopping,stopped \
+                --query 'Reservations[*].Instances[*].InstanceId' --output text)
+            if [ -n "$INSTANCE_IDS" ]; then
+              echo "  Terminating instances: $INSTANCE_IDS"
+              aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+              echo "  Waiting for instances to terminate..."
+              aws ec2 wait instance-terminated --instance-ids $INSTANCE_IDS
+            fi
+
+            # Release Elastic IPs associated with this VPC
+            for ALLOC_ID in $(aws ec2 describe-addresses \
+                --filters Name=domain,Values=vpc \
+                --query "Addresses[?AssociationId!=null] | [?NetworkInterfaceId!=null].AllocationId" \
+                --output text); do
+              ENI_VPC=$(aws ec2 describe-addresses --allocation-ids $ALLOC_ID \
+                --query 'Addresses[0].NetworkInterfaceId' --output text)
+              if [ -n "$ENI_VPC" ]; then
+                echo "  Releasing EIP $ALLOC_ID"
+                aws ec2 release-address --allocation-id $ALLOC_ID || true
+              fi
+            done
+
             # Detach and delete internet gateways
             for IGW_ID in $(aws ec2 describe-internet-gateways \
                 --filters Name=attachment.vpc-id,Values=$VPC_ID \
