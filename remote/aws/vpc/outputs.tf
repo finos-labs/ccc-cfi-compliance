@@ -50,6 +50,16 @@ output "vpc_id" {
   value       = module.vpc.vpc_id
 }
 
+output "bad_vpc_id" {
+  description = "Bad VPC ID (map_public_ip_on_launch=true, no flow logs) for CN02/CN04 negative test scenarios."
+  value       = module.bad_vpc.vpc_id
+}
+
+output "BAD_VPC_ID" {
+  description = "Bad VPC ID as a directly-named output for CI env var injection."
+  value       = module.bad_vpc.vpc_id
+}
+
 output "public_subnet_ids" {
   description = "Created public subnet IDs"
   value       = module.vpc.public_subnets
@@ -196,4 +206,9 @@ output "cn04_flow_log_id" {
 output "cn04_flow_log_log_group_name" {
   description = "CN04 CloudWatch log group used by flow logs."
   value       = try(aws_cloudwatch_log_group.cn04_flow_logs[0].name, null)
+}
+
+output "CN04_FLOW_LOG_GROUP_NAME" {
+  description = "CN04 CloudWatch log group name as a directly-named output for CI env var injection."
+  value       = try(aws_cloudwatch_log_group.cn04_flow_logs[0].name, "")
 }

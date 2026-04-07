@@ -123,6 +123,40 @@ module "vpc" {
 }
 
 # =============================================================================
+# BAD VPC — Intentionally non-compliant VPC for CN02/CN04 negative test scenarios.
+# map_public_ip_on_launch=true violates CCC.VPC.CN02 (no flow logs = CN04 violation).
+# No aws_flow_log resources are attached to this VPC by design.
+# =============================================================================
+
+module "bad_vpc" {
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=v5.7.0"
+
+  name = "${local.name}-bad"
+  cidr = var.bad_vpc_cidr
+
+  azs            = var.availability_zones
+  public_subnets = [for i in range(length(var.availability_zones)) : cidrsubnet(var.bad_vpc_cidr, 8, i)]
+
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  enable_nat_gateway = false
+  enable_vpn_gateway = false
+
+  create_igw              = true
+  map_public_ip_on_launch = true
+
+  tags = merge(local.common_resource_tags, {
+    CFIControlSet = "CCC.VPC"
+    CFIVpcRole    = "bad"
+  })
+
+  public_subnet_tags = merge(local.common_resource_tags, {
+    Tier = "public"
+  })
+}
+
+# =============================================================================
 # CN03 — Restrict VPC peering to allowed requesters (CCC.VPC.CN03)
 # Creates requester fixture VPCs (allowed/disallowed/non-allowlisted) and an
 # optional IAM guardrail policy that denies CreateVpcPeeringConnection from

@@ -7,9 +7,15 @@ variable "aws_region" {
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
+  description = "CIDR block for the compliant (good) VPC."
   type        = string
   default     = "10.20.0.0/16"
+}
+
+variable "bad_vpc_cidr" {
+  description = "CIDR block for the intentionally non-compliant VPC used in CN02/CN04 negative test scenarios (map_public_ip_on_launch=true, no flow logs)."
+  type        = string
+  default     = "10.21.0.0/16"
 }
 
 variable "availability_zones" {

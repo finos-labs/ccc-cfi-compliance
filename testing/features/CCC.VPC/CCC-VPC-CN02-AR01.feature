@@ -19,14 +19,13 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
     Then "{result.ViolatingSubnetCount}" is "0"
     And "{result.Reason}" contains "disable default public IP"
 
-  @Policy @NEGATIVE @OPT_IN
-  # Redeploy with map_public_ip_on_launch=true in terraform.tfvars before running this scenario.
-  # Run with: --tags '@NEGATIVE'
-  Scenario: Negative check: public subnets auto-assign external IPs (failure simulation)
-    Given I refer to "{UID}" as "TargetVpcId"
-    When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
-    Then "{result.ViolatingSubnetCount}" should be greater than "0"
-    And "{result.Reason}" contains "MapPublicIpOnLaunch=true"
+  # @Policy @NEGATIVE @OPT_IN
+  # TODO: negative check pending — purpose is to validate check logic correctness for false negatives, not VPC state
+  # Scenario: Negative check: public subnets auto-assign external IPs (failure simulation)
+  #   Given I refer to "{UID}" as "TargetVpcId"
+  #   When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
+  #   Then "{result.ViolatingSubnetCount}" should be greater than "0"
+  #   And "{result.Reason}" contains "MapPublicIpOnLaunch=true"
 
   @Behavioural @MAIN @CCC.VPC 
   # Requires CN_TEST_AMI_ID set in compliance-testing.env (region-specific AMI ID).

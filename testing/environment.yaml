@@ -18,27 +18,27 @@ instances:
       - type: logging
         aws-cloud-trail-log-group-name: cfi-test-log-group
       - type: vpc
-        # CN03.AR01: Full CN03 peering guardrail configuration.
         # All values populated at runtime via ${VAR} substitution (os.ExpandEnv
         # in envconfig.go) from Terraform outputs exported after apply.
-        # For manual runs, set the corresponding env vars or replace with
-        # explicit VPC ID strings.
+        # For manual runs, set the corresponding env vars or replace with explicit values.
         #
-        # The allowed/disallowed lists here are merged with env var sources
-        # (CN03_ALLOWED_REQUESTER_VPC_ID_1..N, CN03_ALLOWED_REQUESTER_VPC_IDS
-        # etc.) by the CN03 resolver — duplicates are deduplicated automatically.
-        # The batch dry-run scenario additionally uses the JSON trial matrix file
-        # (CN03_PEER_TRIAL_MATRIX_FILE) as a portable audit artifact capturing
-        # the same VPC IDs in a self-contained, replayable format.
+        # CN03: IaC-provisioned VPC IDs flow in automatically via env vars — the list
+        # fields below are for explicit manual additions only. Duplicates across all
+        # sources are deduplicated automatically.
         cn03-receiver-vpc-id: "${CN03_RECEIVER_VPC_ID}"
+        cn03-non-allowlisted-requester-vpc-id: "${CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID}"
         cn03-allowed-requester-vpc-ids:
-          - "${CN03_ALLOWED_REQUESTER_VPC_IDS}"
           # Add explicit VPC IDs here to include on top of IaC-provisioned ones:
           # - "vpc-abc123"
         cn03-disallowed-requester-vpc-ids:
-          - "${CN03_DISALLOWED_REQUESTER_VPC_IDS}"
           # Add explicit VPC IDs here to include on top of IaC-provisioned ones:
           # - "vpc-def456"
+        cn03-allowed-requester-vpc-ids-csv: "${CN03_ALLOWED_REQUESTER_VPC_IDS}"
+        cn03-disallowed-requester-vpc-ids-csv: "${CN03_DISALLOWED_REQUESTER_VPC_IDS}"
+        # CN04: flow log group name for behavioral observation scenarios.
+        cn04-flow-log-group-name: "${CN04_FLOW_LOG_GROUP_NAME}"
+        # Bad VPC: intentionally non-compliant VPC for CN02/CN04 negative checks.
+        bad-vpc-id: "${BAD_VPC_ID}"
 
   - id: main-azure
     properties:
