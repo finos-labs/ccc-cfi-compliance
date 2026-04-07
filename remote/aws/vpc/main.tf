@@ -78,6 +78,7 @@ locals {
 
   cn03_guardrail_policy_json = templatefile("${path.module}/policies/cn03-guardrail-policy.json.tftpl", {
     allowed_requester_vpc_arns_json = jsonencode(local.cn03_allowed_accepter_vpc_arns)
+    allowed_accepter_vpc_arns_json  = jsonencode([module.vpc.vpc_arn])
   })
 
   # ---------------------------------------------------------------------------

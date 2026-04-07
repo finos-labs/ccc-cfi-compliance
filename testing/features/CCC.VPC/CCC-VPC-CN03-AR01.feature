@@ -8,7 +8,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" using argument "vpc"
     And I refer to "{result}" as "vpcService"
-    And I refer to "{Cn03ReceiverVpcId}" as "ReceiverVpcId"
+    And I refer to "{UID}" as "ReceiverVpcId"
     And I refer to "{Cn03NonAllowlistedRequesterVpcId}" as "NonAllowlistedRequesterVpcId"
     And I load environment variable "CN03_PEER_TRIAL_MATRIX_FILE" as "PeerTrialMatrixFile"
     And "{ReceiverVpcId}" is not nil
