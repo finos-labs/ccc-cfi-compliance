@@ -15,16 +15,16 @@ case "$PREFIX" in
     ;;
 esac
 
-# List RG names matching PREFIX, sorted unique. Avoids `mapfile < <(az | sort)` under
-# `pipefail`: sort can get SIGPIPE when the reader closes before fflush (GitHub Actions).
-list_matching_resource_groups() {
-  local raw sorted
-  raw="$(az group list --subscription "$SUBSCRIPTION_ID" \
-    --query "[?starts_with(name, '${PREFIX}')].name" -o tsv 2>/dev/null || true)"
-  # trim whitespace-only
-  [[ -z "${raw//[$'\t\r\n']}" ]] && return 0
-  sorted="$(printf '%s\n' "$raw" | LC_ALL=C sort -u)"
-  printf '%s\n' "$sorted"
+# Fill array from a multiline string (no `mapfile < <(…)` — avoids SIGPIPE + pipefail on runners).
+# Requires bash 4.3+ (`local -n`); matches `ubuntu-latest` / GitHub Actions.
+read_lines_into_array() {
+  local _content=$1
+  local -n _target=$2
+  _target=()
+  while IFS= read -r _line || [[ -n "${_line}" ]]; do
+    [[ -z "${_line}" ]] && continue
+    _target+=("${_line}")
+  done <<< "${_content}"
 }
 
 remove_container_immutability_if_possible() {
@@ -71,10 +71,11 @@ cleanup_storage_account() {
   local rg=$1 sa=$2
   local key
   key="$(az storage account keys list -g "$rg" -n "$sa" --subscription "$SUBSCRIPTION_ID" --query "[0].value" -o tsv)"
-  local containers
-  mapfile -t containers < <(az storage container list \
+  local containers_raw containers
+  containers_raw="$(az storage container list \
     --account-name "$sa" --account-key "$key" --subscription "$SUBSCRIPTION_ID" \
-    --query "[].name" -o tsv 2>/dev/null || true)
+    --query "[].name" -o tsv 2>/dev/null || true)"
+  read_lines_into_array "${containers_raw}" containers
 
   for c in "${containers[@]}"; do
     [[ -z "$c" ]] && continue
@@ -92,8 +93,10 @@ cleanup_resource_group() {
   local rg=$1
   echo "Resource group: $rg"
 
-  mapfile -t sas < <(az storage account list -g "$rg" --subscription "$SUBSCRIPTION_ID" \
-    --query "[].name" -o tsv 2>/dev/null || true)
+  local sas_raw sas
+  sas_raw="$(az storage account list -g "$rg" --subscription "$SUBSCRIPTION_ID" \
+    --query "[].name" -o tsv 2>/dev/null || true)"
+  read_lines_into_array "${sas_raw}" sas
 
   for sa in "${sas[@]}"; do
     [[ -z "$sa" ]] && continue
@@ -105,7 +108,13 @@ cleanup_resource_group() {
   az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes
 }
 
-mapfile -t GROUPS < <(list_matching_resource_groups)
+GROUPS=()
+_raw_groups="$(az group list --subscription "$SUBSCRIPTION_ID" \
+  --query "[?starts_with(name, '${PREFIX}')].name" -o tsv 2>/dev/null || true)"
+if [[ -n "${_raw_groups//[$'\t\r\n']}" ]]; then
+  _sorted_groups="$(printf '%s\n' "${_raw_groups}" | LC_ALL=C sort -u)"
+  read_lines_into_array "${_sorted_groups}" GROUPS
+fi
 
 if [[ ${#GROUPS[@]} -eq 0 || -z "${GROUPS[0]:-}" ]]; then
   echo "No resource groups match prefix '$PREFIX'."
