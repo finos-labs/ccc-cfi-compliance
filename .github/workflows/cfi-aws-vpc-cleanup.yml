@@ -1,0 +1,119 @@
+name: "TEMP: Clean up AWS VPCs in region"
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "AWS region to clean VPCs from (e.g. us-east-1)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ inputs.region }}
+
+      - name: Delete all non-default VPCs in region
+        env:
+          AWS_REGION: ${{ inputs.region }}
+        run: |
+          set -euo pipefail
+
+          VPC_IDS=$(aws ec2 describe-vpcs \
+            --filters Name=isDefault,Values=false \
+            --query 'Vpcs[*].VpcId' \
+            --output text)
+
+          if [ -z "$VPC_IDS" ]; then
+            echo "No non-default VPCs found in $AWS_REGION"
+            exit 0
+          fi
+
+          echo "Found VPCs: $VPC_IDS"
+
+          for VPC_ID in $VPC_IDS; do
+            echo "--- Cleaning VPC: $VPC_ID ---"
+
+            # Terminate running EC2 instances (blocks IGW detach if they have public IPs)
+            INSTANCE_IDS=$(aws ec2 describe-instances \
+                --filters Name=vpc-id,Values=$VPC_ID Name=instance-state-name,Values=pending,running,stopping,stopped \
+                --query 'Reservations[*].Instances[*].InstanceId' --output text)
+            if [ -n "$INSTANCE_IDS" ]; then
+              echo "  Terminating instances: $INSTANCE_IDS"
+              aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+              echo "  Waiting for instances to terminate..."
+              aws ec2 wait instance-terminated --instance-ids $INSTANCE_IDS
+            fi
+
+            # Release Elastic IPs associated with this VPC
+            for ALLOC_ID in $(aws ec2 describe-addresses \
+                --filters Name=domain,Values=vpc \
+                --query "Addresses[?AssociationId!=null] | [?NetworkInterfaceId!=null].AllocationId" \
+                --output text); do
+              ENI_VPC=$(aws ec2 describe-addresses --allocation-ids $ALLOC_ID \
+                --query 'Addresses[0].NetworkInterfaceId' --output text)
+              if [ -n "$ENI_VPC" ]; then
+                echo "  Releasing EIP $ALLOC_ID"
+                aws ec2 release-address --allocation-id $ALLOC_ID || true
+              fi
+            done
+
+            # Detach and delete internet gateways
+            for IGW_ID in $(aws ec2 describe-internet-gateways \
+                --filters Name=attachment.vpc-id,Values=$VPC_ID \
+                --query 'InternetGateways[*].InternetGatewayId' --output text); do
+              echo "  Detaching IGW $IGW_ID"
+              aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
+              aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
+            done
+
+            # Delete subnets
+            for SUBNET_ID in $(aws ec2 describe-subnets \
+                --filters Name=vpc-id,Values=$VPC_ID \
+                --query 'Subnets[*].SubnetId' --output text); do
+              echo "  Deleting subnet $SUBNET_ID"
+              aws ec2 delete-subnet --subnet-id $SUBNET_ID
+            done
+
+            # Delete non-main route tables
+            for RT_ID in $(aws ec2 describe-route-tables \
+                --filters Name=vpc-id,Values=$VPC_ID \
+                --query 'RouteTables[?Associations[?Main==`false`] || length(Associations)==`0`].RouteTableId' \
+                --output text); do
+              echo "  Deleting route table $RT_ID"
+              aws ec2 delete-route-table --route-table-id $RT_ID || true
+            done
+
+            # Delete non-default security groups
+            for SG_ID in $(aws ec2 describe-security-groups \
+                --filters Name=vpc-id,Values=$VPC_ID \
+                --query 'SecurityGroups[?GroupName!=`default`].GroupId' \
+                --output text); do
+              echo "  Deleting security group $SG_ID"
+              aws ec2 delete-security-group --group-id $SG_ID || true
+            done
+
+            # Delete VPC peering connections
+            for PCX_ID in $(aws ec2 describe-vpc-peering-connections \
+                --filters Name=requester-vpc-info.vpc-id,Values=$VPC_ID \
+                --query 'VpcPeeringConnections[*].VpcPeeringConnectionId' --output text); do
+              echo "  Deleting peering connection $PCX_ID"
+              aws ec2 delete-vpc-peering-connection --vpc-peering-connection-id $PCX_ID || true
+            done
+
+            # Delete the VPC
+            echo "  Deleting VPC $VPC_ID"
+            aws ec2 delete-vpc --vpc-id $VPC_ID
+            echo "  ✅ Deleted $VPC_ID"
+          done
+
+          echo "Done. All non-default VPCs removed from $AWS_REGION."

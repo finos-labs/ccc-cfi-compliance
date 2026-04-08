@@ -15,8 +15,12 @@ func LoadEnvironment(path string) (*types.EnvironmentConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read environment file %s: %w", path, err)
 	}
+	
+	// Native parameter substitution to handle variables like ${INSTANCE_ID}
+	expandedData := []byte(os.ExpandEnv(string(data)))
+
 	var config types.EnvironmentConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal(expandedData, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse environment file %s: %w", path, err)
 	}
 	return &config, nil

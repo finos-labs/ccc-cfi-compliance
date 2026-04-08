@@ -1,0 +1,99 @@
+name: CFI Nuke
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: cfi-infra
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # Run every morning at 4 AM UTC (11 PM EST / 8 PM PST)
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  # PHASE 1: Parallel Nuke across all providers
+  nuke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [aws, azure, gcp]
+    env:
+      TARGET_PROVIDER: ${{ matrix.provider }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: matrix.provider == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/TerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Authenticate to Google Cloud (OIDC)
+        if: matrix.provider == 'gcp'
+        uses: google-github-actions/auth@v1
+        with:
+          token_format: "id_token"
+          id_token_audience: "https://iam.googleapis.com/projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/finos-oidc-pool/providers/github-provider"
+          service_account: "gha-deployer@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com"
+
+      - name: Install nuke tool
+        run: |
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            BINARY_URL="https://github.com/ekristen/aws-nuke/releases/download/v3.60.1/aws-nuke-v3.60.1-linux-amd64.tar.gz"
+            BINARY_NAME="aws-nuke"
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            BINARY_URL="https://github.com/ekristen/azure-nuke/releases/download/v1.2.3/azure-nuke-v1.2.3-linux-amd64.tar.gz"
+            BINARY_NAME="azure-nuke"
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            BINARY_URL="https://github.com/ekristen/gcp-nuke/releases/download/v1.8.1/gcp-nuke-v1.8.1-linux-amd64.tar.gz"
+            BINARY_NAME="gcp-nuke"
+          fi
+
+          echo "📦 Installing $BINARY_NAME..."
+          wget -q "$BINARY_URL"
+          tar -xzf *.tar.gz
+          sudo mv "$BINARY_NAME" /usr/local/bin/
+          sudo chmod +x /usr/local/bin/"$BINARY_NAME"
+          $BINARY_NAME --version
+
+      - name: Run nuke
+        continue-on-error: true
+        run: |
+          echo "💥 Running nuke for $TARGET_PROVIDER..."
+          if [ "$TARGET_PROVIDER" = "aws" ]; then
+            aws-nuke run \
+              --config .github/workflows/nuke/aws-nuke-config.yaml \
+              --no-dry-run \
+              --force || true
+          elif [ "$TARGET_PROVIDER" = "azure" ]; then
+            FEDERATED_TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r '.value')
+            
+            if [ -n "$FEDERATED_TOKEN" ] && [ "$FEDERATED_TOKEN" != "null" ]; then
+              echo "$FEDERATED_TOKEN" > /tmp/azure-federated-token.txt
+              azure-nuke run \
+                --config .github/workflows/nuke/azure-nuke-config.yaml \
+                --tenant-id ${{ secrets.AZURE_TENANT_ID }} \
+                --client-id ${{ secrets.AZURE_CLIENT_ID }} \
+                --subscription-id ${{ secrets.AZURE_SUBSCRIPTION_ID }} \
+                --client-federated-token-file /tmp/azure-federated-token.txt \
+                --no-dry-run \
+                --force || true
+              rm -f /tmp/azure-federated-token.txt
+            fi
+          elif [ "$TARGET_PROVIDER" = "gcp" ]; then
+            gcp-nuke run \
+              --config .github/workflows/nuke/gcp-nuke-config.yaml \
+              --project-id ${{ secrets.GCP_PROJECT_ID }} \
+              --no-dry-run \
+              --no-prompt || true
+          fi

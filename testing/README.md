@@ -12,7 +12,7 @@ The testing system discovers cloud resources using native cloud provider APIs an
 
 The main entry point for running compliance tests. This shell script:
 
-- Loads environment variables from `compliance-testing.env`
+- Loads environment variables from `environment.yaml`
 - Parses command-line arguments for provider, region, and cloud-specific options
 - Builds the Go test runner binary (`ccc-compliance`)
 - Executes the runner with the configured parameters
@@ -163,7 +163,7 @@ After deploying infrastructure:
 ./testing/run-compliance-tests.sh --provider gcp
 ```
 
-All required variables are auto-loaded from `compliance-testing.env`, but you can override with command-line options if you want.
+All required variables are auto-loaded from `terraform_setup.env`, but you can override with command-line options if you want.
 
 ```
 ./run-compliance-tests.sh --help

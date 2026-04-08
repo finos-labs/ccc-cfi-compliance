@@ -9,7 +9,7 @@ provider "azurerm" {
 # Create a resource group with standard tags
 # All resources within this group should inherit these tags
 resource "azurerm_resource_group" "cfi_test" {
-  name     = "rg-cfi-${var.target_id}-${random_id.suffix.hex}"
+  name     = "rg-cfi-${var.instance_id}-${random_id.suffix.hex}"
   location = var.azure_location
 
   tags = {
@@ -17,10 +17,6 @@ resource "azurerm_resource_group" "cfi_test" {
     ManagedBy        = "Terraform"
     Project          = "CCC-CFI-Compliance"
     AutoCleanup      = "true"
-    CFITargetID      = var.target_id
-    GitHubWorkflow   = "CFI-Build"
-    GitHubRunID      = var.github_run_id
-    GitHubRepository = var.github_repository
   }
 }
 
@@ -36,22 +32,10 @@ variable "azure_location" {
   default     = "eastus"
 }
 
-variable "target_id" {
-  description = "CFI Target ID (e.g., azure-storage-account)"
+variable "instance_id" {
+  description = "CFI Instance ID"
   type        = string
   default     = "local-test"
-}
-
-variable "github_run_id" {
-  description = "GitHub Actions run ID"
-  type        = string
-  default     = "local"
-}
-
-variable "github_repository" {
-  description = "GitHub repository"
-  type        = string
-  default     = "local"
 }
 
 # Note: For each Azure resource, you should also add tags explicitly:

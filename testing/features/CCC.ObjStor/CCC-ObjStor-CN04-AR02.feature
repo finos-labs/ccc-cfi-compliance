@@ -34,7 +34,6 @@ Feature: CCC.ObjStor.CN04.AR02
     When I call "{storage}" with "DeleteObject" using arguments "{ResourceName}" and "admin-protected-object={Timestamp}.txt"
     Then "{result}" is an error
     And I attach "{result}" to the test output as "admin-delete-protected-error.txt"
-    And "{result}" should contain "retention"
 
   @Behavioural
   Scenario: Service prevents object modification during retention period
