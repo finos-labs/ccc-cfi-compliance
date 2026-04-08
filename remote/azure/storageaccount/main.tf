@@ -9,6 +9,23 @@ variable "location" {
   default     = "eastus"
 }
 
+# Must match testing/environment.yaml → instances[main-azure].services[object-storage]
+# object-storage-retention-period-days (CN04.AR02 policy length checks).
+variable "object_storage_retention_period_days" {
+  type        = number
+  default     = 2
+  description = "Container immutability retention in days; keep in sync with testing/environment.yaml main-azure."
+}
+
+# Locked policies match real WORM-style immutability for CN04 tests. Cleanup cannot remove the
+# policy (or the storage account) until blob versions exit retention — see testing/scripts/
+# azure-cleanup-cfi-resource-groups.sh and .github/workflows/cfi-azure-cleanup.yml (daily retries).
+variable "container_immutability_locked" {
+  type        = bool
+  default     = true
+  description = "If false, faster teardown for dev only; compliance runs should use true."
+}
+
 locals {
   storage_account_name = "storagecfitest${var.instance_id}"
   resource_group_name  = "cfi_test_${var.instance_id}"
@@ -87,8 +104,8 @@ module "storage_account" {
 # Must be separate from module; AVM module does not support immutability_policy on containers.
 resource "azurerm_storage_container_immutability_policy" "ccc_test_container" {
   storage_container_resource_manager_id = module.storage_account.containers[local.default_container].id
-  immutability_period_in_days            = 2
-  locked                                 = true
+  immutability_period_in_days           = var.object_storage_retention_period_days
+  locked                                = var.container_immutability_locked
 }
 
 # Enable read, write, delete logging for blob service (Storage Analytics)

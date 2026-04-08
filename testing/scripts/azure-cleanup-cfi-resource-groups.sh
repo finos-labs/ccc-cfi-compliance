@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# Child-first teardown for CFI Terraform Azure stacks (remote/azure/storageaccount):
-# immutability policy → blobs → container → storage account → resource group.
-# Locked immutability cannot be removed via API; retention must expire or use a test config with locked=false.
-set -euo pipefail
+# Child-first teardown for CFI Terraform Azure stacks (remote/azure/storageaccount).
+#
+# Azure locked + version-level immutability: blob versions must exit their retention window
+# (see testing/environment.yaml object-storage-retention-period-days and Terraform
+# object_storage_retention_period_days) before the immutability policy can be removed and the
+# storage account deleted. This script is intended to run on a schedule (e.g. daily): failures
+# to delete an account or RG are treated as deferrals — the next run often succeeds once
+# retention and blob soft-delete periods have passed.
+#
+# Per-container order: delete blobs (best effort) → remove immutability policy → delete blobs
+# again → delete container → storage account → resource group.
+set -uo pipefail
 
 SUBSCRIPTION_ID="${1:?subscription id}"
 PREFIX="${2:?resource group name prefix}"
@@ -15,7 +23,10 @@ case "$PREFIX" in
     ;;
 esac
 
-# Fill array from a multiline string (no `mapfile < <(…)` — avoids SIGPIPE + pipefail on runners).
+# Set to 1 if any storage account or RG delete is deferred (run again later).
+CLEANUP_DEFERRED=0
+
+# Fill array from a multiline string (no `mapfile < <(…)` — avoids SIGPIPE + pipefail on CI).
 # Requires bash 4.3+ (`local -n`); matches `ubuntu-latest` / GitHub Actions.
 read_lines_into_array() {
   local _content=$1
@@ -43,25 +54,31 @@ remove_container_immutability_if_possible() {
   fi
   if az storage container immutability-policy delete \
     --account-name "$sa" --container-name "$container" --account-key "$key" \
-    --if-match "$etag" --subscription "$SUBSCRIPTION_ID" 2>/dev/null; then
+    --if-match "$etag" --subscription "$SUBSCRIPTION_ID"; then
     echo "      Removed immutability policy on container $container"
     return 0
   fi
-  echo "      WARN: immutability-policy delete failed (policy may be locked). Trying management-plane DELETE..."
+  echo "      WARN: data-plane immutability-policy delete failed; trying ARM DELETE..."
   if az rest --method DELETE \
     --url "https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${rg}/providers/Microsoft.Storage/storageAccounts/${sa}/blobServices/default/containers/${container}/immutabilityPolicies/default?api-version=2023-05-01" \
-    --headers "If-Match=${etag}" 2>/dev/null; then
+    --headers "If-Match=${etag}"; then
     echo "      Removed immutability policy via ARM"
-  else
-    echo "      WARN: locked or protected immutability may block cleanup until retention expires."
+    return 0
   fi
+  echo "      WARN: Immutability policy still present (blobs in retention or locked policy)." >&2
+  echo "      Scheduled cleanup will retry; see object-storage-retention-period-days in environment.yaml." >&2
+  return 0
 }
 
-empty_and_delete_container() {
+delete_container_blobs() {
   local sa=$1 key=$2 container=$3
   az storage blob delete-batch \
     --account-name "$sa" --account-key "$key" --subscription "$SUBSCRIPTION_ID" \
     --source "$container" --pattern '*' --delete-snapshots include 2>/dev/null || true
+}
+
+delete_storage_container() {
+  local sa=$1 key=$2 container=$3
   az storage container delete \
     --account-name "$sa" --container-name "$container" --account-key "$key" \
     --subscription "$SUBSCRIPTION_ID" --yes 2>/dev/null || true
@@ -80,13 +97,21 @@ cleanup_storage_account() {
   for c in "${containers[@]}"; do
     [[ -z "$c" ]] && continue
     echo "    Container: $c"
+    # Locked immutability: clear blobs first (no-op until retention ends), then try policy removal.
+    delete_container_blobs "$sa" "$key" "$c"
     remove_container_immutability_if_possible "$rg" "$sa" "$key" "$c"
-    empty_and_delete_container "$sa" "$key" "$c"
+    delete_container_blobs "$sa" "$key" "$c"
+    delete_storage_container "$sa" "$key" "$c"
   done
 
   echo "  Deleting storage account $sa..."
-  az storage account delete --name "$sa" --resource-group "$rg" \
-    --subscription "$SUBSCRIPTION_ID" --yes
+  if az storage account delete --name "$sa" --resource-group "$rg" \
+    --subscription "$SUBSCRIPTION_ID" --yes; then
+    return 0
+  fi
+  echo "  WARN: Storage account $sa not deleted yet (immutability/versioning or dependencies). Will retry on next run." >&2
+  CLEANUP_DEFERRED=1
+  return 1
 }
 
 cleanup_resource_group() {
@@ -101,11 +126,16 @@ cleanup_resource_group() {
   for sa in "${sas[@]}"; do
     [[ -z "$sa" ]] && continue
     echo "  Storage account: $sa"
-    cleanup_storage_account "$rg" "$sa"
+    cleanup_storage_account "$rg" "$sa" || true
   done
 
   echo "Deleting resource group $rg (any remaining resources)..."
-  az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes
+  if az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes; then
+    return 0
+  fi
+  echo "WARN: Resource group $rg not fully deleted yet (e.g. storage still protected). Will retry on next run." >&2
+  CLEANUP_DEFERRED=1
+  return 1
 }
 
 # Do not use array name GROUPS — bash sets $GROUPS to numeric supplementary group IDs (read-only-ish);
@@ -129,8 +159,12 @@ echo ""
 
 for rg in "${CFI_RG_NAMES[@]}"; do
   [[ -z "$rg" ]] && continue
-  cleanup_resource_group "$rg"
+  cleanup_resource_group "$rg" || true
   echo ""
 done
 
 echo "Cleanup finished."
+if [[ "${CLEANUP_DEFERRED}" -ne 0 ]]; then
+  echo "NOTE: Some deletes were deferred (immutability retention / soft-delete). Daily scheduled runs should complete teardown after those windows pass." >&2
+fi
+exit 0
