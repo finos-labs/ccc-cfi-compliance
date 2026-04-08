@@ -108,24 +108,26 @@ cleanup_resource_group() {
   az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes
 }
 
-GROUPS=()
+# Do not use array name GROUPS — bash sets $GROUPS to numeric supplementary group IDs (read-only-ish);
+# reusing it produced bogus "resource group" names like 1001, 100, 118 in CI.
+CFI_RG_NAMES=()
 _raw_groups="$(az group list --subscription "$SUBSCRIPTION_ID" \
   --query "[?starts_with(name, '${PREFIX}')].name" -o tsv 2>/dev/null || true)"
 if [[ -n "${_raw_groups//[$'\t\r\n']}" ]]; then
   _sorted_groups="$(printf '%s\n' "${_raw_groups}" | LC_ALL=C sort -u)"
-  read_lines_into_array "${_sorted_groups}" GROUPS
+  read_lines_into_array "${_sorted_groups}" CFI_RG_NAMES
 fi
 
-if [[ ${#GROUPS[@]} -eq 0 || -z "${GROUPS[0]:-}" ]]; then
+if [[ ${#CFI_RG_NAMES[@]} -eq 0 || -z "${CFI_RG_NAMES[0]:-}" ]]; then
   echo "No resource groups match prefix '$PREFIX'."
   exit 0
 fi
 
-echo "Matching resource groups (${#GROUPS[@]}):"
-printf '  - %s\n' "${GROUPS[@]}"
+echo "Matching resource groups (${#CFI_RG_NAMES[@]}):"
+printf '  - %s\n' "${CFI_RG_NAMES[@]}"
 echo ""
 
-for rg in "${GROUPS[@]}"; do
+for rg in "${CFI_RG_NAMES[@]}"; do
   [[ -z "$rg" ]] && continue
   cleanup_resource_group "$rg"
   echo ""
