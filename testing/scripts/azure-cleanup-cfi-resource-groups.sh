@@ -15,9 +15,16 @@ case "$PREFIX" in
     ;;
 esac
 
+# List RG names matching PREFIX, sorted unique. Avoids `mapfile < <(az | sort)` under
+# `pipefail`: sort can get SIGPIPE when the reader closes before fflush (GitHub Actions).
 list_matching_resource_groups() {
-  az group list --subscription "$SUBSCRIPTION_ID" \
-    --query "[?starts_with(name, '${PREFIX}')].name" -o tsv | sort -u
+  local raw sorted
+  raw="$(az group list --subscription "$SUBSCRIPTION_ID" \
+    --query "[?starts_with(name, '${PREFIX}')].name" -o tsv 2>/dev/null || true)"
+  # trim whitespace-only
+  [[ -z "${raw//[$'\t\r\n']}" ]] && return 0
+  sorted="$(printf '%s\n' "$raw" | LC_ALL=C sort -u)"
+  printf '%s\n' "$sorted"
 }
 
 remove_container_immutability_if_possible() {
