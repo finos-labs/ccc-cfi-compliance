@@ -129,11 +129,15 @@ cleanup_resource_group() {
     cleanup_storage_account "$rg" "$sa" || true
   done
 
-  echo "Deleting resource group $rg (any remaining resources)..."
-  if az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes; then
+  # Without --no-wait, az blocks until every resource is gone. A protected storage account can
+  # leave that wait running for a very long time. --no-wait returns once the delete is queued;
+  # Azure keeps working in the background; the next scheduled run retries if the RG still exists.
+  echo "Deleting resource group $rg (any remaining resources, async)..."
+  if az group delete --name "$rg" --subscription "$SUBSCRIPTION_ID" --yes --no-wait; then
+    echo "  Resource group delete started (async). If protected resources remain, the RG may persist until a later run."
     return 0
   fi
-  echo "WARN: Resource group $rg not fully deleted yet (e.g. storage still protected). Will retry on next run." >&2
+  echo "WARN: Could not start delete for resource group $rg. Will retry on next run." >&2
   CLEANUP_DEFERRED=1
   return 1
 }
