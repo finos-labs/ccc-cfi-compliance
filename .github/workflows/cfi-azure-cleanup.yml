@@ -1,0 +1,50 @@
+# Deletes CFI Azure test stacks (Terraform: resource_group_name = "cfi_test_${instance_id}").
+# Order: remove container immutability when possible → blobs → containers → storage accounts
+# → resource group (Log Analytics, etc.). Needed because locked immutability blocks naive RG delete.
+#
+# If immutability is locked and blobs are still in retention, deletes may fail until retention
+# elapses or you use a dev Terraform config with locked=false.
+
+name: CFI Azure cleanup (test resource groups)
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: cfi-azure-cleanup
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # Run every morning at 4 AM UTC (11 PM EST / 8 PM PST)
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      resource_group_prefix:
+        description: "Resource groups whose names start with this prefix. Must start with cfi_test_."
+        type: string
+        default: "cfi_test_"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Delete CFI test resource groups (child resources first)
+        env:
+          SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # schedule has no inputs; workflow_dispatch may override prefix
+          PREFIX: ${{ github.event_name == 'workflow_dispatch' && inputs.resource_group_prefix != '' && inputs.resource_group_prefix || 'cfi_test_' }}
+        run: |
+          bash "$GITHUB_WORKSPACE/testing/scripts/azure-cleanup-cfi-resource-groups.sh" \
+            "$SUBSCRIPTION_ID" "$PREFIX"
