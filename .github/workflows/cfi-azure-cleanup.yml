@@ -1,9 +1,13 @@
 # Deletes CFI Azure test stacks (Terraform: resource_group_name = "cfi_test_${instance_id}").
-# Order: remove container immutability when possible → blobs → containers → storage accounts
-# → resource group (Log Analytics, etc.). Needed because locked immutability blocks naive RG delete.
 #
-# If immutability is locked and blobs are still in retention, deletes may fail until retention
-# elapses or you use a dev Terraform config with locked=false.
+# Immutability uses a locked policy and retention days from Terraform / environment.yaml
+# (object-storage-retention-period-days, default 2). Azure requires blob/version retention to
+# expire before the immutability policy and storage account can be removed. Blob/container
+# soft-delete in Terraform (often 7 days) can add to the wait. Scheduled daily: each run is
+# best-effort; deferrals log a warning and typically succeed once those windows clear.
+#
+# Order: clear blobs (repeat after policy removal) → remove immutability policy → container
+# → storage account → resource group.
 
 name: CFI Azure cleanup (test resource groups)
 
