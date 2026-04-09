@@ -21,9 +21,8 @@ query: |
     --output json
 
 rules:
-  - jsonpath: "$.value[0].logs[?(@.category=='StorageRead')].enabled"
-    expected_values:
-      - true
+  - jsonpath: '$.value[*].properties.logs[?(@.category=="StorageRead")].enabled'
+    expected_values: []
     validation_rule: "^true$"
     description: >
       Verifies that StorageRead diagnostic logging is enabled for the blob

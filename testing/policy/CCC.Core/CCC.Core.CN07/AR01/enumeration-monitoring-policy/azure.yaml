@@ -11,13 +11,11 @@ validity_commentary: >
 query: |
   az monitor diagnostic-settings list \
     --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
-    --query "[0]" \
     --output json
 
 rules:
-  - jsonpath: '$.logs[?(@.categoryGroup=="audit")].enabled'
-    expected_values:
-      - true
+  - jsonpath: '$.value[*].properties.logs[?(@.categoryGroup=="audit")].enabled'
+    expected_values: []
     validation_rule: "^true$"
     description: >
       Verifies that diagnostic settings are configured to audit enumeration activities.
