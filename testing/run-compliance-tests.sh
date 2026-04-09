@@ -56,7 +56,10 @@ while [[ $# -gt 0 ]]; do
       echo "                                                     iam, load-balancer, security-group, vpc, logging"
       echo "  -o, --output DIR                     Output directory (default: testing/output)"
       echo "  -r, --resource RESOURCE              Filter to specific resource name"
-      echo "  -g, --tags 'TAG1 TAG2 ...'           Space-separated tags ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')"
+      echo "  -g, --tags 'TAG1 TAG2 ...'           Space-separated tags ANDed with service tags (e.g., '@CCC.Core.CN01 @Policy')."
+      echo "                                       By default @NEGATIVE and @OPT_IN scenarios are excluded."
+      echo "                                       Tags are ANDed with the service filter, so include service tags explicitly."
+      echo "                                       e.g. for VPC opt-in: '--tags @OPT_IN @CCC.VPC'"
       echo "  -t, --timeout DURATION               Timeout for all tests (default: 30m)"
       echo "  -h, --help                           Show this help message"
       echo ""
@@ -64,6 +67,7 @@ while [[ $# -gt 0 ]]; do
       echo "  $0 --instance main-aws"
       echo "  $0 --instance main-azure --service object-storage"
       echo "  $0 --instance main-gcp --tags '@CCC.Core.CN04 @Policy'"
+      echo "  $0 --instance main-aws --tags '@OPT_IN'               # run opt-in scenarios explicitly"
       echo "  $0 --instance main-aws --env-file /path/to/custom-environment.yaml"
       exit 0
       ;;

@@ -65,10 +65,13 @@ locals {
   cn03_guardrail_policy_arn         = var.cn03_apply_guardrail ? local.cn03_target_guardrail_policy_arn : null
   cn03_guardrail_policy_mode        = var.cn03_apply_guardrail ? "reconcile" : "disabled"
 
+  # cn03_allowed_accepter_vpc_arns: named from the accepter VPC's perspective —
+  # the list of requester VPCs the compliance (accepter) VPC permits to initiate
+  # peering. Used in the cn03-guardrail-policy as ec2:RequesterVpc conditions.
   cn03_allowed_accepter_vpc_arns = distinct(concat(
     [for key in sort(keys(aws_vpc.cn03_allowed_peer)) : aws_vpc.cn03_allowed_peer[key].arn],
     [for key in sort(keys(data.aws_vpc.cn03_tagged_allowed)) : data.aws_vpc.cn03_tagged_allowed[key].arn],
-    var.cn03_allowed_accepter_vpc_arns
+    var.cn03_allowed_requester_vpc_arns
   ))
 
   cn03_disallowed_accepter_vpc_arns = distinct(concat(
@@ -78,6 +81,7 @@ locals {
 
   cn03_guardrail_policy_json = templatefile("${path.module}/policies/cn03-guardrail-policy.json.tftpl", {
     allowed_requester_vpc_arns_json = jsonencode(local.cn03_allowed_accepter_vpc_arns)
+    allowed_accepter_vpc_arns_json  = jsonencode([module.vpc.vpc_arn])
   })
 
   # ---------------------------------------------------------------------------
@@ -123,6 +127,40 @@ module "vpc" {
 }
 
 # =============================================================================
+# BAD VPC — Intentionally non-compliant VPC for CN02/CN04 negative test scenarios.
+# map_public_ip_on_launch=true violates CCC.VPC.CN02 (no flow logs = CN04 violation).
+# No aws_flow_log resources are attached to this VPC by design.
+# =============================================================================
+
+module "bad_vpc" {
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=v5.7.0"
+
+  name = "${local.name}-bad"
+  cidr = var.bad_vpc_cidr
+
+  azs            = var.availability_zones
+  public_subnets = [for i in range(length(var.availability_zones)) : cidrsubnet(var.bad_vpc_cidr, 8, i)]
+
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  enable_nat_gateway = false
+  enable_vpn_gateway = false
+
+  create_igw              = true
+  map_public_ip_on_launch = true
+
+  tags = merge(local.common_resource_tags, {
+    CFIControlSet = "CCC.VPC"
+    CFIVpcRole    = "bad"
+  })
+
+  public_subnet_tags = merge(local.common_resource_tags, {
+    Tier = "public"
+  })
+}
+
+# =============================================================================
 # CN03 — Restrict VPC peering to allowed requesters (CCC.VPC.CN03)
 # Creates requester fixture VPCs (allowed/disallowed/non-allowlisted) and an
 # optional IAM guardrail policy that denies CreateVpcPeeringConnection from
@@ -140,6 +178,7 @@ resource "aws_vpc" "cn03_allowed_peer" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-allowed-requester-${each.key}"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
     PeerClass  = var.cn03_allowed_peer_tag_value
   })
 }
@@ -154,6 +193,7 @@ resource "aws_vpc" "cn03_disallowed_peer" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-disallowed-requester-${each.key}"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
     PeerClass  = var.cn03_disallowed_peer_tag_value
   })
 }
@@ -168,6 +208,7 @@ resource "aws_vpc" "cn03_non_allowlisted_requester" {
   tags = merge(local.common_resource_tags, {
     Name       = "${local.name}-cn03-non-allowlisted-requester-01"
     CFIControl = "CCC.VPC.CN03"
+    CFIVpcRole = "cn03-peer-test-vpc"
   })
 }
 
@@ -243,13 +284,13 @@ resource "null_resource" "cn03_guardrail_reconcile" {
       TMP_POLICY_FILE="$$(mktemp)"
       echo '${self.triggers.policy_b64}' | base64 --decode > "$${TMP_POLICY_FILE}"
       if aws iam get-policy --policy-arn "$${POLICY_ARN}" >/dev/null 2>&1; then
-        VERSION_COUNT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'length(Versions)' --output text)"
-        if [ "$${VERSION_COUNT}" -ge 5 ]; then
-          OLDEST_NON_DEFAULT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' --output text)"
-          if [ "$${OLDEST_NON_DEFAULT}" != "None" ] && [ -n "$${OLDEST_NON_DEFAULT}" ]; then
-            aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id "$${OLDEST_NON_DEFAULT}"
-          fi
-        fi
+        # Prune the oldest non-default version before creating a new one.
+        # Runs unconditionally — safe when count < 5 (xargs -r skips if no output).
+        aws iam list-policy-versions \
+          --policy-arn "$${POLICY_ARN}" \
+          --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' \
+          --output text | grep -v '^None$' | grep -v '^$' | \
+          xargs -r -I% aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id %
 
         aws iam create-policy-version \
           --policy-arn "$${POLICY_ARN}" \
@@ -367,5 +408,4 @@ resource "aws_flow_log" "cn04_vpc" {
 
   depends_on = [aws_iam_role_policy.cn04_flow_logs]
 }
-
 

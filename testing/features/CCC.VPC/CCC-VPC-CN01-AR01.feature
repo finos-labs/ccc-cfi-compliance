@@ -14,8 +14,8 @@ Feature: CCC.VPC.CN01.AR01 - Subscription must not contain default network resou
     When I call "{vpcService}" with "CountDefaultVpcs"
     Then "{result}" is "0"
 
-  @Policy @NEGATIVE @OPT_IN
-  # No @CCC.VPC tag => excluded from default VPC runs
-  Scenario: Negative check: default VPC exists
-    When I call "{vpcService}" with "CountDefaultVpcs"
-    Then "{result}" should be greater than "0"
+  # @Policy @NEGATIVE @OPT_IN
+  # TODO: negative check pending — purpose is to validate check logic correctness for false negatives, not VPC state
+  # Scenario: Negative check: default VPC exists
+  #   When I call "{vpcService}" with "CountDefaultVpcs"
+  #   Then "{result}" should be greater than "0"

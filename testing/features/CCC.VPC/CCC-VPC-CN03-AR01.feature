@@ -8,8 +8,8 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" using argument "vpc"
     And I refer to "{result}" as "vpcService"
-    And I load environment variable "CN03_RECEIVER_VPC_ID" as "ReceiverVpcId"
-    And I load environment variable "CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID" as "NonAllowlistedRequesterVpcId"
+    And I refer to "{UID}" as "ReceiverVpcId"
+    And I refer to "{Cn03NonAllowlistedRequesterVpcId}" as "NonAllowlistedRequesterVpcId"
     And I load environment variable "CN03_PEER_TRIAL_MATRIX_FILE" as "PeerTrialMatrixFile"
     And "{ReceiverVpcId}" is not nil
 
@@ -17,7 +17,8 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
   # outputs step in cfi-test.yml). For local runs use export-cn03-artifacts.sh
   # or set the vars manually.
   #
-  # - CN03_RECEIVER_VPC_ID: receiver/target VPC ID for dry-run attempts
+  # - CN03_RECEIVER_VPC_ID: no longer used as receiver source in CI — ReceiverVpcId is
+  #   now driven by resource iteration ({UID}). Still accepted for local/manual runs.
   # - CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID: requester VPC ID outside allow/disallow lists
   # - CN03_ALLOWED_REQUESTER_VPC_ID_1..N: indexed allowed requester VPC IDs
   # - CN03_DISALLOWED_REQUESTER_VPC_ID_1..N: indexed disallowed requester VPC IDs

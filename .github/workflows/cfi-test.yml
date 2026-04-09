@@ -261,7 +261,8 @@ jobs:
           echo "CN03_DISALLOWED_REQUESTER_VPC_ID_1=$(terraform output -raw CN03_DISALLOWED_REQUESTER_VPC_ID_1)" >> $GITHUB_ENV
           echo "CN03_DISALLOWED_REQUESTER_VPC_ID_2=$(terraform output -raw CN03_DISALLOWED_REQUESTER_VPC_ID_2)" >> $GITHUB_ENV
 
-          echo "CN04_FLOW_LOG_GROUP_NAME=$(terraform output -json cn04_flow_log_log_group_name | jq -r '. // empty')" >> $GITHUB_ENV
+          echo "CN04_FLOW_LOG_GROUP_NAME=$(terraform output -raw CN04_FLOW_LOG_GROUP_NAME)" >> $GITHUB_ENV
+          echo "BAD_VPC_ID=$(terraform output -raw BAD_VPC_ID)" >> $GITHUB_ENV
 
           # Trial matrix JSON file — portable audit artifact used by the batch
           # dry-run scenario. Captures receiver + allowed + disallowed VPC IDs
