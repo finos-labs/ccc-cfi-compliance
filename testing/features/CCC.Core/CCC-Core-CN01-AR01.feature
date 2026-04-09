@@ -7,7 +7,7 @@ Feature: CCC.Core.CN01.AR01
   Background:
     Given a cloud api for "{Instance}" in "api"
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Service accepts TLS 1.3 encrypted traffic
     Given an openssl s_client request using "tls1_3" to "{portNumber}" on "{hostName}" protocol "{protocol}"
     And I refer to "{result}" as "connection"
@@ -16,28 +16,28 @@ Feature: CCC.Core.CN01.AR01
     And I close connection "{connection}"
     Then "{connection}" state is closed
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Service rejects TLS 1.2 traffic
     Given an openssl s_client request using "tls1_2" to "{portNumber}" on "{hostName}" protocol "{protocol}"
     And I refer to "{result}" as "connection"
     And we wait for a period of "40" ms
     Then "{connection.State}" is "closed"
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Service rejects TLS 1.1 traffic
     Given an openssl s_client request using "tls1_1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
     And I refer to "{result}" as "connection"
     And we wait for a period of "40" ms
     Then "{connection.State}" is "closed"
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Service rejects TLS 1.0 traffic
     Given an openssl s_client request using "tls1" to "{portNumber}" on "{hostName}" protocol "{protocol}"
     And I refer to "{result}" as "connection"
     And we wait for a period of "40" ms
     Then "{connection.State}" is "closed"
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Verify SSL/TLS protocol support
     Given "report" contains details of SSL Support type "protocols" for "{hostName}" on port "{portNumber}"
     Then "{report}" is an array of objects which doesn't contain any of
@@ -51,7 +51,7 @@ Feature: CCC.Core.CN01.AR01
       | id     | finding            |
       | TLS1_3 | offered with final |
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Verify no known SSL/TLS vulnerabilities
     Given "report" contains details of SSL Support type "vulnerable" for "{hostName}" on port "{portNumber}"
     Then "{report}" is an array of objects with at least the following contents
@@ -62,7 +62,7 @@ Feature: CCC.Core.CN01.AR01
       | ROBOT         | OK       |
       | secure_renego | OK       |
 
-  @Behavioural @PerPort @tls @object-storage
+  @Behavioural @PerPort @tls @object-storage @vpc
   Scenario: Verify TLS 1.3 only certificate validity
     Given "report" contains details of SSL Support type "server-defaults" for "{hostName}" on port "{portNumber}"
     Then "{report}" is an array of objects with at least the following contents
@@ -70,12 +70,12 @@ Feature: CCC.Core.CN01.AR01
       | cert_expirationStatus | OK       |
       | cert_chain_of_trust   | OK       |
 
-  @Policy @PerService @object-storage
+  @Policy @PerService @object-storage @vpc
   Scenario: Storage account enforces minimum TLS version
     When I attempt policy check "object-storage-tls-policy" for control "CCC.Core.CN01" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
-  @Policy @PerService @load-balancer
+  @Policy @PerService @load-balancer @vpc
   Scenario: Load balancer enforces minimum TLS version
     When I attempt policy check "load-balancer-tls-policy" for control "CCC.Core.CN01" assessment requirement "AR01" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true

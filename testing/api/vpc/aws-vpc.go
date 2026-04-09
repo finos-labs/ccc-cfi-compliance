@@ -15,8 +15,8 @@ import (
 
 // AWSVPCService implements VPC Service for AWS EC2/VPC.
 type AWSVPCService struct {
-	client      *ec2.Client
-	ctx         context.Context
+	client   *ec2.Client
+	ctx      context.Context
 	instance ccctypes.InstanceConfig
 }
 
@@ -52,7 +52,11 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams
 		return nil, fmt.Errorf("failed to describe VPCs: %w", err)
 	}
 
-	resources := make([]ccctypes.TestParams, 0, len(output.Vpcs))
+	region := strings.TrimSpace(s.instance.Properties.Region)
+	// Regional EC2 API endpoint: stable HTTPS target for PerPort TLS checks (VPC has no public hostname).
+	endpoint := fmt.Sprintf("ec2.%s.amazonaws.com", region)
+
+	resources := make([]ccctypes.TestParams, 0, len(output.Vpcs)*2)
 	for _, vpc := range output.Vpcs {
 		vpcID := aws.ToString(vpc.VpcId)
 		resourceName := vpcID
@@ -67,6 +71,22 @@ func (s *AWSVPCService) GetOrProvisionTestableResources() ([]ccctypes.TestParams
 			ServiceType:         "vpc",
 			CatalogTypes:        []string{"CCC.VPC"},
 			TagFilter:           []string{"@MAIN", "@CCC.VPC"},
+			Instance:            s.instance,
+		})
+
+		// PerPort: CCC.Core CN01 behavioural TLS / port tests (same tag pattern as object-storage).
+		resources = append(resources, ccctypes.TestParams{
+			ResourceName:        resourceName,
+			UID:                 vpcID,
+			ReportFile:          fmt.Sprintf("%s-port", vpcID),
+			ReportTitle:         fmt.Sprintf("%s:443", endpoint),
+			HostName:            endpoint,
+			PortNumber:          "443",
+			Protocol:            "https",
+			ProviderServiceType: "ec2:vpc",
+			ServiceType:         "vpc",
+			CatalogTypes:        []string{"CCC.VPC"},
+			TagFilter:           []string{"@vpc", "@PerPort", "@tls", "~@ftp", "~@telnet", "~@ssh", "~@smtp", "~@dns", "~@ldap"},
 			Instance:            s.instance,
 		})
 	}
