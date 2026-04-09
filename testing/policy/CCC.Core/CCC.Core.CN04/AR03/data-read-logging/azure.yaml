@@ -20,13 +20,12 @@ validity_commentary: >
 query: |
   az monitor diagnostic-settings list \
     --resource "/subscriptions/${AzureSubscriptionID}/resourceGroups/${AzureResourceGroup}/providers/Microsoft.Storage/storageAccounts/${AzureStorageAccount}/blobServices/default" \
-    --query "[].logs[?category=='StorageRead'] | [0][0]" \
     --output json
 
 rules:
-  - jsonpath: "$.enabled"
-    expected_values: ["true"]
-    validation_rule: ""
+  - jsonpath: '$.value[*].properties.logs[?(@.category=="StorageRead")].enabled'
+    expected_values: []
+    validation_rule: "^true$"
     description: >
       Validates that StorageRead logging is enabled for the blob service.
       StorageRead captures blob download, metadata read, and list

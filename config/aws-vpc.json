@@ -9,5 +9,6 @@
         "cfi", 
         "prowler"
     ],
+    "test-on-branches": ["fix/single-workflow-integration", "main"],
     "git": "https://github.com/terraform-aws-modules/terraform-aws-vpc"
 }

@@ -21,11 +21,10 @@ query: |
   az monitor activity-log list \
     --subscription ${AzureSubscriptionID} \
     --max-events 1 \
-    --query "[0]" \
     --output json
 
 rules:
-  - jsonpath: "$.eventTimestamp"
+  - jsonpath: "$[0].eventTimestamp"
     expected_values: []
     validation_rule: "^\\d{4}-\\d{2}-\\d{2}T.*$"
     description: >

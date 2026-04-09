@@ -24,7 +24,7 @@ query: |
     --output json
 
 rules:
-  - jsonpath: "$.properties.immutabilityPeriodSinceCreationInDays"
+  - jsonpath: "$.immutabilityPeriodSinceCreationInDays"
     expected_values: []
     validation_rule: "^[1-9][0-9]*$"
     description: >

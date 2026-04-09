@@ -47,3 +47,8 @@ Feature: CCC.Core.CN01.AR02
   Scenario: Security group restricts SSH port access
     When I attempt policy check "security-group-ssh-port" for control "CCC.Core.CN01" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
+
+  @Policy @NotTestable @object-storage 
+  Scenario: Object Storage restricts SSH port access
+    # No policy for this in object storage
+    Then no-op required

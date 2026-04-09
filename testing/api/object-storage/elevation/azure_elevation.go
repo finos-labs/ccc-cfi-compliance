@@ -2,6 +2,7 @@ package elevation
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,8 +73,43 @@ func NewAzureStorageElevator(
 	}, nil
 }
 
-// GetCurrentIdentityObjectID gets the object ID of the current identity via Microsoft Graph API
+// objectIDFromJWT reads the Entra object id (oid) claim from an Azure access token JWT.
+// Avoids Microsoft Graph, which frequently returns 400 for workload / CI tokens lacking Graph permissions.
+func objectIDFromJWT(accessToken string) (string, error) {
+	parts := strings.Split(accessToken, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("token is not a JWT")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("decode JWT payload: %w", err)
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", err
+	}
+	if oid, ok := claims["oid"].(string); ok && oid != "" {
+		return oid, nil
+	}
+	return "", fmt.Errorf("JWT has no oid claim")
+}
+
+func (e *AzureStorageElevator) objectIDFromResourceManagerToken() (string, error) {
+	token, err := e.credential.GetToken(e.ctx, policy.TokenRequestOptions{
+		Scopes: []string{"https://management.azure.com/.default"},
+	})
+	if err != nil {
+		return "", err
+	}
+	return objectIDFromJWT(token.Token)
+}
+
+// GetCurrentIdentityObjectID resolves the current principal's object id (ARM token oid first, then Graph).
 func (e *AzureStorageElevator) GetCurrentIdentityObjectID() (string, error) {
+	if oid, err := e.objectIDFromResourceManagerToken(); err == nil {
+		return oid, nil
+	}
+
 	// Get a token for Graph API
 	token, err := e.credential.GetToken(e.ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://graph.microsoft.com/.default"},

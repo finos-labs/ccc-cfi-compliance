@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic/login"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 	"gopkg.in/yaml.v3"
 )
@@ -80,14 +81,35 @@ func getMapKeys(m map[string]interface{}) []string {
 	return keys
 }
 
+// InferCloudFromPolicyQuery returns which cloud a policy shell query targets ("aws", "azure", "gcp"), if recognizable.
+func InferCloudFromPolicyQuery(query string) (string, bool) {
+	s := strings.TrimSpace(strings.ReplaceAll(query, "\\\n", " "))
+	switch {
+	case strings.HasPrefix(strings.ToLower(s), "az "):
+		return "azure", true
+	case strings.HasPrefix(strings.ToLower(s), "aws "):
+		return "aws", true
+	case strings.HasPrefix(strings.ToLower(s), "gcloud "):
+		return "gcp", true
+	default:
+		return "", false
+	}
+}
+
 // ExecuteQuery runs a shell query and returns the output
 func (c *PolicyChecker) ExecuteQuery(query string) (string, error) {
 	// Clean up the query (remove line continuations, extra whitespace)
 	cleanQuery := strings.ReplaceAll(query, "\\\n", " ")
 	cleanQuery = strings.TrimSpace(cleanQuery)
 
-	// Execute via shell
+	if cloud, ok := InferCloudFromPolicyQuery(cleanQuery); ok {
+		if err := login.Default.EnsureLoginToken(cloud); err != nil {
+			return "", fmt.Errorf("login: %w", err)
+		}
+	}
+
 	cmd := exec.Command("sh", "-c", cleanQuery)
+	cmd.Env = login.EnvForPolicyQuery(cleanQuery)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("query execution failed: %w\nOutput: %s", err, string(output))

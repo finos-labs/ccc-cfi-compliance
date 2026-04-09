@@ -70,3 +70,8 @@ Feature: CCC.Core.CN01.AR07
   Scenario: Security group enforces IANA port-protocol mapping
     When I attempt policy check "security-group-port-protocol" for control "CCC.Core.CN01" assessment requirement "AR07" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
+
+  @Policy @NotTestable @object-storage 
+  Scenario: Object Storage enforces IANA port-protocol mapping
+    # No policy for this in object storage
+    Then no-op required

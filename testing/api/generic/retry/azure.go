@@ -11,22 +11,36 @@ import (
 // Default propagation retry parameters for Azure (RBAC and Graph API can take up to 5 min)
 const (
 	DefaultPropagationAttempts = 5
-	DefaultPropagationDelay   = 60 * time.Second
+	DefaultPropagationDelay    = 60 * time.Second
 )
 
-// IsAzureRBACPropagationError returns true for 403 AuthorizationPermissionMismatch,
-// which commonly occurs when RBAC role assignments have not yet propagated (up to 5 min).
+// IsAzureRBACPropagationError returns true for transient 403s after granting data-plane RBAC.
+//
+//   - AuthorizationPermissionMismatch: ARM / management-plane (common while role assignment propagates).
+//   - AuthorizationFailure: blob / queue / table data plane (azblob ListContainers, etc.) after
 func IsAzureRBACPropagationError(err error) bool {
+	if err == nil {
+		return false
+	}
 	var respErr *azcore.ResponseError
 	if errors.As(err, &respErr) {
-		return respErr.StatusCode == 403 && respErr.ErrorCode == "AuthorizationPermissionMismatch"
+		if respErr.StatusCode != 403 {
+			return false
+		}
+		switch respErr.ErrorCode {
+		case "AuthorizationPermissionMismatch", "AuthorizationFailure":
+			return true
+		default:
+			return false
+		}
 	}
-	// Fallback: error may be wrapped or in string form (e.g. from policy/CLI output)
-	if err != nil {
-		msg := err.Error()
-		return strings.Contains(msg, "403") && strings.Contains(msg, "AuthorizationPermissionMismatch")
+	// Wrapped or string-shaped errors (e.g. XML body in message)
+	msg := err.Error()
+	if !strings.Contains(msg, "403") {
+		return false
 	}
-	return false
+	return strings.Contains(msg, "AuthorizationPermissionMismatch") ||
+		strings.Contains(msg, "AuthorizationFailure")
 }
 
 // IsAzureCredentialPropagationError returns true for AAD errors indicating
