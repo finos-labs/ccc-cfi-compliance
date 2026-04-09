@@ -8,21 +8,27 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     Given a cloud api for "{Instance}" in "api"
     And I call "{api}" with "GetServiceAPI" using argument "vpc"
     And I refer to "{result}" as "vpcService"
-    And I load environment variable "CN03_RECEIVER_VPC_ID" as "ReceiverVpcId"
-    And I load environment variable "CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID" as "NonAllowlistedRequesterVpcId"
+    And I refer to "{UID}" as "ReceiverVpcId"
+    And I refer to "{Cn03NonAllowlistedRequesterVpcId}" as "NonAllowlistedRequesterVpcId"
     And I load environment variable "CN03_PEER_TRIAL_MATRIX_FILE" as "PeerTrialMatrixFile"
     And "{ReceiverVpcId}" is not nil
 
-  # Inputs:
-  # - CN03_RECEIVER_VPC_ID: fixed receiver/target VPC ID for dry-run attempts
-  # - CN03_ALLOWED_REQUESTER_VPC_ID_1..N: allowed requester VPC IDs for scenario coverage
-  # - CN03_DISALLOWED_REQUESTER_VPC_ID_1..N: disallowed requester VPC IDs for scenario coverage
-  # - CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID: requester VPC ID outside explicit allow/disallow lists
-  # - CN03_ALLOWED_REQUESTER_VPC_IDS: optional CSV allow-list used by requester classification
-  # - CN03_DISALLOWED_REQUESTER_VPC_IDS: optional CSV disallow-list (mirrors allowed pattern)
-  # - CN03_PEER_OWNER_ID: optional (cross-account)
-  # - CN03_PEER_TRIAL_MATRIX_FILE: optional JSON file for batch dry-run coverage
+  # Inputs — all set automatically from Terraform outputs in CI (Export Terraform
+  # outputs step in cfi-test.yml). For local runs use export-cn03-artifacts.sh
+  # or set the vars manually.
   #
+  # - CN03_RECEIVER_VPC_ID: no longer used as receiver source in CI — ReceiverVpcId is
+  #   now driven by resource iteration ({UID}). Still accepted for local/manual runs.
+  # - CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID: requester VPC ID outside allow/disallow lists
+  # - CN03_ALLOWED_REQUESTER_VPC_ID_1..N: indexed allowed requester VPC IDs
+  # - CN03_DISALLOWED_REQUESTER_VPC_ID_1..N: indexed disallowed requester VPC IDs
+  # - CN03_ALLOWED_REQUESTER_VPC_IDS: CSV form of allowed list (also in environment.yaml)
+  # - CN03_DISALLOWED_REQUESTER_VPC_IDS: CSV form of disallowed list (also in environment.yaml)
+  # - CN03_PEER_OWNER_ID: optional, for cross-account peering
+  # - CN03_PEER_TRIAL_MATRIX_FILE: path to JSON trial matrix (audit artifact written
+  #   from cn03_peer_trial_matrix_json terraform output); used only by batch scenario
+  #
+  # The resolver merges all sources (env vars + environment.yaml) and deduplicates.
   # Dry-run is used so no real peering connection is created.
 
   @Policy @SANITY @ALLOWLIST @OPT_IN
@@ -50,7 +56,7 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.AllCorrect}" is true
     And "{result.ViolationCount}" is "0"
 
-  @Destructive @MAIN @DEFAULT @CCC.VPC
+  @Destructive @MAIN @CCC.VPC
   Scenario: Enforcement proof (dry-run): non-allowlisted requester is denied even when not explicitly listed as disallowed
     Given "{NonAllowlistedRequesterVpcId}" is not nil
     When I call "{vpcService}" with "EvaluatePeerAgainstAllowList" using argument "{NonAllowlistedRequesterVpcId}"
@@ -79,6 +85,12 @@ Feature: CCC.VPC.CN03.AR01 - Restrict VPC peering requests from non-allowlisted 
     And "{result.ViolationCount}" is "0"
 
   @Destructive @SANITY @OPT_IN
+  # Unlike the scenarios above which resolve VPC IDs dynamically from env vars
+  # at runtime, this scenario replays a pre-built JSON artifact written directly
+  # from Terraform outputs. It covers the same allowed/disallowed dry-runs but
+  # from a self-contained file that can be attached to a compliance report and
+  # replayed independently of the live environment — making it a portable audit
+  # record of exactly which VPC IDs were tested and what the outcomes were.
   Scenario: Batch trial matrix (dry-run): all file-listed requesters match expected outcomes
     Given "{PeerTrialMatrixFile}" is not nil
     When I call "{vpcService}" with "RunVpcPeeringDryRunTrialsFromFile" using argument "{PeerTrialMatrixFile}"

@@ -12,27 +12,25 @@ Feature: CCC.VPC.CN02.AR01 - No external IP by default in public subnets
   # Public subnet: has a route to an Internet Gateway (IGW)
   # Default external IP assignment: subnet setting MapPublicIpOnLaunch = true
 
-  @Policy @MAIN @DEFAULT
-  @CCC.VPC
+  @Policy @MAIN @CCC.VPC @DEFAULT
   Scenario: Main check (config): public subnets do not auto-assign external IPs
     Given I refer to "{UID}" as "TargetVpcId"
     When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
     Then "{result.ViolatingSubnetCount}" is "0"
     And "{result.Reason}" contains "disable default public IP"
 
-  @Policy @NEGATIVE @OPT_IN
-  # Redeploy with map_public_ip_on_launch=true in terraform.tfvars before running this scenario.
-  # Run with: --tags '@NEGATIVE'
-  Scenario: Negative check: public subnets auto-assign external IPs (failure simulation)
-    Given I refer to "{UID}" as "TargetVpcId"
-    When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
-    Then "{result.ViolatingSubnetCount}" should be greater than "0"
-    And "{result.Reason}" contains "MapPublicIpOnLaunch=true"
+  # @Policy @NEGATIVE @OPT_IN
+  # TODO: negative check pending — purpose is to validate check logic correctness for false negatives, not VPC state
+  # Scenario: Negative check: public subnets auto-assign external IPs (failure simulation)
+  #   Given I refer to "{UID}" as "TargetVpcId"
+  #   When I call "{vpcService}" with "EvaluatePublicSubnetDefaultIPControl" using argument "{TargetVpcId}"
+  #   Then "{result.ViolatingSubnetCount}" should be greater than "0"
+  #   And "{result.Reason}" contains "MapPublicIpOnLaunch=true"
 
-  @Behavioural @OPT_IN
-  # Requires CN_TEST_AMI_ID set in compliance-testing.env (region-specific AMI ID).
-  # Leave CN_TEST_AMI_ID blank to skip. Launches and deletes a short-lived EC2 instance.
-  # Run with: --tags '@Behavioural'
+  @Behavioural @MAIN @CCC.VPC 
+  # Uses CN_TEST_AMI_ID from compliance-testing.env when set (region-specific AMI ID).
+  # If CN_TEST_AMI_ID is blank, the VPC service resolves a default AMI and still launches an instance.
+  # This scenario is tagged @MAIN and runs by default — it will launch and delete a short-lived EC2 instance.
   Scenario: Behavioural check (active): resource launched in public subnet is not assigned an external IP
     Given I refer to "{UID}" as "TargetVpcId"
     When I call "{vpcService}" with "SelectPublicSubnetForTest" using argument "{TargetVpcId}"

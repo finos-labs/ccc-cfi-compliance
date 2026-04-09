@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# export-cn03-artifacts.sh — LOCAL / MANUAL USE ONLY
+#
+# In CI, CN03 env vars and the trial matrix file are captured directly by the
+# "Export Terraform outputs" step in cfi-test.yml immediately after terraform
+# apply. This script is retained for local development and manual test runs
+# where that workflow step is not available.
+#
+# Usage: ./export-cn03-artifacts.sh [output-dir]
+# Then:  source <output-dir>/cn03-feature.env
 set -euo pipefail
 
 OUT_DIR="${1:-.}"

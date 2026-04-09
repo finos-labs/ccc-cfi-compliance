@@ -7,9 +7,15 @@ variable "aws_region" {
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
+  description = "CIDR block for the compliant (good) VPC."
   type        = string
   default     = "10.20.0.0/16"
+}
+
+variable "bad_vpc_cidr" {
+  description = "CIDR block for the intentionally non-compliant VPC used in CN02/CN04 negative test scenarios (map_public_ip_on_launch=true, no flow logs)."
+  type        = string
+  default     = "10.21.0.0/16"
 }
 
 variable "availability_zones" {
@@ -191,7 +197,7 @@ variable "cn03_disallowed_peer_tag_value" {
   default     = "disallowed"
 }
 
-variable "cn03_allowed_accepter_vpc_arns" {
+variable "cn03_allowed_requester_vpc_arns" {
   description = "Optional explicit requester VPC ARN allow-list additions for CN03 guardrail (in addition to tag discovery)."
   type        = list(string)
   default     = []

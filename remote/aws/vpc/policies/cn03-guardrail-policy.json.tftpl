@@ -10,6 +10,9 @@
         "Null": {
           "ec2:RequesterVpc": "false"
         },
+        "ArnEquals": {
+          "ec2:AccepterVpc": ${allowed_accepter_vpc_arns_json}
+        },
         "ArnNotEquals": {
           "ec2:RequesterVpc": ${allowed_requester_vpc_arns_json}
         }
