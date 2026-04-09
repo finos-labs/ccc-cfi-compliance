@@ -235,32 +235,43 @@ jobs:
           echo "✅ Prowler metadata modifications completed"
 
       # =======================================================================
-      # CN03 — Load peering trial artifacts (AWS VPC only)
-      # Downloads artifacts uploaded by cfi-nuke-and-rebuild and sources
-      # cn03-feature.env to populate CN03_* env vars for feature scenarios.
-      # Skipped gracefully if artifacts are not yet available.
+      # CN03/CN04 — Capture Terraform outputs (AWS VPC only)
+      # Reads outputs directly from Terraform state after apply, so no
+      # cross-run artifact handoff is needed.
+      #
+      # Uses uppercase outputs (pre-formatted CSV strings) not lowercase list
+      # outputs — list types are not compatible with `terraform output -raw`.
       # =======================================================================
-      - name: Download CN03 artifacts
-        if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
-        uses: actions/download-artifact@v4
-        with:
-          name: cn03-artifacts-${{ matrix.target.id }}
-          path: cn03-artifacts/
-        continue-on-error: true
-
-      - name: Load CN03 environment
+      - name: Export Terraform outputs
         if: matrix.target.provider == 'aws' && matrix.target.service == 'networking'
         run: |
-          ENV_FILE="cn03-artifacts/cn03-feature.env"
-          if [ -f "$ENV_FILE" ]; then
-            echo "📋 Loading CN03 feature environment..."
-            grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed "s/^export //; s/=''$/=/" >> $GITHUB_ENV
-            # Override matrix file path to runner-local location
-            echo "CN03_PEER_TRIAL_MATRIX_FILE=$GITHUB_WORKSPACE/cn03-artifacts/cn03-peer-trials.json" >> $GITHUB_ENV
-            echo "✅ CN03 environment loaded"
-          else
-            echo "⚠️  CN03 artifacts not found — CN03 scenarios requiring env vars will be skipped"
-          fi
+          set -euo pipefail
+          echo "📋 Capturing Terraform outputs for CN03/CN04..."
+          cd "$GITHUB_WORKSPACE/$TARGET_PATH"
+
+          # Scalar / CSV string outputs (uppercase) — safe for -raw
+          echo "CN03_RECEIVER_VPC_ID=$(terraform output -raw CN03_RECEIVER_VPC_ID)" >> $GITHUB_ENV
+          echo "CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID=$(terraform output -raw CN03_NON_ALLOWLISTED_REQUESTER_VPC_ID)" >> $GITHUB_ENV
+          echo "CN03_ALLOWED_REQUESTER_VPC_IDS=$(terraform output -raw CN03_ALLOWED_REQUESTER_VPC_IDS)" >> $GITHUB_ENV
+          echo "CN03_DISALLOWED_REQUESTER_VPC_IDS=$(terraform output -raw CN03_DISALLOWED_REQUESTER_VPC_IDS)" >> $GITHUB_ENV
+
+          # Indexed VPC IDs — scanned by CN03 Go code as primary terraform-fixture source
+          echo "CN03_ALLOWED_REQUESTER_VPC_ID_1=$(terraform output -raw CN03_ALLOWED_REQUESTER_VPC_ID_1)" >> $GITHUB_ENV
+          echo "CN03_ALLOWED_REQUESTER_VPC_ID_2=$(terraform output -raw CN03_ALLOWED_REQUESTER_VPC_ID_2)" >> $GITHUB_ENV
+          echo "CN03_DISALLOWED_REQUESTER_VPC_ID_1=$(terraform output -raw CN03_DISALLOWED_REQUESTER_VPC_ID_1)" >> $GITHUB_ENV
+          echo "CN03_DISALLOWED_REQUESTER_VPC_ID_2=$(terraform output -raw CN03_DISALLOWED_REQUESTER_VPC_ID_2)" >> $GITHUB_ENV
+
+          echo "CN04_FLOW_LOG_GROUP_NAME=$(terraform output -json cn04_flow_log_log_group_name | jq -r '. // empty')" >> $GITHUB_ENV
+
+          # Trial matrix JSON file — portable audit artifact used by the batch
+          # dry-run scenario. Captures receiver + allowed + disallowed VPC IDs
+          # as a point-in-time snapshot independent of env var resolution.
+          mkdir -p "$GITHUB_WORKSPACE/${{ env.OUTPUT_DIR }}"
+          TRIAL_MATRIX_PATH="$GITHUB_WORKSPACE/${{ env.OUTPUT_DIR }}/cn03-peer-trials.json"
+          terraform output -raw cn03_peer_trial_matrix_json > "$TRIAL_MATRIX_PATH"
+          echo "CN03_PEER_TRIAL_MATRIX_FILE=$TRIAL_MATRIX_PATH" >> $GITHUB_ENV
+
+          echo "✅ Terraform outputs exported to GITHUB_ENV"
 
       - name: Refresh AWS Credentials for Compliance Tests (OIDC)
         if: env.RUN_CFI == 'true' && matrix.target.provider == 'aws'
