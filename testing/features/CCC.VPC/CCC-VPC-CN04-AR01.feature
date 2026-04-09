@@ -10,7 +10,7 @@ Feature: CCC.VPC.CN04.AR01 - Flow logs must capture all VPC traffic
     And I refer to "{result}" as "vpcService"
 
   # Policy check: flow logs are configured as ACTIVE with TrafficType=ALL.
-  @Policy @MAIN @CCC.VPC @DEFAULT
+  @Policy @MAIN @DEFAULT
   @CCC.VPC
   Scenario: Main check (config): flow logs are active and capture all traffic
     Given I refer to "{UID}" as "TargetVpcId"
