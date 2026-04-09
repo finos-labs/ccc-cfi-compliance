@@ -197,7 +197,7 @@ variable "cn03_disallowed_peer_tag_value" {
   default     = "disallowed"
 }
 
-variable "cn03_allowed_accepter_vpc_arns" {
+variable "cn03_allowed_requester_vpc_arns" {
   description = "Optional explicit requester VPC ARN allow-list additions for CN03 guardrail (in addition to tag discovery)."
   type        = list(string)
   default     = []

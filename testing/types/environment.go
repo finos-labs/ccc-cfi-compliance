@@ -76,7 +76,14 @@ func (ic InstanceConfig) VpcServiceConfig() VpcServiceConfig {
 
 func vpcPropString(props map[string]interface{}, key string) string {
 	if v, ok := props[key]; ok {
-		return strings.TrimSpace(fmt.Sprintf("%v", v))
+		if v == nil {
+			return ""
+		}
+		s := strings.TrimSpace(fmt.Sprintf("%v", v))
+		if s == "<nil>" {
+			return ""
+		}
+		return s
 	}
 	return ""
 }

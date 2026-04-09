@@ -65,10 +65,13 @@ locals {
   cn03_guardrail_policy_arn         = var.cn03_apply_guardrail ? local.cn03_target_guardrail_policy_arn : null
   cn03_guardrail_policy_mode        = var.cn03_apply_guardrail ? "reconcile" : "disabled"
 
+  # cn03_allowed_accepter_vpc_arns: named from the accepter VPC's perspective —
+  # the list of requester VPCs the compliance (accepter) VPC permits to initiate
+  # peering. Used in the cn03-guardrail-policy as ec2:RequesterVpc conditions.
   cn03_allowed_accepter_vpc_arns = distinct(concat(
     [for key in sort(keys(aws_vpc.cn03_allowed_peer)) : aws_vpc.cn03_allowed_peer[key].arn],
     [for key in sort(keys(data.aws_vpc.cn03_tagged_allowed)) : data.aws_vpc.cn03_tagged_allowed[key].arn],
-    var.cn03_allowed_accepter_vpc_arns
+    var.cn03_allowed_requester_vpc_arns
   ))
 
   cn03_disallowed_accepter_vpc_arns = distinct(concat(
