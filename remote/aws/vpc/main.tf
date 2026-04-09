@@ -290,7 +290,7 @@ resource "null_resource" "cn03_guardrail_reconcile" {
           --policy-arn "$${POLICY_ARN}" \
           --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' \
           --output text | grep -v '^None$' | grep -v '^$' | \
-          xargs -r -I% aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id %
+          xargs -r -I% aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id % || true
 
         aws iam create-policy-version \
           --policy-arn "$${POLICY_ARN}" \
