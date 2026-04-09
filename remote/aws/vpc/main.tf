@@ -284,13 +284,13 @@ resource "null_resource" "cn03_guardrail_reconcile" {
       TMP_POLICY_FILE="$$(mktemp)"
       echo '${self.triggers.policy_b64}' | base64 --decode > "$${TMP_POLICY_FILE}"
       if aws iam get-policy --policy-arn "$${POLICY_ARN}" >/dev/null 2>&1; then
-        VERSION_COUNT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'length(Versions)' --output text)"
-        if [ "$${VERSION_COUNT}" -ge 5 ]; then
-          OLDEST_NON_DEFAULT="$$(aws iam list-policy-versions --policy-arn "$${POLICY_ARN}" --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' --output text)"
-          if [ "$${OLDEST_NON_DEFAULT}" != "None" ] && [ -n "$${OLDEST_NON_DEFAULT}" ]; then
-            aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id "$${OLDEST_NON_DEFAULT}"
-          fi
-        fi
+        # Prune the oldest non-default version before creating a new one.
+        # Runs unconditionally — safe when count < 5 (xargs -r skips if no output).
+        aws iam list-policy-versions \
+          --policy-arn "$${POLICY_ARN}" \
+          --query 'Versions[?IsDefaultVersion==`false`]|sort_by(@,&CreateDate)[0].VersionId' \
+          --output text | grep -v '^None$' | grep -v '^$' | \
+          xargs -r -I% aws iam delete-policy-version --policy-arn "$${POLICY_ARN}" --version-id %
 
         aws iam create-policy-version \
           --policy-arn "$${POLICY_ARN}" \
