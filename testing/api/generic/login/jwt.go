@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// refreshSkew is how much lifetime we want left before skipping a re-login.
+const refreshSkew = 5 * time.Minute
+
+func tokenFreshEnough(exp time.Time, ok bool) bool {
+	if !ok || exp.IsZero() {
+		return false
+	}
+	return time.Until(exp) > refreshSkew
+}
+
 // jwtExpiry returns the exp claim time for a JWT access token, if present.
 func jwtExpiry(accessToken string) (time.Time, bool) {
 	parts := strings.Split(strings.TrimSpace(accessToken), ".")

@@ -14,6 +14,7 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/api/factory"
+	"github.com/finos-labs/ccc-cfi-compliance/testing/api/generic/login"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/cloud"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/language/reporters"
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
@@ -159,12 +160,17 @@ func (r *BasicServiceRunner) Run() int {
 	defer cancel()
 
 	// Create cloud factory with the full InstanceConfig so every service can find its properties
-	cloudFactory, err := factory.NewFactory(factory.CloudProvider(config.Instance.Properties.Provider), config.Instance)
+	cloudFactory, err := factory.NewFactory(types.CloudProvider(config.Instance.Properties.Provider), config.Instance)
 	if err != nil {
 		log.Fatalf("Failed to create factory: %v", err)
 	}
 	defer func() {
 		log.Println("🧹 Running TearDown to remove test-created resources...")
+		if strings.EqualFold(config.Instance.Properties.Provider, "azure") {
+			if err := login.RefreshAzureCLIForCleanup(); err != nil {
+				log.Printf("   ⚠️  Azure re-login before TearDown: %v", err)
+			}
+		}
 		if err := cloudFactory.TearDown(); err != nil {
 			log.Printf("   ⚠️  TearDown completed with errors: %v", err)
 		} else {

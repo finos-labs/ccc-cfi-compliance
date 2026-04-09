@@ -10,8 +10,58 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
+
+// AzureLogin refreshes the Azure CLI session (federated OIDC on GitHub Actions, interactive or cached locally).
+type AzureLogin struct {
+	mu sync.Mutex
+}
+
+// NewAzureLogin returns the shared DefaultAzureLogin so RefreshAzureCLIForCleanup and EnsureLoginToken use the same mutex.
+func NewAzureLogin() *AzureLogin {
+	return DefaultAzureLogin
+}
+
+// TokenExpiry returns the Azure management-plane access token expiry from `az account get-access-token`.
+func (l *AzureLogin) TokenExpiry() (time.Time, bool) {
+	cmd := exec.Command("az", "account", "get-access-token",
+		"--resource", "https://management.azure.com/",
+		"-o", "json",
+	)
+	cmd.Env = sanitizeAzureFedTokenEnv(os.Environ())
+	out, err := cmd.Output()
+	if err != nil {
+		return time.Time{}, false
+	}
+	var resp struct {
+		AccessToken string `json:"accessToken"`
+		ExpiresOn   int64  `json:"expires_on"`
+	}
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return time.Time{}, false
+	}
+	if resp.ExpiresOn > 0 {
+		return time.Unix(resp.ExpiresOn, 0), true
+	}
+	return jwtExpiry(resp.AccessToken)
+}
+
+func (l *AzureLogin) tokenOK() bool {
+	exp, ok := l.TokenExpiry()
+	return tokenFreshEnough(exp, ok)
+}
+
+// EnsureLoginToken re-authenticates when the management-plane token is missing or close to expiration.
+func (l *AzureLogin) EnsureLoginToken() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.tokenOK() {
+		return nil
+	}
+	return refreshAzureCLIUnlocked()
+}
 
 // Azure login refresh for policy checks and the test runner.
 //
@@ -24,14 +74,6 @@ import (
 // Mid-job we repeat the same federated az login so CLI tokens stay valid.
 //
 // Locally (not GHA), falls back to interactive az login and AZURE_SUBSCRIPTION_ID if set.
-func refreshAzureCLI() error {
-	if inGitHubActionsWithAzureOIDC() {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-		return runAzLoginWithFederatedToken(ctx)
-	}
-	return runAzLoginInteractive()
-}
 
 func inGitHubActionsWithAzureOIDC() bool {
 	if os.Getenv("GITHUB_ACTIONS") != "true" {
@@ -105,6 +147,12 @@ func runAzLoginWithFederatedToken(ctx context.Context) error {
 			return fmt.Errorf("az account set: %w: %s", err, string(out))
 		}
 	}
+
+	// Drop short-lived GitHub OIDC JWT from the process env so azidentity's EnvironmentCredential
+	// does not keep using an expired client assertion; subsequent SDK calls use the CLI session above.
+	_ = os.Unsetenv("AZURE_FEDERATED_TOKEN")
+	_ = os.Unsetenv("AZURE_FEDERATED_TOKEN_FILE")
+
 	return nil
 }
 
@@ -140,4 +188,33 @@ func sanitizeAzureFedTokenEnv(environ []string) []string {
 		out = append(out, e)
 	}
 	return out
+}
+
+// RefreshAzureCLIForCleanup re-authenticates Azure CLI before TearDown after long suites.
+// On GitHub Actions OIDC it always exchanges a fresh GitHub ID token (EnsureLoginToken alone
+// can skip refresh while management-plane checks still pass; federated assertion may already
+// be expired — AADSTS700024). Locally it refreshes only when tokenOK is false.
+// Serializes with DefaultAzureLogin.EnsureLoginToken via the same mutex.
+func RefreshAzureCLIForCleanup() error {
+	DefaultAzureLogin.mu.Lock()
+	defer DefaultAzureLogin.mu.Unlock()
+
+	if inGitHubActionsWithAzureOIDC() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return runAzLoginWithFederatedToken(ctx)
+	}
+	if DefaultAzureLogin.tokenOK() {
+		return nil
+	}
+	return refreshAzureCLIUnlocked()
+}
+
+func refreshAzureCLIUnlocked() error {
+	if inGitHubActionsWithAzureOIDC() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		return runAzLoginWithFederatedToken(ctx)
+	}
+	return runAzLoginInteractive()
 }

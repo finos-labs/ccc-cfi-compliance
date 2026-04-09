@@ -9,8 +9,10 @@ This package provides a unified interface for interacting with cloud service API
 The factory pattern provides a consistent way to create cloud service clients:
 
 ```go
+import "github.com/finos-labs/ccc-cfi-compliance/testing/types"
+
 // Create a factory for a specific cloud provider
-factory, err := factory.NewFactory(factory.ProviderAWS, cloudProps)
+factory, err := factory.NewFactory(types.ProviderAWS, cloudProps)
 
 // Get a service API client
 service, err := factory.GetServiceAPI("object-storage")

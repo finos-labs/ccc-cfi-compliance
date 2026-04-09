@@ -86,7 +86,7 @@ func (f *AzureFactory) GetServiceAPI(serviceID string) (generic.Service, error) 
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
 func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
-	if identity.Provider != string(ProviderAzure) {
+	if identity.Provider != string(types.ProviderAzure) {
 		return nil, fmt.Errorf("identity is not for Azure provider: %s", identity.Provider)
 	}
 
@@ -130,8 +130,8 @@ func (f *AzureFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam
 }
 
 // GetProvider returns the cloud provider
-func (f *AzureFactory) GetProvider() CloudProvider {
-	return ProviderAzure
+func (f *AzureFactory) GetProvider() types.CloudProvider {
+	return types.ProviderAzure
 }
 
 // TearDown calls TearDown on all cached services

@@ -86,7 +86,7 @@ func (f *GCPFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
 func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
-	if identity.Provider != string(ProviderGCP) {
+	if identity.Provider != string(types.ProviderGCP) {
 		return nil, fmt.Errorf("identity is not for GCP provider: %s", identity.Provider)
 	}
 
@@ -128,8 +128,8 @@ func (f *GCPFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 }
 
 // GetProvider returns the cloud provider
-func (f *GCPFactory) GetProvider() CloudProvider {
-	return ProviderGCP
+func (f *GCPFactory) GetProvider() types.CloudProvider {
+	return types.ProviderGCP
 }
 
 // TearDown calls TearDown on all cached services

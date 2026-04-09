@@ -1,5 +1,14 @@
 package types
 
+// CloudProvider identifies a supported cloud in factories, login refresh, and runners.
+type CloudProvider string
+
+const (
+	ProviderAWS   CloudProvider = "aws"
+	ProviderAzure CloudProvider = "azure"
+	ProviderGCP   CloudProvider = "gcp"
+)
+
 // TestParams holds the parameters for port / service testing
 // This is the single shared structure used by both cloud api and reporters
 type TestParams struct {

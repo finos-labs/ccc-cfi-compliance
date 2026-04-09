@@ -103,7 +103,7 @@ func (c *PolicyChecker) ExecuteQuery(query string) (string, error) {
 	cleanQuery = strings.TrimSpace(cleanQuery)
 
 	if cloud, ok := InferCloudFromPolicyQuery(cleanQuery); ok {
-		if err := login.Default.EnsureLoginToken(cloud); err != nil {
+		if err := login.EnsureForProvider(types.CloudProvider(cloud)); err != nil {
 			return "", fmt.Errorf("login: %w", err)
 		}
 	}

@@ -9,17 +9,8 @@ import (
 	"github.com/finos-labs/ccc-cfi-compliance/testing/types"
 )
 
-// CloudProvider represents the supported cloud providers
-type CloudProvider string
-
-const (
-	ProviderAWS   CloudProvider = "aws"
-	ProviderAzure CloudProvider = "azure"
-	ProviderGCP   CloudProvider = "gcp"
-)
-
 // Cache for factories (one per provider)
-var factoryCache = make(map[CloudProvider]Factory)
+var factoryCache = make(map[types.CloudProvider]Factory)
 
 // Factory creates cloud service API clients for different providers
 type Factory interface {
@@ -31,7 +22,7 @@ type Factory interface {
 	GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error)
 
 	// GetProvider returns the cloud provider this factory is configured for
-	GetProvider() CloudProvider
+	GetProvider() types.CloudProvider
 
 	// TearDown calls TearDown on all cached services to remove test-created resources
 	TearDown() error
@@ -40,7 +31,7 @@ type Factory interface {
 // NewFactory creates a new factory for the specified cloud provider.
 // instance carries all environment configuration, including service-specific properties.
 // Factories are cached per provider to ensure IAM service caching works across calls.
-func NewFactory(provider CloudProvider, instance types.InstanceConfig) (Factory, error) {
+func NewFactory(provider types.CloudProvider, instance types.InstanceConfig) (Factory, error) {
 	// Check cache first
 	if cachedFactory, exists := factoryCache[provider]; exists {
 		fmt.Printf("♻️  Using cached factory for provider: %s\n", provider)
@@ -51,11 +42,11 @@ func NewFactory(provider CloudProvider, instance types.InstanceConfig) (Factory,
 	fmt.Printf("🏭 Creating new factory for provider: %s\n", provider)
 	var factory Factory
 	switch provider {
-	case ProviderAWS:
+	case types.ProviderAWS:
 		factory = NewAWSFactory(instance)
-	case ProviderAzure:
+	case types.ProviderAzure:
 		factory = NewAzureFactory(instance)
-	case ProviderGCP:
+	case types.ProviderGCP:
 		factory = NewGCPFactory(instance)
 	default:
 		return nil, fmt.Errorf("unsupported cloud provider: %s", provider)

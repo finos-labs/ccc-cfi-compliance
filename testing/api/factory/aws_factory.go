@@ -95,7 +95,7 @@ func (f *AWSFactory) GetServiceAPI(serviceID string) (generic.Service, error) {
 
 // GetServiceAPIWithIdentity returns a service API client authenticated as the given identity
 func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.Identity, testAccess bool) (generic.Service, error) {
-	if identity.Provider != string(ProviderAWS) {
+	if identity.Provider != string(types.ProviderAWS) {
 		return nil, fmt.Errorf("identity is not for AWS provider: %s", identity.Provider)
 	}
 
@@ -145,8 +145,8 @@ func (f *AWSFactory) GetServiceAPIWithIdentity(serviceID string, identity *iam.I
 }
 
 // GetProvider returns the cloud provider
-func (f *AWSFactory) GetProvider() CloudProvider {
-	return ProviderAWS
+func (f *AWSFactory) GetProvider() types.CloudProvider {
+	return types.ProviderAWS
 }
 
 // TearDown calls TearDown on all cached services

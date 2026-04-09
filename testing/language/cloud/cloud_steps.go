@@ -547,14 +547,14 @@ func (cw *CloudWorld) aCloudAPIForProviderIn(instanceArg string, apiName string)
 	}
 
 	// Derive provider from the instance properties
-	var provider factory.CloudProvider
+	var provider types.CloudProvider
 	switch instance.Properties.Provider {
 	case "aws":
-		provider = factory.ProviderAWS
+		provider = types.ProviderAWS
 	case "azure":
-		provider = factory.ProviderAzure
+		provider = types.ProviderAzure
 	case "gcp":
-		provider = factory.ProviderGCP
+		provider = types.ProviderGCP
 	default:
 		return fmt.Errorf("unsupported cloud provider %q in instance %q", instance.Properties.Provider, instance.ID)
 	}
