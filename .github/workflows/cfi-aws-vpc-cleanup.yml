@@ -136,7 +136,31 @@ jobs:
 
           echo "Found policy: $POLICY_ARN"
 
-          # Delete all non-default versions first
+          # Detach from all roles
+          aws iam list-entities-for-policy \
+            --policy-arn "$POLICY_ARN" \
+            --entity-filter Role \
+            --query 'PolicyRoles[*].RoleName' \
+            --output text | tr '\t' '\n' | grep -v '^$' | \
+            xargs -r -I% aws iam detach-role-policy --role-name % --policy-arn "$POLICY_ARN" || true
+
+          # Detach from all users
+          aws iam list-entities-for-policy \
+            --policy-arn "$POLICY_ARN" \
+            --entity-filter User \
+            --query 'PolicyUsers[*].UserName' \
+            --output text | tr '\t' '\n' | grep -v '^$' | \
+            xargs -r -I% aws iam detach-user-policy --user-name % --policy-arn "$POLICY_ARN" || true
+
+          # Detach from all groups
+          aws iam list-entities-for-policy \
+            --policy-arn "$POLICY_ARN" \
+            --entity-filter Group \
+            --query 'PolicyGroups[*].GroupName' \
+            --output text | tr '\t' '\n' | grep -v '^$' | \
+            xargs -r -I% aws iam detach-group-policy --group-name % --policy-arn "$POLICY_ARN" || true
+
+          # Delete all non-default versions
           aws iam list-policy-versions \
             --policy-arn "$POLICY_ARN" \
             --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
