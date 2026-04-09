@@ -9,7 +9,7 @@ Feature: CCC.VPC.CN01.AR01 - Subscription must not contain default network resou
     And I call "{api}" with "GetServiceAPI" using argument "vpc"
     And I refer to "{result}" as "vpcService"
 
-  @Policy @MAIN @DEFAULT @CCC.VPC
+  @Policy @MAIN @CCC.VPC @DEFAULT
   Scenario: Main check: no default VPC exists
     When I call "{vpcService}" with "CountDefaultVpcs"
     Then "{result}" is "0"
