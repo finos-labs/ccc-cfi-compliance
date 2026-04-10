@@ -92,16 +92,21 @@ module "storage_account" {
     }
   }
 
-  # Blob Monitor diagnostics (policy uses `az monitor diagnostic-settings list` on blobServices/default):
-  # - CN04.AR02 / AR03: log categories StorageWrite / StorageRead
-  # - CN07.AR01: log category group `audit` (enumeration / control-plane style auditing)
+  # Blob Monitor diagnostics (`az monitor diagnostic-settings list` on blobServices/default).
+  # Azure rejects a single setting that mixes log *categories* with log *category groups* (400 BadRequest).
+  # Use two settings on the same blob target: CN04 needs StorageRead/StorageWrite; CN07.AR01 needs group `audit`.
   # CN09.AR01: same sink → Log Analytics workspace above.
-  # If your tenant auto-creates a conflicting diagnostic setting (rare in CI), resolve the 409 or rename.
   diagnostic_settings_blob = {
     cfi_cn04_monitor = {
-      name                  = "cfi-blob-diag-${var.instance_id}"
+      name                  = "cfi-blob-diag-cn04-${var.instance_id}"
       workspace_resource_id = azurerm_log_analytics_workspace.storage_diag.id
       log_categories        = toset(["StorageRead", "StorageWrite"])
+      log_groups            = toset([])
+    }
+    cfi_cn07_monitor = {
+      name                  = "cfi-blob-diag-audit-${var.instance_id}"
+      workspace_resource_id = azurerm_log_analytics_workspace.storage_diag.id
+      log_categories        = toset([])
       log_groups            = toset(["audit"])
     }
   }
