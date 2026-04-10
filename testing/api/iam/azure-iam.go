@@ -107,13 +107,20 @@ func getAzureTenantID() string {
 // ProvisionUser creates a new service principal with a client secret, or returns existing one
 // ProvisionUserWithAccess creates a user and sets their access level in a single operation
 func (s *AzureIAMService) ProvisionUserWithAccess(userName string, serviceID string, level string) (*Identity, error) {
-	// Check cache first for both user and access level
 	cacheKey := fmt.Sprintf("%s:%s", userName, serviceID)
 	if cachedIdentity, exists := s.provisionedUsers[userName]; exists {
 		if cachedLevel, levelExists := s.accessLevels[cacheKey]; levelExists && cachedLevel == level {
 			fmt.Printf("♻️  Using cached identity for user %s with %s access (skipping all delays)\n", userName, level)
 			return cachedIdentity, nil
 		}
+		fmt.Printf("♻️  Reusing provisioned principal %s; applying %s access for current scope\n", userName, level)
+		policyDoc, err := s.setAccessInternal(cachedIdentity, serviceID, level)
+		if err != nil {
+			return nil, err
+		}
+		cachedIdentity.Policy = policyDoc
+		s.accessLevels[cacheKey] = level
+		return cachedIdentity, nil
 	}
 
 	// Step 1: Provision the user (or retrieve existing) - no waiting yet

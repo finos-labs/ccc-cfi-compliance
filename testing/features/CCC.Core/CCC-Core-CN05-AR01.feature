@@ -13,7 +13,7 @@ Feature: CCC.Core.CN05.AR01 - Block Unauthorized Data Modification
 
   @Destructive @Behavioural @object-storage
   Scenario: Service prevents data modification by user with no access
-    Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-write-access", "{UID}", and "none"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
     And I attach "{result}" to the test output as "no-access-user-identity.json"
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserNoAccess}", and "{false}"

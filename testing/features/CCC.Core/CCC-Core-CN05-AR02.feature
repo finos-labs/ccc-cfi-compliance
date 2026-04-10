@@ -13,7 +13,7 @@ Feature: CCC.Core.CN05.AR02 - Block Unauthorized Administrative Access
 
   @Destructive @Behavioural @object-storage
   Scenario: Service prevents administrative action (creating a new bucket) by user with no access
-    Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-admin-access", "{UID}", and "none"
+    Given I call "{iamService}" with "ProvisionUserWithAccess" using arguments "test-user-no-access", "{UID}", and "none"
     And I refer to "{result}" as "testUserNoAccess"
     And I attach "{result}" to the test output as "no-admin-user-identity.json"
     And I call "{api}" with "GetServiceAPIWithIdentity" using arguments "object-storage", "{testUserNoAccess}", and "{false}"
