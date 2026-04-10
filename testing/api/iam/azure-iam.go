@@ -332,8 +332,9 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 	if objectID != "" {
 		fmt.Printf("   🔍 Looking for role assignments for principal %s...\n", objectID)
 
-		// List role assignments in the subscription
-		filter := fmt.Sprintf("principalId eq '%s'", objectID)
+		// List role assignments in the subscription (assignedTo('...') is the supported OData form;
+		// principalId eq without strict quoting can yield UnsupportedQuery from ARM).
+		filter := roleAssignmentFilterAssignedTo(objectID)
 		pager := s.authClient.NewListForSubscriptionPager(&armauthorization.RoleAssignmentsClientListForSubscriptionOptions{
 			Filter: &filter,
 		})
@@ -794,9 +795,19 @@ func (s *AzureIAMService) waitForRBACPropagation(principalID, scope, roleDefinit
 	return nil
 }
 
+// roleAssignmentFilterAssignedTo returns OData for List role assignments by principal (service principal / user).
+func roleAssignmentFilterAssignedTo(principalID string) string {
+	return fmt.Sprintf("assignedTo('%s')", strings.TrimSpace(principalID))
+}
+
+// roleAssignmentFilterAtScopeAndAssignedTo limits results to the requested scope and principal (ARM List for Scope).
+func roleAssignmentFilterAtScopeAndAssignedTo(principalID string) string {
+	return fmt.Sprintf("atScope() and assignedTo('%s')", strings.TrimSpace(principalID))
+}
+
 // checkRoleAssignmentExists lists role assignments and returns true if the expected one exists.
 func (s *AzureIAMService) checkRoleAssignmentExists(principalID, scope, roleDefinitionID string) (bool, error) {
-	filter := fmt.Sprintf("principalId eq '%s'", principalID)
+	filter := roleAssignmentFilterAtScopeAndAssignedTo(principalID)
 	pager := s.authClient.NewListForScopePager(scope, &armauthorization.RoleAssignmentsClientListForScopeOptions{
 		Filter: &filter,
 	})

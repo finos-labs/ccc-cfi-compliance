@@ -47,6 +47,7 @@ resource "azurerm_resource_group" "this" {
   location = var.location
 }
 
+data "azurerm_client_config" "current" {}
 
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
 # Azure Policy/Defender may auto-create blob-diagnostic-setting targeting this workspace
@@ -91,9 +92,19 @@ module "storage_account" {
     }
   }
 
-  # CN09.AR01: Blob diagnostics - Azure Policy/Defender often auto-create "blob-diagnostic-setting"
-  # on new storage accounts. We skip diagnostic_settings_blob to avoid 409 Conflict (same sink).
-  # If not auto-created, add diagnostic_settings_blob with a dedicated workspace.
+  # Blob Monitor diagnostics (policy uses `az monitor diagnostic-settings list` on blobServices/default):
+  # - CN04.AR02 / AR03: log categories StorageWrite / StorageRead
+  # - CN07.AR01: log category group `audit` (enumeration / control-plane style auditing)
+  # CN09.AR01: same sink → Log Analytics workspace above.
+  # If your tenant auto-creates a conflicting diagnostic setting (rare in CI), resolve the 409 or rename.
+  diagnostic_settings_blob = {
+    cfi_cn04_monitor = {
+      name                  = "cfi-blob-diag-${var.instance_id}"
+      workspace_resource_id = azurerm_log_analytics_workspace.storage_diag.id
+      log_categories        = toset(["StorageRead", "StorageWrite"])
+      log_groups            = toset(["audit"])
+    }
+  }
 
   # Create default container with immutable storage (CN04 tests - retention policy added below)
   containers = {
@@ -105,6 +116,16 @@ module "storage_account" {
       }
     }
   }
+}
+
+# ObjStor.CN01.AR02: policy counts `az role assignment list --scope <storageAccount>` (not inherited RG/sub roles).
+# Without an assignment at this scope, count is 0 and "Azure Storage RBAC in Use" fails.
+resource "azurerm_role_assignment" "cfi_deploy_identity_storage_reader" {
+  scope                = module.storage_account.resource_id
+  role_definition_name = "Reader"
+  principal_id         = data.azurerm_client_config.current.object_id
+
+  # Runs after the storage account exists; Reader is sufficient to prove RBAC on the resource.
 }
 
 # Container-level immutability policy (CN04.AR02 - object retention enforcement)
