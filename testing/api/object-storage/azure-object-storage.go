@@ -700,7 +700,7 @@ func (s *AzureBlobService) GetOrProvisionTestableResources() ([]types.TestParams
 			ServiceType:         "object-storage",
 			ProviderServiceType: "Microsoft.Storage/storageAccounts",
 			CatalogTypes:        []string{"CCC.ObjStor"},
-			TagFilter:           []string{"@object-storage", "@PerService"},
+			TagFilter:           []string{"@object-storage", "@PerService", "@Policy"},
 			Instance:            *s.instance,
 		})
 
