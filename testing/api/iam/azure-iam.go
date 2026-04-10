@@ -274,24 +274,30 @@ func (s *AzureIAMService) setAccessInternal(identity *Identity, serviceID string
 	fmt.Printf("   Scope: %s\n", scope)
 	fmt.Printf("   Role: %s\n", roleDefinitionID)
 
-	// Create a unique name for the role assignment
-	roleAssignmentName := uuid.New().String()
-
-	// Create role assignment
+	principalType := armauthorization.PrincipalTypeServicePrincipal
+	// principalType + retries: new service principals can return PrincipalNotFound until directory replication
+	// completes (see https://aka.ms/docs-principaltype).
 	roleAssignmentParams := armauthorization.RoleAssignmentCreateParameters{
 		Properties: &armauthorization.RoleAssignmentProperties{
 			PrincipalID:      &objectID,
+			PrincipalType:    &principalType,
 			RoleDefinitionID: &roleDefinitionID,
 		},
 	}
 
-	_, err = s.authClient.Create(s.ctx, scope, roleAssignmentName, roleAssignmentParams, nil)
-	if err != nil {
-		// Check if assignment already exists
-		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "RoleAssignmentExists") {
-			fmt.Printf("   ℹ️  Role assignment already exists\n")
-			return policyDoc, nil
+	err = retry.DoVoid(12, 5*time.Second, func() error {
+		roleAssignmentName := uuid.New().String()
+		_, e := s.authClient.Create(s.ctx, scope, roleAssignmentName, roleAssignmentParams, nil)
+		if e == nil {
+			return nil
 		}
+		if strings.Contains(e.Error(), "already exists") || strings.Contains(e.Error(), "RoleAssignmentExists") {
+			fmt.Printf("   ℹ️  Role assignment already exists\n")
+			return nil
+		}
+		return e
+	}, isAzureRoleAssignmentPrincipalNotYetVisible)
+	if err != nil {
 		return "", fmt.Errorf("failed to create role assignment: %w", err)
 	}
 
@@ -389,6 +395,17 @@ func (s *AzureIAMService) DestroyUser(identity *Identity) error {
 }
 
 // Helper functions
+
+// isAzureRoleAssignmentPrincipalNotYetVisible matches transient ARM errors when assigning a role
+// to an application/service principal that was just created (directory replication delay).
+func isAzureRoleAssignmentPrincipalNotYetVisible(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "principalnotfound") ||
+		strings.Contains(msg, "does not exist in the directory")
+}
 
 func (s *AzureIAMService) getRoleDefinitionForLevel(serviceID string, level string) (string, error) {
 	// Azure built-in role definition IDs

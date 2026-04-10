@@ -49,6 +49,11 @@ resource "azurerm_resource_group" "this" {
 
 data "azurerm_client_config" "current" {}
 
+# Scoped built-in Reader role ID (avoids name-resolution issues during assignment).
+locals {
+  reader_role_definition_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7"
+}
+
 # Log Analytics workspace for Azure Monitor diagnostics (CN09.AR01)
 # Azure Policy/Defender may auto-create blob-diagnostic-setting targeting this workspace
 resource "azurerm_log_analytics_workspace" "storage_diag" {
@@ -126,9 +131,11 @@ module "storage_account" {
 # ObjStor.CN01.AR02: policy counts `az role assignment list --scope <storageAccount>` (not inherited RG/sub roles).
 # Without an assignment at this scope, count is 0 and "Azure Storage RBAC in Use" fails.
 resource "azurerm_role_assignment" "cfi_deploy_identity_storage_reader" {
-  scope                = module.storage_account.resource_id
-  role_definition_name = "Reader"
-  principal_id         = data.azurerm_client_config.current.object_id
+  depends_on = [module.storage_account]
+
+  scope              = module.storage_account.resource_id
+  role_definition_id = local.reader_role_definition_id
+  principal_id       = data.azurerm_client_config.current.object_id
 
   # Runs after the storage account exists; Reader is sufficient to prove RBAC on the resource.
 }
