@@ -6,9 +6,13 @@
     "description": "This module creates a secure AWS VPC with subnets, NAT gateways, routing, and advanced networking capabilities.",
     "path": "remote/aws/vpc",
     "test-frameworks": [
-        "cfi", 
+        "cfi",
         "prowler"
     ],
-    "test-on-branches": ["fix/single-workflow-integration", "main"],
+    "test-on-branches": [
+        "ccc-vpc-aws-assess",
+        "ccc-vpc-aws-goodvpc-badvpc",
+        "main"
+    ],
     "git": "https://github.com/terraform-aws-modules/terraform-aws-vpc"
 }
