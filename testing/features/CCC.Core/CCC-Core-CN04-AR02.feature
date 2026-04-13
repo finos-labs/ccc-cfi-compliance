@@ -12,6 +12,11 @@ Feature: CCC.Core.CN04.AR02 - Log Data Modification Attempts
     When I attempt policy check "data-write-logging" for control "CCC.Core.CN04" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
     Then "{result}" is true
 
+  @Policy @vpc
+  Scenario: VPC config change logging compliance
+    When I attempt policy check "data-write-logging" for control "CCC.Core.CN04" assessment requirement "AR02" for service "{ServiceType}" on resource "{ResourceName}" and provider "{Provider}"
+    Then "{result}" is true
+
   @Behavioural
   Scenario: Verify data modifications are logged with identity and timestamp
     Given I call "{api}" with "GetServiceAPI" using argument "{ServiceType}"
