@@ -143,3 +143,13 @@ variable "site_config" {
     vnet_route_all_enabled  = true
   }
 }
+
+variable "private_endpoints" {
+  description = <<-EOT
+    Controls: CCC.Core.CN05 [coverage: partial]
+    Map of private endpoints to create (passed through to the AVM module). Each
+    entry typically specifies subnet_resource_id and private_dns_zone_resource_ids.
+  EOT
+  type        = any
+  default     = {}
+}

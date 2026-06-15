@@ -38,6 +38,7 @@ output "virtual_network" {
     resource_id                  = module.virtual_network.resource_id
     functions_subnet_resource_id = module.virtual_network.functions_subnet_resource_id
     vm_subnet_resource_id        = module.virtual_network.vm_subnet_resource_id
+    pe_subnet_resource_id        = module.virtual_network.pe_subnet_resource_id
   }
 }
 

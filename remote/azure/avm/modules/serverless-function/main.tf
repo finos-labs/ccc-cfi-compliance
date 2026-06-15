@@ -19,6 +19,7 @@ module "avm_res_web_site" {
   https_only                    = var.https_only
   managed_identities            = var.managed_identities
   maximum_instance_count        = var.maximum_instance_count
+  private_endpoints             = var.private_endpoints
   public_network_access_enabled = var.public_network_access_enabled
   site_config                   = var.site_config
 

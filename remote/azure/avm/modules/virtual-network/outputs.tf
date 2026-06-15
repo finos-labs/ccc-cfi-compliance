@@ -17,3 +17,8 @@ output "vm_subnet_resource_id" {
   description = "The resource ID of the virtual machine subnet."
   value       = module.avm_res_network_virtualnetwork.subnets["vm"].resource_id
 }
+
+output "pe_subnet_resource_id" {
+  description = "The resource ID of the private-endpoints subnet."
+  value       = module.avm_res_network_virtualnetwork.subnets["pe"].resource_id
+}

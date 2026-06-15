@@ -126,6 +126,25 @@ variable "public_network_access_enabled" {
   default = false
 }
 
+# ---------------------------------------------------------------------------
+# Optional, off-by-default break-glass for storage data-plane provisioning.
+# The default posture is fully private; the function deployment container is
+# created over the ARM control plane, so this is normally unnecessary. When
+# enabled with a single operator IP, the storage firewall switches to the
+# "selected networks" posture (public access enabled + default Deny + ip_rules).
+# ---------------------------------------------------------------------------
+variable "allow_deployer_ip" {
+  description = "Allow a single operator IP through the storage firewall for data-plane provisioning."
+  type        = bool
+  default     = false
+}
+
+variable "deployer_ip_address" {
+  description = "Operator public IP (CIDR or single address) allowed when allow_deployer_ip is true."
+  type        = string
+  default     = ""
+}
+
 variable "https_traffic_only_enabled" {
   type    = bool
   default = true

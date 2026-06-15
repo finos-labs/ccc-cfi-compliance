@@ -17,10 +17,16 @@ module "avm_res_network_virtualnetwork" {
   # workloads, so the deployable baseline relaxes enforcement to AllowUnencrypted.
   encryption = {
     enabled     = true
-    enforcement = "AllowUnencrypted"
+    enforcement = var.encryption_enforcement
   }
 
   subnets = {
+    # Dedicated subnet for the storage / key-vault / function private endpoints.
+    pe = {
+      name                              = "private-endpoints"
+      address_prefixes                  = [var.pe_subnet_prefix]
+      private_endpoint_network_policies = "Enabled"
+    }
     functions = {
       name             = "functions-integration"
       address_prefixes = [var.functions_subnet_prefix]

@@ -25,6 +25,25 @@ variable "functions_subnet_prefix" {
   default     = "10.40.2.0/24"
 }
 
+variable "pe_subnet_prefix" {
+  description = "Address prefix for the private-endpoints subnet."
+  type        = string
+  default     = "10.40.1.0/24"
+}
+
+variable "encryption_enforcement" {
+  description = <<-EOT
+    Controls: CCC.Core.CN01 [coverage: supporting]
+    VNet encryption enforcement mode (DropUnencrypted | AllowUnencrypted).
+    Limitation: DropUnencrypted requires all VMs in the VNet to run supported
+    SKUs/accelerated networking and can break traffic to unsupported workloads,
+    so the deployable baseline defaults to AllowUnencrypted. Set to
+    DropUnencrypted for a hardened posture once fleet support is validated.
+  EOT
+  type        = string
+  default     = "AllowUnencrypted"
+}
+
 variable "vm_subnet_prefix" {
   description = "Address prefix for the virtual machine subnet."
   type        = string

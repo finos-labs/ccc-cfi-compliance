@@ -12,6 +12,7 @@ module "avm_res_keyvault_vault" {
   enabled_for_template_deployment = var.enabled_for_template_deployment
   legacy_access_policies_enabled  = var.legacy_access_policies_enabled
   network_acls                    = var.network_acls
+  private_endpoints               = var.private_endpoints
   public_network_access_enabled   = var.public_network_access_enabled
   purge_protection_enabled        = var.purge_protection_enabled
   sku_name                        = var.sku_name

@@ -1,13 +1,22 @@
 locals {
-  storage_account_name  = "avmstor${var.instance_id}"
-  default_container     = "ccc-avm-test-container-${var.instance_id}"
-  key_vault_name        = "avmkv${var.instance_id}"
-  log_analytics_name    = "avmlaw${var.instance_id}"
-  virtual_network_name  = "avmvnet${var.instance_id}"
-  function_storage_name = "avmfnstor${var.instance_id}"
-  function_plan_name    = "avmplan${var.instance_id}"
-  function_app_name     = "avmfunc${var.instance_id}"
-  virtual_machine_name  = "avmvm${var.instance_id}"
+  storage_account_name = "avmstor${var.instance_id}"
+  default_container    = "ccc-avm-test-container-${var.instance_id}"
+  key_vault_name       = "avmkv${var.instance_id}"
+  log_analytics_name   = "avmlaw${var.instance_id}"
+  virtual_network_name = "avmvnet${var.instance_id}"
+  function_plan_name   = "avmplan${var.instance_id}"
+  function_app_name    = "avmfunc${var.instance_id}"
+  virtual_machine_name = "avmvm${var.instance_id}"
+
+  # Optional, off-by-default break-glass: allow a single operator IP through the
+  # storage firewall for data-plane provisioning. The default posture is fully
+  # private (deny + no public access); the function's deploymentpackage container
+  # is created over the ARM control plane, so this is normally unnecessary.
+  deployer_ip_rules = var.allow_deployer_ip && var.deployer_ip_address != "" ? toset([var.deployer_ip_address]) : toset([])
+  storage_network_rules = merge(var.network_rules, {
+    ip_rules = local.deployer_ip_rules
+  })
+  storage_public_network_access_enabled = var.allow_deployer_ip ? true : var.public_network_access_enabled
 }
 
 data "azurerm_client_config" "current" {}
@@ -33,10 +42,36 @@ module "storage_account" {
   https_traffic_only_enabled        = var.https_traffic_only_enabled
   infrastructure_encryption_enabled = var.infrastructure_encryption_enabled
   min_tls_version                   = var.min_tls_version
-  network_rules                     = var.network_rules
-  public_network_access_enabled     = var.public_network_access_enabled
+  network_rules                     = local.storage_network_rules
+  public_network_access_enabled     = local.storage_public_network_access_enabled
   shared_access_key_enabled         = var.shared_access_key_enabled
   default_container                 = local.default_container
+
+  # Flex Consumption backing deployment container, created over the ARM control
+  # plane so the account can stay fully private (no data-plane / public access).
+  extra_containers = {
+    deploymentpackage = {
+      name = "deploymentpackage"
+    }
+  }
+
+  # Blob + file private endpoints into the pe subnet, resolved via private DNS.
+  private_endpoints = {
+    blob = {
+      name                            = "pe-${local.storage_account_name}-blob"
+      private_service_connection_name = "pse-${local.storage_account_name}-blob"
+      subnet_resource_id              = module.virtual_network.pe_subnet_resource_id
+      subresource_name                = "blob"
+      private_dns_zone_resource_ids   = [module.dns_blob.resource_id]
+    }
+    file = {
+      name                            = "pe-${local.storage_account_name}-file"
+      private_service_connection_name = "pse-${local.storage_account_name}-file"
+      subnet_resource_id              = module.virtual_network.pe_subnet_resource_id
+      subresource_name                = "file"
+      private_dns_zone_resource_ids   = [module.dns_file.resource_id]
+    }
+  }
 }
 
 module "key_vault" {
@@ -56,6 +91,17 @@ module "key_vault" {
   purge_protection_enabled        = var.purge_protection_enabled
   sku_name                        = var.sku_name
   soft_delete_retention_days      = var.soft_delete_retention_days
+
+  # Vault private endpoint into the pe subnet, resolved via private DNS.
+  private_endpoints = {
+    vault = {
+      name                            = "pe-${local.key_vault_name}-vault"
+      private_service_connection_name = "pse-${local.key_vault_name}-vault"
+      subnet_resource_id              = module.virtual_network.pe_subnet_resource_id
+      subresource_name                = "vault"
+      private_dns_zone_resource_ids   = [module.dns_vault.resource_id]
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -86,10 +132,48 @@ module "virtual_network" {
 }
 
 # ---------------------------------------------------------------------------
-# Serverless function backing infrastructure (deployment enablers, not CCC
-# attestation surfaces): Flex Consumption plan, a deployment-package storage
-# account, the user-assigned identity the app uses to read it, and the RBAC
-# grants + propagation wait that make identity-based access work at apply time.
+# Private DNS zones (support) — resolve the storage, key vault and function
+# private-endpoint FQDNs to their private IPs from inside the virtual network.
+# ---------------------------------------------------------------------------
+module "dns_blob" {
+  source = "./modules/private-dns-zone"
+
+  domain_name        = "privatelink.blob.core.windows.net"
+  parent_id          = azurerm_resource_group.this.id
+  virtual_network_id = module.virtual_network.resource_id
+}
+
+module "dns_file" {
+  source = "./modules/private-dns-zone"
+
+  domain_name        = "privatelink.file.core.windows.net"
+  parent_id          = azurerm_resource_group.this.id
+  virtual_network_id = module.virtual_network.resource_id
+}
+
+module "dns_vault" {
+  source = "./modules/private-dns-zone"
+
+  domain_name        = "privatelink.vaultcore.azure.net"
+  parent_id          = azurerm_resource_group.this.id
+  virtual_network_id = module.virtual_network.resource_id
+}
+
+module "dns_sites" {
+  source = "./modules/private-dns-zone"
+
+  domain_name        = "privatelink.azurewebsites.net"
+  parent_id          = azurerm_resource_group.this.id
+  virtual_network_id = module.virtual_network.resource_id
+}
+
+# ---------------------------------------------------------------------------
+# Serverless function backing identity + RBAC. The Flex Consumption app reads
+# and writes its deployment package on the GOVERNED storage account's
+# deploymentpackage container using this user-assigned identity (no account
+# keys, no separate public storage account). The container itself is created on
+# the governed account over the control plane (module.storage_account
+# extra_containers), so the account stays fully private.
 # ---------------------------------------------------------------------------
 resource "azurerm_service_plan" "functions" {
   name                = local.function_plan_name
@@ -105,39 +189,10 @@ resource "azurerm_user_assigned_identity" "function" {
   location            = var.location
 }
 
-# Deployment-package store for the Flex Consumption app. Public access stays
-# enabled because the Terraform runner and the Flex backing pull need data-plane
-# reachability; access is still gated by Entra (shared keys disabled).
-resource "azurerm_storage_account" "function" {
-  name                            = local.function_storage_name
-  resource_group_name             = azurerm_resource_group.this.name
-  location                        = var.location
-  account_tier                    = "Standard"
-  account_replication_type        = "LRS"
-  min_tls_version                 = "TLS1_2"
-  https_traffic_only_enabled      = true
-  public_network_access_enabled   = true
-  shared_access_key_enabled       = false
-  allow_nested_items_to_be_public = false
-}
-
-resource "azurerm_role_assignment" "deployer_function_blob" {
-  scope                = azurerm_storage_account.function.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
 resource "azurerm_role_assignment" "function_blob" {
-  scope                = azurerm_storage_account.function.id
+  scope                = module.storage_account.resource_id
   role_definition_name = "Storage Blob Data Owner"
   principal_id         = azurerm_user_assigned_identity.function.principal_id
-}
-
-resource "azurerm_storage_container" "deploy" {
-  name               = "deploymentpackage"
-  storage_account_id = azurerm_storage_account.function.id
-
-  depends_on = [azurerm_role_assignment.deployer_function_blob]
 }
 
 resource "time_sleep" "wait_for_function_rbac" {
@@ -158,7 +213,7 @@ module "serverless_function" {
 
   service_plan_resource_id          = azurerm_service_plan.functions.id
   virtual_network_subnet_id         = module.virtual_network.functions_subnet_resource_id
-  storage_container_endpoint        = "https://${azurerm_storage_account.function.name}.blob.core.windows.net/${azurerm_storage_container.deploy.name}"
+  storage_container_endpoint        = "https://${local.storage_account_name}.blob.core.windows.net/deploymentpackage"
   storage_user_assigned_identity_id = azurerm_user_assigned_identity.function.id
 
   client_certificate_enabled    = var.client_certificate_enabled
@@ -173,7 +228,18 @@ module "serverless_function" {
     user_assigned_resource_ids = [azurerm_user_assigned_identity.function.id]
   }
 
-  depends_on = [time_sleep.wait_for_function_rbac, azurerm_storage_container.deploy]
+  # Inbound private endpoint for the function app, resolved via private DNS.
+  private_endpoints = {
+    sites = {
+      name                            = "pe-${local.function_app_name}-sites"
+      private_service_connection_name = "pse-${local.function_app_name}-sites"
+      subnet_resource_id              = module.virtual_network.pe_subnet_resource_id
+      subresource_name                = "sites"
+      private_dns_zone_resource_ids   = [module.dns_sites.resource_id]
+    }
+  }
+
+  depends_on = [time_sleep.wait_for_function_rbac, module.storage_account]
 }
 
 # ---------------------------------------------------------------------------
