@@ -190,3 +190,132 @@ variable "network_acls" {
     bypass         = "AzureServices"
   }
 }
+
+# ---------------------------------------------------------------------------
+# Shared across the serverless-function and virtual-machine modules. Both adopt
+# a system-assigned managed identity (CCC.Core.CN03/CN05). The function also
+# receives a user-assigned identity for backing-storage access, injected in the
+# root module block rather than via this variable.
+# ---------------------------------------------------------------------------
+variable "managed_identities" {
+  type = object({
+    system_assigned            = optional(bool, false)
+    user_assigned_resource_ids = optional(set(string), [])
+  })
+  default = {
+    system_assigned = true
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Log Analytics workspace (avm-res-operationalinsights-workspace) — see
+# remote/azure/avm/log-analytics-workspace.tfvars for CCC annotations.
+# ---------------------------------------------------------------------------
+variable "log_analytics_workspace_retention_in_days" {
+  type    = number
+  default = 365
+}
+
+variable "log_analytics_workspace_internet_ingestion_enabled" {
+  type    = string
+  default = "false"
+}
+
+variable "log_analytics_workspace_internet_query_enabled" {
+  type    = string
+  default = "false"
+}
+
+# ---------------------------------------------------------------------------
+# Serverless function (avm-res-web-site) — see
+# remote/azure/avm/serverless-function.tfvars for CCC annotations.
+# Note: public_network_access_enabled (declared above) is shared with storage
+# and key vault; all three adopt the private posture (false).
+# ---------------------------------------------------------------------------
+variable "client_certificate_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "client_certificate_mode" {
+  type    = string
+  default = "Required"
+}
+
+variable "function_app_uses_fc1" {
+  type    = bool
+  default = true
+}
+
+variable "https_only" {
+  type    = bool
+  default = true
+}
+
+variable "maximum_instance_count" {
+  type    = number
+  default = 40
+}
+
+variable "site_config" {
+  type = object({
+    minimum_tls_version     = optional(string)
+    scm_minimum_tls_version = optional(string)
+    ftps_state              = optional(string)
+    vnet_route_all_enabled  = optional(bool)
+  })
+  default = {
+    minimum_tls_version     = "1.3"
+    scm_minimum_tls_version = "1.3"
+    ftps_state              = "Disabled"
+    vnet_route_all_enabled  = true
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Virtual machine (avm-res-compute-virtualmachine) — see
+# remote/azure/avm/virtual-machine.tfvars for CCC annotations. vm_zone and
+# vm_sku_size are deployment knobs (Trusted Launch + encryption-at-host capable).
+# ---------------------------------------------------------------------------
+variable "account_credentials" {
+  type = object({
+    password_authentication_disabled = optional(bool, true)
+    admin_credentials = optional(object({
+      username                           = optional(string, "azureuser")
+      generate_admin_password_or_ssh_key = optional(bool, true)
+    }), {})
+  })
+  default = {
+    password_authentication_disabled = true
+  }
+}
+
+variable "encryption_at_host_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "secure_boot_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "vtpm_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "boot_diagnostics" {
+  type    = bool
+  default = true
+}
+
+variable "vm_zone" {
+  type    = string
+  default = "1"
+}
+
+variable "vm_sku_size" {
+  type    = string
+  default = "Standard_D2ds_v5"
+}
