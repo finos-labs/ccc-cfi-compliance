@@ -222,3 +222,24 @@ variable "extra_containers" {
   }))
   default = {}
 }
+
+variable "managed_identities" {
+  description = <<-EOT
+    Controls: CCC.ObjStor.CN01, CCC.Core.CN02 [coverage: partial]
+    Managed identities assigned to the storage account. A user-assigned identity
+    is required for customer-managed-key (CMK) access to Key Vault.
+  EOT
+  type        = any
+  default     = {}
+}
+
+variable "customer_managed_key" {
+  description = <<-EOT
+    Controls: CCC.ObjStor.CN01, CCC.Core.CN02 [coverage: partial]
+    Customer-managed key (CMK) configuration: the Key Vault resource ID, key
+    name, and the user-assigned identity used to reach the key. Null leaves the
+    account on Microsoft-managed keys (still encrypted at rest).
+  EOT
+  type        = any
+  default     = null
+}

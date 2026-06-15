@@ -47,10 +47,16 @@ variable "source_image_reference" {
 }
 
 variable "os_disk" {
-  description = "OS managed disk configuration. Uses platform-managed keys (no disk encryption set)."
+  description = <<-EOT
+    Controls: CCC.Core.CN02, CCC.Core.CN11 [coverage: partial]
+    OS managed disk configuration. Set disk_encryption_set_id to encrypt the OS
+    disk with a customer-managed key (CMK) backed by Key Vault; omit it to use
+    platform-managed keys.
+  EOT
   type = object({
-    caching              = string
-    storage_account_type = string
+    caching                = string
+    storage_account_type   = string
+    disk_encryption_set_id = optional(string)
   })
   default = {
     caching              = "ReadWrite"

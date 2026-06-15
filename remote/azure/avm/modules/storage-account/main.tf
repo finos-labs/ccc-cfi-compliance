@@ -21,6 +21,8 @@ module "avm_res_storage_storageaccount" {
   private_endpoints                 = var.private_endpoints
   public_network_access_enabled     = var.public_network_access_enabled
   shared_access_key_enabled         = var.shared_access_key_enabled
+  managed_identities                = var.managed_identities
+  customer_managed_key              = var.customer_managed_key
 
   containers = merge(
     {
