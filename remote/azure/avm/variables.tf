@@ -135,3 +135,58 @@ variable "min_tls_version" {
   type    = string
   default = "TLS1_2"
 }
+
+# ---------------------------------------------------------------------------
+# Key Vault (avm-res-keyvault-vault) — see remote/azure/avm/key-vault.tfvars
+# for the control-informed values and CCC annotations.
+# Note: public_network_access_enabled (declared above) is shared with the
+# storage account module; both adopt the private posture (false).
+# ---------------------------------------------------------------------------
+
+variable "enabled_for_deployment" {
+  type    = bool
+  default = false
+}
+
+variable "enabled_for_disk_encryption" {
+  type    = bool
+  default = false
+}
+
+variable "enabled_for_template_deployment" {
+  type    = bool
+  default = false
+}
+
+variable "legacy_access_policies_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "purge_protection_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "soft_delete_retention_days" {
+  type    = number
+  default = 90
+}
+
+variable "sku_name" {
+  type    = string
+  default = "premium"
+}
+
+variable "network_acls" {
+  type = object({
+    bypass                     = optional(string, "None")
+    default_action             = optional(string, "Deny")
+    ip_rules                   = optional(list(string), [])
+    virtual_network_subnet_ids = optional(list(string), [])
+  })
+  default = {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+  }
+}

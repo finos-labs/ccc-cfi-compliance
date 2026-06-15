@@ -13,3 +13,12 @@ output "storage_account" {
     default_container = module.storage_account.default_container
   }
 }
+
+output "key_vault" {
+  description = "Deployed key vault details."
+  value = {
+    name        = module.key_vault.name
+    resource_id = module.key_vault.resource_id
+    uri         = module.key_vault.uri
+  }
+}
