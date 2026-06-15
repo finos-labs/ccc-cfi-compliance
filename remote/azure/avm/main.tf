@@ -297,6 +297,21 @@ module "dns_sites" {
 }
 
 # ---------------------------------------------------------------------------
+# Flex Consumption (FC1) hosting plan for the serverless function, via the
+# avm-res-web-serverfarm thin wrapper.
+# ---------------------------------------------------------------------------
+module "app_service_plan" {
+  source = "./modules/app-service-plan"
+
+  location  = var.location
+  name      = local.function_plan_name
+  parent_id = azurerm_resource_group.this.id
+
+  os_type  = "Linux"
+  sku_name = "FC1"
+}
+
+# ---------------------------------------------------------------------------
 # Serverless function backing identity + RBAC. The Flex Consumption app reads
 # and writes its deployment package on the GOVERNED storage account's
 # deploymentpackage container using this user-assigned identity (no account
@@ -304,14 +319,6 @@ module "dns_sites" {
 # the governed account over the control plane (module.storage_account
 # extra_containers), so the account stays fully private.
 # ---------------------------------------------------------------------------
-resource "azurerm_service_plan" "functions" {
-  name                = local.function_plan_name
-  resource_group_name = azurerm_resource_group.this.name
-  location            = var.location
-  os_type             = "Linux"
-  sku_name            = "FC1"
-}
-
 resource "azurerm_user_assigned_identity" "function" {
   name                = "${local.function_app_name}-uami"
   resource_group_name = azurerm_resource_group.this.name
@@ -340,7 +347,7 @@ module "serverless_function" {
   name      = local.function_app_name
   parent_id = azurerm_resource_group.this.id
 
-  service_plan_resource_id          = azurerm_service_plan.functions.id
+  service_plan_resource_id          = module.app_service_plan.resource_id
   virtual_network_subnet_id         = module.virtual_network.functions_subnet_resource_id
   storage_container_endpoint        = "https://${local.storage_account_name}.blob.core.windows.net/deploymentpackage"
   storage_user_assigned_identity_id = azurerm_user_assigned_identity.function.id
