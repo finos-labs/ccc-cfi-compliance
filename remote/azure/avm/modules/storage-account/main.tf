@@ -18,16 +18,27 @@ module "avm_res_storage_storageaccount" {
   infrastructure_encryption_enabled = var.infrastructure_encryption_enabled
   min_tls_version                   = var.min_tls_version
   network_rules                     = var.network_rules
+  private_endpoints                 = var.private_endpoints
   public_network_access_enabled     = var.public_network_access_enabled
   shared_access_key_enabled         = var.shared_access_key_enabled
+  managed_identities                = var.managed_identities
+  customer_managed_key              = var.customer_managed_key
 
-  containers = {
-    (var.default_container) = {
-      name          = var.default_container
-      public_access = "None"
-      immutable_storage_with_versioning = {
-        enabled = true
+  containers = merge(
+    {
+      (var.default_container) = {
+        name          = var.default_container
+        public_access = "None"
+        immutable_storage_with_versioning = {
+          enabled = true
+        }
+      }
+    },
+    {
+      for key, container in var.extra_containers : key => {
+        name          = container.name
+        public_access = "None"
       }
     }
-  }
+  )
 }
