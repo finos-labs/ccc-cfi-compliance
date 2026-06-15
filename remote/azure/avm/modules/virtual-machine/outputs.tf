@@ -5,5 +5,5 @@ output "name" {
 
 output "resource_id" {
   description = "The resource ID of the virtual machine."
-  value       = module.avm_res_compute_virtualmachine.resource_id
+  value       = nonsensitive(module.avm_res_compute_virtualmachine.resource_id)
 }

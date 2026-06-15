@@ -1,6 +1,6 @@
 output "name" {
   description = "The name of the Log Analytics workspace."
-  value       = module.avm_res_operationalinsights_workspace.resource.name
+  value       = var.name
 }
 
 output "resource_id" {
