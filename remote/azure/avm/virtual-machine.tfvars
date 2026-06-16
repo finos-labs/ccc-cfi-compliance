@@ -13,6 +13,12 @@
 #
 # See virtual-machine.provenance.json for the authoritative, machine-readable audit trail.
 
+# Deployment knobs (not CCC control mappings):
+# - Standard_D2ds_v5 (variables.tf default) uses DDSv5, often quota 0 on dev subs.
+# - Standard_D2s_v3 uses DSv3 quota; SkuNotAvailable in westus2 is often zone 1
+#   capacity, not regional — leave vm_zone unset (regional) like other westus2 VMs.
+vm_sku_size = "Standard_D2s_v3"
+
 # Controls: CCC.Core.CN05  [coverage: partial]
 # Limitation: Applies to Linux SSH; Windows admin access is governed
 # differently. Key distribution is an operational concern.

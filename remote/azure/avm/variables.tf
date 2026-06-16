@@ -1,7 +1,7 @@
 variable "instance_id" {
   description = "Unique ID for this run; used in globally unique resource names."
   type        = string
-  default     = "20260611"
+  default     = "20260616"
 }
 
 variable "location" {
@@ -331,7 +331,7 @@ variable "boot_diagnostics" {
 
 variable "vm_zone" {
   type    = string
-  default = "1"
+  default = "2"
 }
 
 variable "vm_sku_size" {

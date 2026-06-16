@@ -14,9 +14,10 @@ variable "resource_group_name" {
 }
 
 variable "zone" {
-  description = "Availability zone for the virtual machine."
+  description = "Availability zone for the virtual machine. Null deploys regionally (no zone pin)."
   type        = string
-  default     = "1"
+  default     = null
+  nullable    = true
 }
 
 variable "sku_size" {

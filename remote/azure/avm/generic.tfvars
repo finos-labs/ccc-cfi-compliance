@@ -1,1 +1,1 @@
-location = "uswest2"
+location = "westus2"
