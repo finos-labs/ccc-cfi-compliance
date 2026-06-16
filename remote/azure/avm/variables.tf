@@ -126,6 +126,25 @@ variable "public_network_access_enabled" {
   default = false
 }
 
+# ---------------------------------------------------------------------------
+# Optional, off-by-default break-glass for storage data-plane provisioning.
+# The default posture is fully private; the function deployment container is
+# created over the ARM control plane, so this is normally unnecessary. When
+# enabled with a single operator IP, the storage firewall switches to the
+# "selected networks" posture (public access enabled + default Deny + ip_rules).
+# ---------------------------------------------------------------------------
+variable "allow_deployer_ip" {
+  description = "Allow a single operator IP through the storage firewall for data-plane provisioning."
+  type        = bool
+  default     = false
+}
+
+variable "deployer_ip_address" {
+  description = "Operator public IP (CIDR or single address) allowed when allow_deployer_ip is true."
+  type        = string
+  default     = ""
+}
+
 variable "https_traffic_only_enabled" {
   type    = bool
   default = true
@@ -134,4 +153,188 @@ variable "https_traffic_only_enabled" {
 variable "min_tls_version" {
   type    = string
   default = "TLS1_2"
+}
+
+# ---------------------------------------------------------------------------
+# Key Vault (avm-res-keyvault-vault) — see remote/azure/avm/key-vault.tfvars
+# for the control-informed values and CCC annotations.
+# Note: public_network_access_enabled (declared above) is shared with the
+# storage account module; both adopt the private posture (false).
+# ---------------------------------------------------------------------------
+
+variable "enabled_for_deployment" {
+  type    = bool
+  default = false
+}
+
+variable "enabled_for_disk_encryption" {
+  type    = bool
+  default = false
+}
+
+variable "enabled_for_template_deployment" {
+  type    = bool
+  default = false
+}
+
+variable "legacy_access_policies_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "purge_protection_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "soft_delete_retention_days" {
+  type    = number
+  default = 90
+}
+
+variable "sku_name" {
+  type    = string
+  default = "premium"
+}
+
+variable "network_acls" {
+  type = object({
+    bypass                     = optional(string, "None")
+    default_action             = optional(string, "Deny")
+    ip_rules                   = optional(list(string), [])
+    virtual_network_subnet_ids = optional(list(string), [])
+  })
+  default = {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Shared across the serverless-function and virtual-machine modules. Both adopt
+# a system-assigned managed identity (CCC.Core.CN03/CN05). The function also
+# receives a user-assigned identity for backing-storage access, injected in the
+# root module block rather than via this variable.
+# ---------------------------------------------------------------------------
+variable "managed_identities" {
+  type = object({
+    system_assigned            = optional(bool, false)
+    user_assigned_resource_ids = optional(set(string), [])
+  })
+  default = {
+    system_assigned = true
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Log Analytics workspace (avm-res-operationalinsights-workspace) — see
+# remote/azure/avm/log-analytics-workspace.tfvars for CCC annotations.
+# ---------------------------------------------------------------------------
+variable "log_analytics_workspace_retention_in_days" {
+  type    = number
+  default = 365
+}
+
+variable "log_analytics_workspace_internet_ingestion_enabled" {
+  type    = string
+  default = "false"
+}
+
+variable "log_analytics_workspace_internet_query_enabled" {
+  type    = string
+  default = "false"
+}
+
+# ---------------------------------------------------------------------------
+# Serverless function (avm-res-web-site) — see
+# remote/azure/avm/serverless-function.tfvars for CCC annotations.
+# Note: public_network_access_enabled (declared above) is shared with storage
+# and key vault; all three adopt the private posture (false).
+# ---------------------------------------------------------------------------
+variable "client_certificate_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "client_certificate_mode" {
+  type    = string
+  default = "Required"
+}
+
+variable "function_app_uses_fc1" {
+  type    = bool
+  default = true
+}
+
+variable "https_only" {
+  type    = bool
+  default = true
+}
+
+variable "maximum_instance_count" {
+  type    = number
+  default = 40
+}
+
+variable "site_config" {
+  type = object({
+    minimum_tls_version     = optional(string)
+    scm_minimum_tls_version = optional(string)
+    ftps_state              = optional(string)
+    vnet_route_all_enabled  = optional(bool)
+  })
+  default = {
+    minimum_tls_version     = "1.3"
+    scm_minimum_tls_version = "1.3"
+    ftps_state              = "Disabled"
+    vnet_route_all_enabled  = true
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Virtual machine (avm-res-compute-virtualmachine) — see
+# remote/azure/avm/virtual-machine.tfvars for CCC annotations. vm_zone and
+# vm_sku_size are deployment knobs (Trusted Launch + encryption-at-host capable).
+# ---------------------------------------------------------------------------
+variable "account_credentials" {
+  type = object({
+    password_authentication_disabled = optional(bool, true)
+    admin_credentials = optional(object({
+      username                           = optional(string, "azureuser")
+      generate_admin_password_or_ssh_key = optional(bool, true)
+    }), {})
+  })
+  default = {
+    password_authentication_disabled = true
+  }
+}
+
+variable "encryption_at_host_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "secure_boot_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "vtpm_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "boot_diagnostics" {
+  type    = bool
+  default = true
+}
+
+variable "vm_zone" {
+  type    = string
+  default = "1"
+}
+
+variable "vm_sku_size" {
+  type    = string
+  default = "Standard_D2ds_v5"
 }

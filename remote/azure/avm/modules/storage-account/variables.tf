@@ -198,3 +198,48 @@ variable "min_tls_version" {
   type        = string
   default     = "TLS1_2"
 }
+
+variable "private_endpoints" {
+  description = <<-EOT
+    Controls: CCC.Core.CN05 [coverage: partial]
+    Map of private endpoints to create for the storage account (passed through to
+    the AVM module). Each entry typically specifies subnet_resource_id,
+    subresource_name (e.g. "blob"/"file") and private_dns_zone_resource_ids.
+  EOT
+  type        = any
+  default     = {}
+}
+
+variable "extra_containers" {
+  description = <<-EOT
+    Additional (mutable) blob containers to create alongside the immutable default
+    container, via the ARM control plane. Used to provision the Flex function's
+    deploymentpackage container on the governed account without enabling data-plane
+    (public) access.
+  EOT
+  type = map(object({
+    name = string
+  }))
+  default = {}
+}
+
+variable "managed_identities" {
+  description = <<-EOT
+    Controls: CCC.ObjStor.CN01, CCC.Core.CN02 [coverage: partial]
+    Managed identities assigned to the storage account. A user-assigned identity
+    is required for customer-managed-key (CMK) access to Key Vault.
+  EOT
+  type        = any
+  default     = {}
+}
+
+variable "customer_managed_key" {
+  description = <<-EOT
+    Controls: CCC.ObjStor.CN01, CCC.Core.CN02 [coverage: partial]
+    Customer-managed key (CMK) configuration: the Key Vault resource ID, key
+    name, and the user-assigned identity used to reach the key. Null leaves the
+    account on Microsoft-managed keys (still encrypted at rest).
+  EOT
+  type        = any
+  default     = null
+}
