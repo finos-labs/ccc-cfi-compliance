@@ -22,3 +22,13 @@ output "pe_subnet_resource_id" {
   description = "The resource ID of the private-endpoints subnet."
   value       = module.avm_res_network_virtualnetwork.subnets["pe"].resource_id
 }
+
+output "aks_subnet_resource_id" {
+  description = "The resource ID of the AKS node subnet."
+  value       = module.avm_res_network_virtualnetwork.subnets["aks"].resource_id
+}
+
+output "aks_api_subnet_resource_id" {
+  description = "The resource ID of the AKS API-server VNet-integration subnet."
+  value       = module.avm_res_network_virtualnetwork.subnets["aks_api"].resource_id
+}

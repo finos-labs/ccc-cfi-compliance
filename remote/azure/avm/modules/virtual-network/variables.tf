@@ -49,3 +49,15 @@ variable "vm_subnet_prefix" {
   type        = string
   default     = "10.40.3.0/24"
 }
+
+variable "aks_subnet_prefix" {
+  description = "Address prefix for the AKS node subnet."
+  type        = string
+  default     = "10.40.4.0/24"
+}
+
+variable "aks_api_subnet_prefix" {
+  description = "Address prefix for the AKS API-server VNet-integration subnet."
+  type        = string
+  default     = "10.40.5.0/24"
+}

@@ -338,3 +338,55 @@ variable "vm_sku_size" {
   type    = string
   default = "Standard_D2ds_v5"
 }
+
+# ---------------------------------------------------------------------------
+# Managed cluster (avm-res-containerservice-managedcluster) — see
+# remote/azure/avm/managed-cluster.tfvars for CCC annotations. Pattern from
+# Azure AVM PR #333 (examples/finos-ccc).
+# ---------------------------------------------------------------------------
+variable "aks_kubernetes_version" {
+  type    = string
+  default = "1.31"
+}
+
+variable "aks_cluster_admin_group_object_ids" {
+  description = "Entra GROUP object IDs granted Kubernetes cluster-admin via AAD integration."
+  type        = list(string)
+  default     = []
+}
+
+variable "aks_node_vm_size" {
+  type    = string
+  default = "Standard_D4s_v5"
+}
+
+variable "aks_node_count" {
+  type    = number
+  default = 2
+}
+
+variable "aks_node_availability_zones" {
+  type    = list(string)
+  default = ["1", "2", "3"]
+}
+
+variable "aks_outbound_type" {
+  description = "AKS outbound type. Prefer userDefinedRouting with approved egress; loadBalancer is the deployable baseline."
+  type        = string
+  default     = "loadBalancer"
+}
+
+variable "aks_pod_cidr" {
+  type    = string
+  default = "172.18.0.0/16"
+}
+
+variable "aks_service_cidr" {
+  type    = string
+  default = "172.19.0.0/16"
+}
+
+variable "aks_dns_service_ip" {
+  type    = string
+  default = "172.19.0.10"
+}

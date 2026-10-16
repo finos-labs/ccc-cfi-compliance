@@ -7,6 +7,7 @@ locals {
   function_plan_name   = "avmplan${var.instance_id}"
   function_app_name    = "avmfunc${var.instance_id}"
   virtual_machine_name = "avmvm${var.instance_id}"
+  managed_cluster_name = "avmaks${var.instance_id}"
 
   # Optional, off-by-default break-glass: allow a single operator IP through the
   # storage firewall for data-plane provisioning. The default posture is fully
@@ -159,6 +160,22 @@ resource "azapi_resource" "cmk_disk_key" {
       kty     = "RSA"
       keySize = 4096
       keyOps  = ["decrypt", "encrypt", "sign", "unwrapKey", "verify", "wrapKey"]
+    }
+  }
+  response_export_values = ["properties.keyUriWithVersion"]
+}
+
+# Separate KMS key for AKS etcd / Kubernetes secrets encryption at rest
+# (CCC.K8S.CN07). Distinct from the disk CMK used by the DES.
+resource "azapi_resource" "cmk_kms_key" {
+  type      = "Microsoft.KeyVault/vaults/keys@2023-07-01"
+  name      = "cmk-kms"
+  parent_id = module.key_vault.resource_id
+  body = {
+    properties = {
+      kty     = "RSA"
+      keySize = 4096
+      keyOps  = ["decrypt", "encrypt"]
     }
   }
   response_export_values = ["properties.keyUriWithVersion"]
@@ -407,4 +424,117 @@ module "virtual_machine" {
   }
 
   depends_on = [azapi_resource.des]
+}
+
+# ---------------------------------------------------------------------------
+# Managed cluster (avm-res-containerservice-managedcluster) — private AKS with
+# VNet-integrated API server, Cilium, OIDC/workload identity, DES + KV KMS.
+# Pattern sourced from the FINOS CCC example (AVM PR #333).
+# ---------------------------------------------------------------------------
+resource "azurerm_user_assigned_identity" "aks_control_plane" {
+  name                = "${local.managed_cluster_name}-cp-uami"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = var.location
+}
+
+resource "azurerm_user_assigned_identity" "aks_kubelet" {
+  name                = "${local.managed_cluster_name}-kubelet-uami"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = var.location
+}
+
+# Unique subzone of private.<location>.azmk8s.io for the private API server.
+module "dns_aks" {
+  source = "./modules/private-dns-zone"
+
+  domain_name        = "ccc-${var.instance_id}.private.${var.location}.azmk8s.io"
+  parent_id          = azurerm_resource_group.this.id
+  virtual_network_id = module.virtual_network.resource_id
+  link_name          = "aks-cluster-vnet"
+}
+
+# CCC.K8S.CN17 / CN01 / CN07 prerequisite grants for the control-plane identity.
+resource "azurerm_role_assignment" "aks_cp_network" {
+  scope                = module.virtual_network.resource_id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+}
+
+resource "azurerm_role_assignment" "aks_cp_dns" {
+  scope                = module.dns_aks.resource_id
+  role_definition_name = "Private DNS Zone Contributor"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+}
+
+resource "azurerm_role_assignment" "aks_cp_kubelet_operator" {
+  scope                = azurerm_user_assigned_identity.aks_kubelet.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+}
+
+resource "azurerm_role_assignment" "aks_cp_kms_crypto" {
+  scope                = "${module.key_vault.resource_id}/keys/cmk-kms"
+  role_definition_name = "Key Vault Crypto User"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+
+  depends_on = [azapi_resource.cmk_kms_key]
+}
+
+resource "azurerm_role_assignment" "aks_cp_kv_contributor" {
+  scope                = module.key_vault.resource_id
+  role_definition_name = "Key Vault Contributor"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+}
+
+resource "azurerm_role_assignment" "aks_cp_des_reader" {
+  scope                = azapi_resource.des.id
+  role_definition_name = "Reader"
+  principal_id         = azurerm_user_assigned_identity.aks_control_plane.principal_id
+}
+
+resource "time_sleep" "wait_for_aks_rbac" {
+  create_duration = "120s"
+  depends_on = [
+    azurerm_role_assignment.aks_cp_network,
+    azurerm_role_assignment.aks_cp_dns,
+    azurerm_role_assignment.aks_cp_kubelet_operator,
+    azurerm_role_assignment.aks_cp_kms_crypto,
+    azurerm_role_assignment.aks_cp_kv_contributor,
+    azurerm_role_assignment.aks_cp_des_reader,
+  ]
+}
+
+module "managed_cluster" {
+  source = "./modules/managed-cluster"
+
+  location  = var.location
+  name      = local.managed_cluster_name
+  parent_id = azurerm_resource_group.this.id
+
+  kubernetes_version             = var.aks_kubernetes_version
+  control_plane_identity_id     = azurerm_user_assigned_identity.aks_control_plane.id
+  kubelet_identity_id           = azurerm_user_assigned_identity.aks_kubelet.id
+  cluster_admin_group_object_ids = var.aks_cluster_admin_group_object_ids
+  private_dns_zone_id           = module.dns_aks.resource_id
+  node_subnet_id                = module.virtual_network.aks_subnet_resource_id
+  api_server_subnet_id          = module.virtual_network.aks_api_subnet_resource_id
+  disk_encryption_set_id        = azapi_resource.des.id
+  key_vault_key_id              = azapi_resource.cmk_kms_key.output.properties.keyUriWithVersion
+  key_vault_resource_id         = module.key_vault.resource_id
+
+  node_vm_size            = var.aks_node_vm_size
+  node_count              = var.aks_node_count
+  node_availability_zones = var.aks_node_availability_zones
+  outbound_type           = var.aks_outbound_type
+  pod_cidr                = var.aks_pod_cidr
+  service_cidr            = var.aks_service_cidr
+  dns_service_ip          = var.aks_dns_service_ip
+
+  depends_on = [
+    time_sleep.wait_for_aks_rbac,
+    time_sleep.wait_for_des_rbac,
+    azapi_resource.des,
+    azapi_resource.cmk_kms_key,
+    module.dns_aks,
+  ]
 }

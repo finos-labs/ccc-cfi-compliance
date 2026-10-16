@@ -39,6 +39,8 @@ output "virtual_network" {
     functions_subnet_resource_id = module.virtual_network.functions_subnet_resource_id
     vm_subnet_resource_id        = module.virtual_network.vm_subnet_resource_id
     pe_subnet_resource_id        = module.virtual_network.pe_subnet_resource_id
+    aks_subnet_resource_id       = module.virtual_network.aks_subnet_resource_id
+    aks_api_subnet_resource_id   = module.virtual_network.aks_api_subnet_resource_id
   }
 }
 
@@ -55,5 +57,15 @@ output "virtual_machine" {
   value = {
     name        = module.virtual_machine.name
     resource_id = module.virtual_machine.resource_id
+  }
+}
+
+output "managed_cluster" {
+  description = "Deployed AKS managed cluster details."
+  value = {
+    name            = module.managed_cluster.name
+    resource_id     = module.managed_cluster.resource_id
+    private_fqdn    = module.managed_cluster.private_fqdn
+    oidc_issuer_url = module.managed_cluster.oidc_issuer_url
   }
 }

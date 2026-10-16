@@ -1,7 +1,8 @@
 # Support infrastructure: a virtual network providing the delegated "functions"
-# subnet (Flex Consumption VNet integration) and a "vm" subnet for the virtual
-# machine NIC. This is an enabler for the CCC capability services, not itself a
-# CCC service under test, so it is not driven by a control-informed tfvars file.
+# subnet (Flex Consumption VNet integration), a "vm" subnet for the virtual
+# machine NIC, and AKS node + API-server subnets for the managed cluster. This
+# is an enabler for the CCC capability services, not itself a CCC service under
+# test, so it is not driven by a control-informed tfvars file.
 
 module "avm_res_network_virtualnetwork" {
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
@@ -40,6 +41,25 @@ module "avm_res_network_virtualnetwork" {
     vm = {
       name             = "vm"
       address_prefixes = [var.vm_subnet_prefix]
+    }
+    # Node subnet for the private AKS cluster (no public node IPs).
+    aks = {
+      name             = "aks-nodes"
+      address_prefixes = [var.aks_subnet_prefix]
+    }
+    # Delegated API-server subnet for AKS VNet integration + private KMS.
+    aks_api = {
+      name             = "aks-api"
+      address_prefixes = [var.aks_api_subnet_prefix]
+      delegations = [{
+        name = "Microsoft.ContainerService.managedClusters"
+        service_delegation = {
+          name = "Microsoft.ContainerService/managedClusters"
+          actions = [
+            "Microsoft.Network/virtualNetworks/subnets/join/action",
+          ]
+        }
+      }]
     }
   }
 }
