@@ -346,7 +346,7 @@ variable "vm_sku_size" {
 # ---------------------------------------------------------------------------
 variable "aks_kubernetes_version" {
   type    = string
-  default = "1.31"
+  default = "1.36"
 }
 
 variable "aks_cluster_admin_group_object_ids" {
@@ -357,7 +357,7 @@ variable "aks_cluster_admin_group_object_ids" {
 
 variable "aks_node_vm_size" {
   type    = string
-  default = "Standard_D4s_v5"
+  default = "Standard_D4s_v3"
 }
 
 variable "aks_node_count" {

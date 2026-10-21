@@ -90,13 +90,19 @@ variable "key_vault_resource_id" {
 variable "node_vm_size" {
   description = "VM size for the default system node pool."
   type        = string
-  default     = "Standard_D4s_v5"
+  default     = "Standard_D4s_v3"
 }
 
 variable "node_count" {
   description = "Node count for the default system pool (demonstration capacity only)."
   type        = number
   default     = 2
+}
+
+variable "node_os_disk_size_gb" {
+  description = "OS disk size (GB) for the default system pool."
+  type        = number
+  default     = 128
 }
 
 variable "node_availability_zones" {

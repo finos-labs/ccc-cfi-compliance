@@ -13,7 +13,8 @@
 # Controls: CCC.Core.CN06, CCC.K8S.CN09, CCC.K8S.CN15  [coverage: partial]
 # Limitation: Region approval, version support/patch evidence and tag/label
 # enforcement are external. Pin a supported patch in the target region.
-aks_kubernetes_version = "1.31"
+# westus2 default GA line as of 2026-10; 1.31 is LTS-only now.
+aks_kubernetes_version = "1.36"
 
 # Controls: CCC.K8S.CN02, CCC.K8S.CN16  [coverage: partial]
 # Limitation: Supply Entra GROUP object IDs for cluster-admin. Application
@@ -25,8 +26,13 @@ aks_kubernetes_version = "1.31"
 # Limitation: No public node IPs; kubelet/IMDS/SSH restrictions and boot
 # attestation are not established by these settings. Sizing is demonstration
 # capacity only.
-aks_node_vm_size = "Standard_D4s_v5"
-aks_node_count   = 2
+# v4+ SKUs cannot use API-server VNet integration on an encrypted VNet
+# (VNetEncryptionNotCompatibleWithAPIServerVNetIntegration). D4s_v3 is
+# available in westus2 zone 2 for this subscription.
+aks_node_vm_size            = "Standard_D4s_v3"
+# westus2 has 6 regional vCPUs left; two D4s_v3 nodes need 8.
+aks_node_count              = 1
+aks_node_availability_zones = ["2"]
 
 # Controls: CCC.K8S.CN06  [coverage: supporting]
 # Limitation: Hardened posture is userDefinedRouting with an approved

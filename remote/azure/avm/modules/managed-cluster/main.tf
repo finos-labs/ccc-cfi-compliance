@@ -87,16 +87,28 @@ module "avm_res_containerservice_managedcluster" {
   }
 
   # Controls: CCC.K8S.CN12, CCC.K8S.CN18 [coverage: partial]
+  # System/default node pool only. Optional fields are set explicitly because
+  # AVM agentpool validations break under TF 1.11 when left null
+  # (`x == null || contains(..., x)` still evaluates contains).
   default_agent_pool = {
-    name                  = "systempool"
-    vm_size               = var.node_vm_size
-    count_of              = var.node_count
-    max_pods              = 30
-    vnet_subnet_id        = var.node_subnet_id
-    os_sku                = "Ubuntu"
-    os_disk_type          = "Managed"
-    enable_node_public_ip = false
-    availability_zones    = var.node_availability_zones
+    name                      = "systempool"
+    vm_size                   = var.node_vm_size
+    count_of                  = var.node_count
+    max_pods                  = 30
+    vnet_subnet_id            = var.node_subnet_id
+    os_sku                    = "Ubuntu"
+    os_disk_type              = "Managed"
+    os_disk_size_gb           = var.node_os_disk_size_gb
+    enable_node_public_ip     = false
+    availability_zones        = var.node_availability_zones
+    kubelet_disk_type         = "OS"
+    pod_ip_allocation_mode    = "DynamicIndividual"
+    scale_down_mode           = "Delete"
+    scale_set_eviction_policy = "Delete"
+    scale_set_priority        = "Regular"
+    type                      = "VirtualMachineScaleSets"
+    upgrade_strategy          = "Rolling"
+    workload_runtime          = "OCIContainer"
   }
 
   # Controls: CCC.K8S.CN06 [coverage: supporting]
